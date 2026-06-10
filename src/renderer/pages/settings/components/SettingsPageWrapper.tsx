@@ -14,6 +14,7 @@ import {
   Puzzle,
   Radio,
   ScrollText,
+  SlashSquare,
   Server,
   Sparkles,
   Zap,
@@ -68,6 +69,12 @@ export function getBuiltinSettingsNavItems(isDesktop: boolean, t: TranslateFn): 
       label: t('settings.sider.agents', { defaultValue: 'Agents' }),
       icon: <Bot size={16} />,
       path: 'agents',
+    },
+    commands: {
+      id: 'commands',
+      label: t('settings.sider.commands', { defaultValue: 'Slash Commands' }),
+      icon: <SlashSquare size={16} />,
+      path: 'commands',
     },
     skills: {
       id: 'skills',
