@@ -1272,6 +1272,17 @@ const SendBox: React.FC<{
     ></Button>
   );
 
+  // Visible "the agent is still working" indicator. Keys off the same
+  // running/processing flag that decides whether the Stop button shows, so it
+  // stays in lockstep across every platform that renders this shared SendBox.
+  const isRunning = isLoading || loading;
+  const runningIndicator = isRunning ? (
+    <span className='sendbox-running' role='status' aria-live='polite'>
+      <span className='sendbox-running-dot' aria-hidden='true' />
+      {t('messages.working', { defaultValue: 'Working...' })}
+    </span>
+  ) : null;
+
   const renderActionButtons = () => {
     if (allowSendWhileLoading && (isLoading || loading)) {
       // Keep a single action slot while processing: show stop when the draft is empty,
@@ -1563,6 +1574,7 @@ const SendBox: React.FC<{
           </div>
           {isSingleLine && (
             <div className='flex items-center gap-2'>
+              {runningIndicator}
               <SpeechInputButton
                 disabled={disabled || isLoading || loading || isUploading}
                 locale={speechLocale}
@@ -1577,6 +1589,7 @@ const SendBox: React.FC<{
           <div className='flex items-center justify-between gap-2 w-full'>
             <div className={isMobile ? 'sendbox-tools sendbox-tools-scroll-mobile' : 'sendbox-tools'}>{tools}</div>
             <div className='flex items-center gap-2'>
+              {runningIndicator}
               <SpeechInputButton
                 disabled={disabled || isLoading || loading || isUploading}
                 locale={speechLocale}

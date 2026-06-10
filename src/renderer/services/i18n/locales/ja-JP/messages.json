@@ -3,6 +3,7 @@
   "fileChanges": "ファイル変更",
   "fileChangesCount": "{{count}} 件のファイル変更",
   "conversationInProgress": "現在、会話中です...",
+  "working": "Working...",
   "confirm": "確認",
   "canceledExecution": "実行がキャンセルされました",
   "openLinkFailed": "リンクを開けませんでした",

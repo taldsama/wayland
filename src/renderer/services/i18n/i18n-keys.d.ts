@@ -1344,6 +1344,7 @@ export type I18nKey =
   | 'messages.slash.title'
   | 'messages.truncation.budgetExhausted.body'
   | 'messages.unknownMessageType'
+  | 'messages.working'
   | 'missionControl.cost.budgets.action.pause'
   | 'missionControl.cost.budgets.action.warn'
   | 'missionControl.cost.budgets.add'

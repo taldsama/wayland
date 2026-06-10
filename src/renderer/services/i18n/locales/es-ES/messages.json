@@ -3,6 +3,7 @@
   "fileChanges": "Cambios en archivos",
   "fileChangesCount": "{{count}} cambios en archivos",
   "conversationInProgress": "Hay una conversación en curso...",
+  "working": "Working...",
   "confirm": "Confirmar",
   "canceledExecution": "Ejecución cancelada",
   "openLinkFailed": "No se pudo abrir el enlace",

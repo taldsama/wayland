@@ -3,6 +3,7 @@
   "fileChanges": "Зміни у файлах",
   "fileChangesCount": "Зміни у файлах: {{count}}",
   "conversationInProgress": "Наразі триває діалог...",
+  "working": "Working...",
   "confirm": "Підтвердити",
   "canceledExecution": "Виконання скасовано",
   "openLinkFailed": "Не вдалося відкрити посилання",
