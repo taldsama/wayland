@@ -21,6 +21,7 @@ import type {
   AcpSessionUpdate,
 } from '@/common/types/acpTypes';
 import { ACP_METHODS, JSONRPC_VERSION, parseInitializeResult } from '@/common/types/acpTypes';
+import { mapModeForAcpBridge } from '@/common/types/agentModes';
 import type { ChildProcess } from 'child_process';
 import type { AcpSessionMcpServer } from './mcpSessionConfig';
 import path from 'path';
@@ -999,14 +1000,19 @@ export class AcpConnection {
       throw new Error('No active ACP session');
     }
 
+    // Translate Wayland-internal modes the bridge does not understand. Today only
+    // 'autoGuarded' -> 'default' (so the bridge escalates risky tool calls as
+    // permission requests that Wayland's guardrail then auto-approves-or-vetoes).
+    const bridgeModeId = mapModeForAcpBridge(modeId);
+
     const response = await this.sendRequest<AcpResponse>('session/set_mode', {
       sessionId: this.sessionId,
-      modeId,
+      modeId: bridgeModeId,
     });
 
-    // Optimistically update the cached modes state
+    // Optimistically update the cached modes state to what the bridge received
     if (this.modes) {
-      this.modes = { ...this.modes, currentModeId: modeId };
+      this.modes = { ...this.modes, currentModeId: bridgeModeId };
     }
 
     return response;

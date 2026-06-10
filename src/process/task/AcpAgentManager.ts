@@ -5,7 +5,8 @@ import { teamEventBus } from '@process/team/teamEventBus';
 import { ipcBridge } from '@/common';
 import type { CronMessageMeta, TMessage } from '@/common/chat/chatLib';
 import { isCodexAutoApproveMode } from '@/common/types/codex/codexModes';
-import { shouldAutoApproveAcpEdit } from '@/common/types/agentModes';
+import { isAutoGuardedMode, shouldAutoApproveAcpEdit } from '@/common/types/agentModes';
+import { classifyDestructiveToolCall } from '@/common/security/destructiveCommand';
 import type { SlashCommandItem } from '@/common/chat/slash/types';
 import { transformMessage } from '@/common/chat/chatLib';
 import type { IConfigStorageRefer } from '@/common/config/storage';
@@ -1107,6 +1108,28 @@ ${collectedResponses.join('\n')}`;
           void this.confirm(v.msg_id, toolCall.toolCallId || v.msg_id, allowOption);
         }, 50);
         return;
+      }
+
+      // Autopilot guardrail. In guarded-auto mode (workflows / Autopilot run the
+      // bridge in 'default' so it escalates risky tool calls) the run proceeds
+      // unattended, so auto-approve every escalated request EXCEPT a catastrophic
+      // command - that must never fire without a human. A flagged command is NOT
+      // auto-approved; it falls through to addConfirmation so it surfaces for an
+      // explicit decision (the run pauses rather than nuking the machine).
+      if (isAutoGuardedMode(this.currentMode) && options.length > 0) {
+        const verdict = classifyDestructiveToolCall(toolCall);
+        if (!verdict.destructive) {
+          const allowOption = options.find((option) => !option.kind.startsWith('reject')) ?? options[0];
+          setTimeout(() => {
+            void this.confirm(v.msg_id, toolCall.toolCallId || v.msg_id, allowOption);
+          }, 50);
+          return;
+        }
+        mainWarn(
+          '[AcpAgentManager]',
+          `Autopilot guardrail held a destructive command (${verdict.reason}); surfacing for confirmation: ${toolCall.title || ''}`
+        );
+        // fall through to addConfirmation below
       }
 
       this.addConfirmation({
