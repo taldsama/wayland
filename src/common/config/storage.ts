@@ -349,6 +349,14 @@ export interface IConfigStorageRefer {
   // Ambient Mode: persisted bubble window position (displayId used for multi-monitor recovery)
   'ambient.bubblePosition'?: { x: number; y: number; displayId: number };
   /**
+   * User-defined slash commands (issue #28). Each entry expands a prompt
+   * template into the composer and surfaces in the slash menu alongside
+   * agent-provided commands. Shape mirrors `UserSlashCommand` in
+   * `src/common/chat/slash/userCommands.ts` - declared as an import type so
+   * src/common/config stays free of chat-feature deps.
+   */
+  'slash.customCommands'?: import('@/common/chat/slash/userCommands').UserSlashCommand[];
+  /**
    * Wayland Core "raw engine mode" power-user toggle. When true, the embedded
    * engine should run on its OWN `config.toml` and NOT be overridden with
    * Desktop's per-session model / skills / overlay injection. Off by default.
