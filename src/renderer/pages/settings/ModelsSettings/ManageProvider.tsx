@@ -7,6 +7,7 @@ import type { CatalogModel, ConnectError, CuratedModel, UsageTag } from '@proces
 import { useModelRegistry } from '@renderer/hooks/useModelRegistry';
 import FluxRouterMark from '@renderer/components/icons/FluxRouterMark';
 import { providerMeta } from './providerCatalog';
+import { allVisibleEnabled, rowsToFlip } from './components/bulkToggle';
 import styles from './ManageProvider.module.css';
 
 type Props = {
@@ -83,6 +84,7 @@ const ManageProvider: React.FC<Props> = ({ provider, onBack, onDisconnected }) =
   const [query, setQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [busyModel, setBusyModel] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   // Re-key dialog state.
   const [rekeyOpen, setRekeyOpen] = useState(false);
@@ -192,6 +194,45 @@ const ManageProvider: React.FC<Props> = ({ provider, onBack, onDisconnected }) =
     },
     [toggleModel, provider.providerId, t]
   );
+
+  // ---- Bulk toggle (respects the active search) --------------------------
+  // Flips only the rows currently visible after filtering — never the
+  // filtered-out rows. Each flip routes through the same `toggleModel` path a
+  // single-row Switch uses, so there is no new registry endpoint. Optimistic
+  // UI updates the visible rows up front and reverts any row whose backend
+  // call fails.
+  const handleBulkToggle = useCallback(
+    async (enable: boolean) => {
+      const ids = rowsToFlip(filtered, enable);
+      if (ids.length === 0) return;
+      const idSet = new Set(ids);
+      setBulkBusy(true);
+      setModels((prev) => prev.map((m) => (idSet.has(m.id) ? { ...m, enabled: enable } : m)));
+      // Fire the per-model toggles in parallel — they are independent IPC
+      // calls — and collect the ids whose call rejected or returned not-ok so
+      // only the failed rows are reverted.
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const res = await toggleModel(provider.providerId, id, enable);
+            return { id, ok: Boolean(res?.ok) };
+          } catch {
+            return { id, ok: false };
+          }
+        })
+      );
+      const failed = results.filter((r) => !r.ok).map((r) => r.id);
+      if (failed.length > 0) {
+        const failedSet = new Set(failed);
+        setModels((prev) => prev.map((m) => (failedSet.has(m.id) ? { ...m, enabled: !enable } : m)));
+        Message.error(t('settings.modelsPage.manage.toggleFailed'));
+      }
+      setBulkBusy(false);
+    },
+    [filtered, toggleModel, provider.providerId, t]
+  );
+
+  const allEnabled = useMemo(() => allVisibleEnabled(filtered), [filtered]);
 
   // ---- Refresh -----------------------------------------------------------
   const handleRefresh = useCallback(async () => {
@@ -401,6 +442,33 @@ const ManageProvider: React.FC<Props> = ({ provider, onBack, onDisconnected }) =
           placeholder={t('settings.modelsPage.manage.searchPlaceholder')}
           aria-label={t('settings.modelsPage.manage.searchPlaceholder')}
         />
+
+        {!loading && !loadError && filtered.length > 0 && (
+          <div className={styles.bulkBar}>
+            <span className={styles.bulkCount}>
+              {t('settings.modelsPage.manage.bulkVisibleCount', { count: filtered.length })}
+            </span>
+            <div className={styles.bulkSpacer} />
+            <Button
+              type='text'
+              size='mini'
+              loading={bulkBusy}
+              disabled={allEnabled}
+              onClick={() => void handleBulkToggle(true)}
+            >
+              {t('settings.modelsPage.manage.selectAll')}
+            </Button>
+            <Button
+              type='text'
+              size='mini'
+              loading={bulkBusy}
+              disabled={rowsToFlip(filtered, false).length === 0}
+              onClick={() => void handleBulkToggle(false)}
+            >
+              {t('settings.modelsPage.manage.deselectAll')}
+            </Button>
+          </div>
+        )}
 
         {loading && (
           <div className={styles.cardState}>
