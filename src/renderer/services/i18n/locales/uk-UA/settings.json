@@ -1574,7 +1574,8 @@
     "constitution": "Конституція",
     "images": "Генерація зображень",
     "voice": "Голос",
-    "groupEngine": "ENGINE"
+    "groupEngine": "ENGINE",
+    "commands": "Slash Commands"
   },
   "channelsIndex": {
     "title": "Канали",
@@ -2404,5 +2405,33 @@
     },
     "scopeWritesTo": "Writes to",
     "scopeSharedCli": "— used by the Wayland Core CLI too."
+  },
+  "slashCommands": {
+    "title": "Slash Commands",
+    "subtitle": "Define your own /commands that expand into prompt templates.",
+    "create": "New command",
+    "createTitle": "New command",
+    "editTitle": "Edit command",
+    "emptyTitle": "No custom commands yet",
+    "emptyBody": "Create a command and it appears in the slash menu when you type / in any chat, alongside your agent’s commands.",
+    "nameLabel": "Command name",
+    "namePlaceholder": "standup",
+    "nameHelp": "Letters, digits, hyphen, underscore. Must start with a letter.",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Shown in the slash menu",
+    "templateLabel": "Prompt template",
+    "templatePlaceholder": "Write the prompt this command expands into. Use {topic} for fill-in placeholders.",
+    "templateHelp": "Selecting the command inserts this text into the composer to edit and send.",
+    "detectedArgs": "Placeholders: {{args}}",
+    "saveError": "Could not save command",
+    "deleteTitle": "Delete command",
+    "deleteBody": "Delete /{{name}}? This cannot be undone.",
+    "nameError": {
+      "empty": "Name is required",
+      "tooLong": "Name is too long (max 32 characters)",
+      "invalidChars": "Use letters, digits, hyphen, underscore; start with a letter",
+      "reserved": "That name is reserved by a built-in command",
+      "duplicate": "A command with that name already exists"
+    }
   }
 }

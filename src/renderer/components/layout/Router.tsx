@@ -33,6 +33,7 @@ const McpLibraryDetailPage = React.lazy(() =>
 const NotificationsSettings = React.lazy(() => import('@renderer/pages/settings/NotificationsSettings'));
 const ModelsSettings = React.lazy(() => import('@renderer/pages/settings/ModelsSettings'));
 const SkillsSettings = React.lazy(() => import('@renderer/pages/settings/SkillsSettings'));
+const SlashCommandsSettings = React.lazy(() => import('@renderer/pages/settings/SlashCommandsSettings'));
 const StorageSettings = React.lazy(() => import('@renderer/pages/settings/StorageSettings'));
 const WCoreSettings = React.lazy(() => import('@renderer/pages/settings/WCoreSettings'));
 const WCoreConfig = React.lazy(() => import('@renderer/pages/settings/WCoreConfig'));
@@ -108,6 +109,7 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
             <Route path='/settings/assistants' element={withRouteFallback(AssistantSettings)} />
             <Route path='/settings/agents' element={withRouteFallback(AgentsSettings)} />
             <Route path='/settings/skills' element={withRouteFallback(SkillsSettings)} />
+            <Route path='/settings/commands' element={withRouteFallback(SlashCommandsSettings)} />
             {/* Constitution is a Desktop concept (the engine has none of its own),
               so it lives as a standalone Desktop settings page, not a Core pane. */}
             <Route path='/settings/constitution' element={withRouteFallback(ConstitutionSettings)} />

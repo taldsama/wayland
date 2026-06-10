@@ -15,6 +15,7 @@ import {
   Radio,
   ScrollText,
   Server,
+  SlashSquare,
   Sparkles,
   Zap,
 } from 'lucide-react';
@@ -34,6 +35,7 @@ export const BUILTIN_TAB_IDS = [
   // WORKSPACE
   'assistants',
   'skills',
+  'commands',
   'constitution',
   // AI MODELS
   'models',
@@ -200,6 +202,12 @@ const SettingsSider: React.FC<{ collapsed?: boolean; tooltipEnabled?: boolean }>
         label: t('settings.sider.skills', { defaultValue: 'Skills & Tools' }),
         icon: <Zap />,
         path: 'skills',
+      },
+      commands: {
+        id: 'commands',
+        label: t('settings.sider.commands', { defaultValue: 'Slash Commands' }),
+        icon: <SlashSquare />,
+        path: 'commands',
       },
       models: {
         id: 'models',
