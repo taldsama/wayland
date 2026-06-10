@@ -308,6 +308,12 @@ const REMOTE_DENIED_KEYS: ReadonlySet<string> = new Set([
   'open-file',
   'open-dev-tools',
   'show-item-in-folder',
+  // --- Doctor / health-check (issue #35). The report enumerates the host's
+  //     provider connectivity verdicts, MCP server reachability, detected
+  //     backends, workspace paths, and config posture. None of it is a raw
+  //     secret, but disclosing the full diagnostic posture to a paired WebUI is
+  //     a reconnaissance aid — deny it to remote callers (defence-in-depth). ---
+  'doctor.run',
 ]);
 
 /**

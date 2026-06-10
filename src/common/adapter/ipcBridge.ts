@@ -11,6 +11,7 @@ import type { OpenDialogOptions } from 'electron';
 // buildEmitter - only the side-effect of allowlist registration differs.
 import { buildProvider, buildEmitter } from './bridgeAllowlist';
 import type { McpSource } from '../../process/services/mcpServices/McpProtocol';
+import type { DoctorReport } from '../../process/doctor/types';
 import type { AgentBackend, AcpModelInfo } from '../types/acpTypes';
 import type { SlashCommandItem } from '../chat/slash/types';
 import type { IMcpServer, IProvider, TChatConversation, TProviderWithModel, ICssTheme } from '../config/storage';
@@ -960,6 +961,15 @@ export const systemSettings = {
   setSaveUploadToWorkspace: buildProvider<void, { enabled: boolean }>('system-settings:set-save-upload-to-workspace'),
   getAutoPreviewOfficeFiles: buildProvider<boolean, void>('system-settings:get-auto-preview-office-files'),
   setAutoPreviewOfficeFiles: buildProvider<void, { enabled: boolean }>('system-settings:set-auto-preview-office-files'),
+};
+
+// Doctor / health-check (issue #35). `runDoctor` runs the full diagnostic
+// battery across providers, models, the engine, MCP, backends, workspaces, and
+// config, returning a machine-readable + human-readable report. Remote-denied
+// (bridgeAllowlist): the report discloses the host's connectivity + config
+// posture, so a paired WebUI client must never enumerate it.
+export const doctor = {
+  runDoctor: buildProvider<DoctorReport, void>('doctor.run'),
 };
 
 // Flux compatibility-layer connectors (opencode, etc.)

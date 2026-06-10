@@ -67,6 +67,7 @@ import { initModelRegistryIpc } from '@process/providers/ipc/modelRegistryIpc';
 import { initWcoreToolKeyIpc } from '@process/agent/wcore/toolKeyIpc';
 import { initWcoreConfigBridge } from './wcoreConfigBridge';
 import { initPendingSendBridge } from './pendingSendBridge';
+import { initDoctorBridge } from './doctorBridge';
 
 export interface BridgeDependencies {
   conversationService: IConversationService;
@@ -144,6 +145,7 @@ export function initAllBridges(deps: BridgeDependencies): void {
   initSyncIpc();
   initConstitutionBridge();
   initOnboardingBridge();
+  initDoctorBridge();
 }
 
 /**
@@ -208,6 +210,7 @@ export {
   initIjfwDropBridge,
   initWikiBridge,
   initImportBridge,
+  initDoctorBridge,
 };
 export { initModelRegistryIpc } from '@process/providers/ipc/modelRegistryIpc';
 export { disposeAllSnapshots } from './workspaceSnapshotBridge';
