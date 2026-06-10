@@ -56,6 +56,14 @@ export interface ConversationTabsContextValue {
 
 const ConversationTabsContext = createContext<ConversationTabsContextValue | null>(null);
 
+/**
+ * Browser-like soft cap on open tabs. Every chat you open becomes a tab; without
+ * a cap the bar would flood as you click through recent chats. When opening a new
+ * chat would exceed this, the oldest tab that is not the one being opened is
+ * evicted (the just-opened tab becomes active, so the active tab is never lost).
+ */
+const MAX_OPEN_TABS = 12;
+
 // Restore state from localStorage
 const loadPersistedState = (): { openTabs: ConversationTab[]; activeTabId: string | null } => {
   try {
@@ -110,26 +118,15 @@ export const ConversationTabsProvider: React.FC<{ children: React.ReactNode }> =
   const activeTab = openTabs.find((tab) => tab.id === activeTabId) || null;
 
   const openTabImpl = useCallback((conversation: TChatConversation) => {
-    // Only show tabs for user-specified workspaces, not temporary workspaces
-    const customWorkspace = conversation.extra?.customWorkspace;
-
-    if (!customWorkspace) {
-      // Don't add temporary workspace conversations to tabs
-      // Close all tabs when leaving the group
-      setOpenTabs([]);
-      // But need to update activeTabId to keep in sync
-      setActiveTabId(conversation.id);
-      return;
-    }
-
+    // Browser-like tabs: EVERY chat opened (new or existing) becomes a tab, not
+    // just custom-workspace ones. Opening a chat that already has a tab just
+    // re-activates it; a new one is appended (with a soft cap, see below).
     setOpenTabs((prev) => {
       const exists = prev.find((tab) => tab.id === conversation.id);
       if (exists) {
-        // Already exists, don't add duplicate
         return prev;
       }
-      // Add new tab
-      return [
+      const appended: ConversationTab[] = [
         ...prev,
         {
           id: conversation.id,
@@ -138,6 +135,15 @@ export const ConversationTabsProvider: React.FC<{ children: React.ReactNode }> =
           type: conversation.type,
         },
       ];
+      if (appended.length > MAX_OPEN_TABS) {
+        // Evict the oldest tab that is NOT the one just opened. The opened tab
+        // becomes active immediately below, so the active tab is never evicted.
+        const evictIdx = appended.findIndex((tab) => tab.id !== conversation.id);
+        if (evictIdx !== -1) {
+          appended.splice(evictIdx, 1);
+        }
+      }
+      return appended;
     });
     // Switch to this tab
     setActiveTabId(conversation.id);
