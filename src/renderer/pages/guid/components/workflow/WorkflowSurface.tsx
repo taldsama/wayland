@@ -41,8 +41,10 @@ import { useTranslation } from 'react-i18next';
 import { ipcBridge } from '@/common';
 import type { WorkflowInteractivity, WorkflowSession } from '@/common/types/workflowTypes';
 import { useWorkflowSession } from '@/renderer/hooks/workflow/useWorkflowSession';
+import { useConversationListSync } from '@/renderer/pages/conversation/GroupedHistory/hooks/useConversationListSync';
 import { AskCard } from '@/renderer/pages/guid/components/workflow/AskCard';
 import { QueuedSteeringChip } from '@/renderer/pages/guid/components/workflow/QueuedSteeringChip';
+import { WorkflowNeedsInputCard } from '@/renderer/pages/guid/components/workflow/WorkflowNeedsInputCard';
 import { StepReviewBeat } from '@/renderer/pages/guid/components/workflow/StepReviewBeat';
 import { WorkflowClarifyCard } from '@/renderer/pages/guid/components/workflow/WorkflowClarifyCard';
 import { WorkflowCompleteCard } from '@/renderer/pages/guid/components/workflow/WorkflowCompleteCard';
@@ -106,17 +108,54 @@ export const WorkflowSurface: React.FC<WorkflowSurfaceProps> = ({
 
   const data = session.data;
 
-  // Thread step titles into the view-mode context so the WorkflowTranscript can
-  // label its step-tag dividers (it is mounted deep inside the chat tree and has
-  // no other access to the session's steps).
+  // "Is the agent currently producing output for this conversation?" - read from
+  // the shared generating-conversations store (fed by responseStream /
+  // turnCompleted). When it is NOT generating and the step is not done, the run
+  // is waiting on the user. Debounce the idle edge so the brief gap between the
+  // user sending and the agent's first chunk does not flash the "Needs you"
+  // beat.
+  const { isConversationGenerating } = useConversationListSync();
+  const responding = data ? isConversationGenerating(data.conversation_id) : false;
+  const [idleStable, setIdleStable] = useState(false);
+  useEffect(() => {
+    if (responding) {
+      setIdleStable(false);
+      return;
+    }
+    const id = window.setTimeout(() => setIdleStable(true), 600);
+    return () => window.clearTimeout(id);
+  }, [responding]);
+
+  const liveStep = data?.steps.find((s) => s.n === data.current_step);
+  const currentStepTerminal = liveStep
+    ? liveStep.status === 'done' || liveStep.status === 'skipped' || liveStep.status === 'errored'
+    : false;
+  // The "spinning forever" case: the run is nominally `running` but the agent
+  // has gone idle without completing the step - it asked the user something in
+  // prose (no structured marker), so the engine never flipped to awaiting_input.
+  // Surface the blue "Needs you" beat. (A formal awaiting_input is handled by
+  // the StepReviewBeat below - that's the step-complete Accept/Revise/Go-back
+  // gate, a different kind of "your move".)
+  const needsInput =
+    !!data &&
+    data.status === 'active' &&
+    data.begin_sent_at !== null &&
+    data.run_mode === 'running' &&
+    !currentStepTerminal &&
+    idleStable;
+
+  // Thread step titles + the live session + the needs-input flag into the
+  // view-mode context so the WorkflowTranscript (mounted deep inside the chat
+  // tree) can render the step-panel surface and the blue "Needs you" treatment.
   const viewModeProviderValue = useMemo(
     () => ({
       ...viewModeValue,
       stepTitles: (data?.steps ?? []).map((s) => s.title),
       session: data ?? undefined,
+      needsInput,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [viewModeValue.mode, viewModeValue.isWorkflow, data]
+    [viewModeValue.mode, viewModeValue.isWorkflow, data, needsInput]
   );
 
   const handleClarifyStart = useCallback((note: string) => {
@@ -411,6 +450,8 @@ export const WorkflowSurface: React.FC<WorkflowSurfaceProps> = ({
                     ))}
                   </div>
                 )}
+                {/* Engine-flagged step gate → review beat (Accept / Revise / Go back).
+                    Running-but-idle (asked in prose) → the blue Needs-you card below. */}
                 {data.run_mode === 'awaiting_input' && (
                   <StepReviewBeat
                     currentStep={data.current_step}
@@ -421,11 +462,15 @@ export const WorkflowSurface: React.FC<WorkflowSurfaceProps> = ({
                   />
                 )}
                 <div className={styles.children}>
-                  {data.run_mode === 'running' && (
-                    <QueuedSteeringChip
-                      // TODO(W5): wire onInterrupt to conversation stop IPC when available
-                      onInterrupt={undefined}
-                    />
+                  {needsInput ? (
+                    <WorkflowNeedsInputCard conversationId={data.conversation_id} />
+                  ) : (
+                    data.run_mode === 'running' && (
+                      <QueuedSteeringChip
+                        // TODO(W5): wire onInterrupt to conversation stop IPC when available
+                        onInterrupt={undefined}
+                      />
+                    )
                   )}
                   {children}
                 </div>
@@ -445,7 +490,7 @@ export const WorkflowSurface: React.FC<WorkflowSurfaceProps> = ({
                 onLaunchNext={(slug) => onLaunchNext?.(slug)}
               />
             ) : (
-              <WorkflowStepRail session={data} onJumpToStep={handleJumpToStep}>
+              <WorkflowStepRail session={data} needsInput={needsInput} onJumpToStep={handleJumpToStep}>
                 <WorkflowStatusBar session={data} />
               </WorkflowStepRail>
             )}

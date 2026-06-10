@@ -113,12 +113,18 @@ type PanelStatus = 'done' | 'now' | 'review' | 'ask' | 'todo' | 'errored' | 'ski
 // Status derivation - panel chrome comes from the session, not the markers
 // ---------------------------------------------------------------------------
 
-const panelStatusFor = (block: StepBlock, session: WorkflowSession | undefined): PanelStatus => {
+const panelStatusFor = (
+  block: StepBlock,
+  session: WorkflowSession | undefined,
+  needsInput: boolean
+): PanelStatus => {
   const st: StepState | undefined = session?.steps.find((s) => s.n === block.stepN);
   if (block.doneMarker || st?.status === 'done') return 'done';
   if (st?.status === 'errored') return 'errored';
   if (st?.status === 'skipped') return 'skipped';
   if (session && block.stepN === session.current_step) {
+    // Waiting on the user wins over "working": the live step reads as a question.
+    if (needsInput) return 'ask';
     if (session.run_mode === 'awaiting_input') return 'review';
     return 'now';
   }
@@ -201,9 +207,10 @@ const StepPanel: React.FC<{
   session: WorkflowSession | undefined;
   stepTitles: string[];
   workflowSessionId: string | undefined;
-}> = ({ block, session, stepTitles, workflowSessionId }) => {
+  needsInput: boolean;
+}> = ({ block, session, stepTitles, workflowSessionId, needsInput }) => {
   const { t } = useTranslation();
-  const status = panelStatusFor(block, session);
+  const status = panelStatusFor(block, session, needsInput);
   const live = status === 'now' && session?.run_mode === 'running';
   const isActive = status === 'now' || status === 'review' || status === 'ask';
   const title = session?.steps.find((s) => s.n === block.stepN)?.title || stepTitles[block.stepN - 1] || `Step ${block.stepN}`;
@@ -235,6 +242,11 @@ const StepPanel: React.FC<{
           {sub && <span className={styles.panelSub}>{sub}</span>}
           {live && (
             <span className={styles.panelLive}>{t('workflow.transcript.working', { defaultValue: 'working' })}</span>
+          )}
+          {status === 'ask' && (
+            <span className={styles.panelNeedsYou}>
+              {t('workflow.transcript.needsYou', { defaultValue: 'needs you' })}
+            </span>
           )}
         </header>
       )}
@@ -272,7 +284,7 @@ export const WorkflowTranscript: React.FC = () => {
   const messages = useMessageList();
   const conversationContext = useConversationContextSafe();
   const workflowSessionId = conversationContext?.workflowSessionId;
-  const { stepTitles = [], session } = useWorkflowViewMode();
+  const { stepTitles = [], session, needsInput = false } = useWorkflowViewMode();
 
   // Segment the message stream into step blocks (+ user insets between them).
   const blocks = React.useMemo<Block[]>(() => {
@@ -384,6 +396,7 @@ export const WorkflowTranscript: React.FC = () => {
                 session={session}
                 stepTitles={stepTitles}
                 workflowSessionId={workflowSessionId}
+                needsInput={needsInput}
               />
             );
           })}

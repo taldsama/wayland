@@ -29,6 +29,8 @@ export type WorkflowStepRailProps = {
   session: WorkflowSession;
   /** Click on a step row → jump to that step. */
   onJumpToStep: (n: number) => void;
+  /** True when the run is waiting on the user - the live step shows a blue "?" not a spinner. */
+  needsInput?: boolean;
   /** Bottom slot - `WorkflowStatusBar` is composed in by the parent (W3.J) via children prop. */
   children?: React.ReactNode;
 };
@@ -111,10 +113,12 @@ type StepRowProps = {
   isCurrent: boolean;
   /** The session run_mode - used to determine review/ask bullet state. */
   runMode: WorkflowRunMode;
+  /** True when the run is waiting on the user (current step shows a blue "?"). */
+  needsInput: boolean;
   onJump: (n: number) => void;
 };
 
-const StepRow: React.FC<StepRowProps> = ({ step, isCurrent, runMode, onJump }) => {
+const StepRow: React.FC<StepRowProps> = ({ step, isCurrent, runMode, needsInput, onJump }) => {
   const { t } = useTranslation();
   const autonomousRunning = step.autonomous_run?.state === 'running';
   // The live step: the workflow's current step while it's still todo/now. The
@@ -129,12 +133,14 @@ const StepRow: React.FC<StepRowProps> = ({ step, isCurrent, runMode, onJump }) =
   // not always emitted), so treat the current step as live while the run is
   // actively running - that's what makes the rail show real progress.
   const displayStatus: BulletStatus = (() => {
+    // Waiting on the user wins: the live step reads as a question, not work.
+    if (isCurrent && needsInput) return 'ask';
     if (isCurrent && runMode === 'awaiting_input') return 'review';
     if (autonomousRunning) return 'now';
     if (isCurrent && runMode === 'running' && (step.status === 'todo' || step.status === 'now')) return 'now';
     return step.status;
   })();
-  const showSpinner = autonomousRunning || displayStatus === 'now';
+  const showSpinner = (autonomousRunning || displayStatus === 'now') && displayStatus !== 'ask';
 
   const handleRowClick = () => {
     onJump(step.n);
@@ -149,6 +155,7 @@ const StepRow: React.FC<StepRowProps> = ({ step, isCurrent, runMode, onJump }) =
       data-status={step.status}
       data-running={autonomousRunning ? 'true' : undefined}
       data-active={isActiveStep ? 'true' : undefined}
+      data-needsinput={isCurrent && needsInput ? 'true' : undefined}
       className={styles.row}
       aria-label={t('workflow.rail.jumpToStep', {
         defaultValue: 'Jump to step {{n}}: {{title}}',
@@ -191,6 +198,7 @@ const StepRow: React.FC<StepRowProps> = ({ step, isCurrent, runMode, onJump }) =
 export const WorkflowStepRail: React.FC<WorkflowStepRailProps> = ({
   session,
   onJumpToStep,
+  needsInput = false,
   children,
 }) => {
   const { t } = useTranslation();
@@ -216,6 +224,7 @@ export const WorkflowStepRail: React.FC<WorkflowStepRailProps> = ({
             step={step}
             isCurrent={step.n === session.current_step}
             runMode={session.run_mode}
+            needsInput={needsInput}
             onJump={handleRowJump}
           />
         ))}

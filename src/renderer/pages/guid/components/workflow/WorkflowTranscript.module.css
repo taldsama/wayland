@@ -72,6 +72,14 @@
     0 8px 28px rgba(0, 0, 0, 0.22);
 }
 
+/* Needs-you active panel: blue lift instead of the orange working lift. */
+.panel:has(.panelHeader[data-status='ask']) {
+  border-color: color-mix(in srgb, var(--color-link-6, #3b82f6) 45%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-link-6, #3b82f6) 22%, transparent),
+    0 8px 28px rgba(0, 0, 0, 0.22);
+}
+
 .panelDone {
   background: var(--color-bg-1);
 }
@@ -96,11 +104,17 @@
 }
 
 .panelHeader[data-status='now'],
-.panelHeader[data-status='review'],
-.panelHeader[data-status='ask'] {
+.panelHeader[data-status='review'] {
   color: var(--color-primary-6, rgb(var(--primary-6)));
   background: var(--color-primary-light-1, rgba(var(--primary-6), 0.08));
   border-bottom-color: var(--color-primary-light-3, rgba(var(--primary-6), 0.25));
+}
+
+/* Needs you - blue, distinct from the orange "working" accent. */
+.panelHeader[data-status='ask'] {
+  color: var(--color-link-6, #3b82f6);
+  background: color-mix(in srgb, var(--color-link-6, #3b82f6) 10%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--color-link-6, #3b82f6) 30%, transparent);
 }
 
 .panelHeader[data-status='done'] {
@@ -139,6 +153,17 @@
   color: var(--color-primary-6, rgb(var(--primary-6)));
   background: var(--color-primary-light-1, rgba(var(--primary-6), 0.12));
   border: 1px solid var(--color-primary-light-3, rgba(var(--primary-6), 0.3));
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 10px;
+}
+
+.panelNeedsYou {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-link-6, #3b82f6);
+  background: color-mix(in srgb, var(--color-link-6, #3b82f6) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-link-6, #3b82f6) 35%, transparent);
   border-radius: 999px;
   padding: 1px 9px;
   font-size: 10px;

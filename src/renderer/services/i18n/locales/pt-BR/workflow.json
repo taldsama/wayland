@@ -12,7 +12,8 @@
     "stepTag": "Step {{n}} · {{title}}",
     "stepLabel": "Step {{n}} · {{title}}",
     "working": "working",
-    "thinking": "Thinking..."
+    "thinking": "Thinking...",
+    "needsYou": "needs you"
   },
   "complete": {
     "headline": "Fluxo de trabalho concluído",
@@ -71,5 +72,11 @@
   "composer": {
     "queued": "Working on this step - your message is queued and will steer the next step.",
     "interrupt": "Interrupt and apply now"
+  },
+  "needsInput": {
+    "title": "Wayland needs your input",
+    "sub": "It is waiting on you to continue. Answer here and the run picks up where it left off.",
+    "placeholder": "Type your answer to continue…",
+    "send": "Send answer"
   }
 }

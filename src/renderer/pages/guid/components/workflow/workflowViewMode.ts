@@ -21,6 +21,12 @@ export type WorkflowViewModeContextValue = {
    * it needs to render the step-panel surface (not just a chat).
    */
   session?: WorkflowSession;
+  /**
+   * True when the run is waiting on the user (the agent's turn ended and the
+   * current step isn't done). Drives the blue "Needs you" treatment on the
+   * active panel + rail instead of the orange "working" spinner.
+   */
+  needsInput?: boolean;
 };
 
 const defaultValue: WorkflowViewModeContextValue = {

@@ -36,6 +36,12 @@ vi.mock('@/common', () => ({
   },
 }));
 
+// The surface reads "is the agent generating?" from the shared store. Stub it
+// so the test does not touch the live ipcBridge emitters / DB.
+vi.mock('@/renderer/pages/conversation/GroupedHistory/hooks/useConversationListSync', () => ({
+  useConversationListSync: () => ({ isConversationGenerating: () => false }),
+}));
+
 // Capture the props each leaf component was rendered with so behavioral
 // assertions stay focused on the composer's wiring contract, not the leaf
 // internals (which have their own coverage in sibling spec files).

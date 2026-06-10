@@ -12,7 +12,8 @@
     "stepTag": "Step {{n}} · {{title}}",
     "stepLabel": "Step {{n}} · {{title}}",
     "working": "working",
-    "thinking": "Thinking..."
+    "thinking": "Thinking...",
+    "needsYou": "needs you"
   },
   "complete": {
     "headline": "Workflow Complete",
@@ -71,5 +72,11 @@
     "confirmCancel": "Cancel",
     "confirmBody": "Wayland will spawn an autonomous worker to complete Step {{n}} in the background. You can keep chatting on the main session.",
     "confirmEta": "ETA: 4-8 minutes."
+  },
+  "needsInput": {
+    "title": "Wayland needs your input",
+    "sub": "It is waiting on you to continue. Answer here and the run picks up where it left off.",
+    "placeholder": "Type your answer to continue…",
+    "send": "Send answer"
   }
 }
