@@ -7,6 +7,7 @@
 import type { TChatConversation } from '@/common/config/storage';
 import { STORAGE_KEYS } from '@/common/config/storageKeys';
 import { addEventListener } from '@/renderer/utils/emitter';
+import { isPopoutModeNow } from '@renderer/hooks/system/useIsPopoutMode';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { reorderByIndex } from '../utils/tabReorder';
 
@@ -76,13 +77,22 @@ const loadPersistedState = (): { openTabs: ConversationTab[]; activeTabId: strin
 };
 
 export const ConversationTabsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Restore initial state from localStorage
-  const persistedState = loadPersistedState();
+  // CRITICAL (#27 phase 2): localStorage is shared across windows (same origin).
+  // A pop-out window must NEVER read or write `wayland_conversation_tabs`, or it
+  // would clobber the main window's tab set. Detect pop-out mode once at mount
+  // (it is fixed for the window's lifetime) and use it to (a) start from an empty
+  // tab set instead of hydrating the shared key and (b) skip the persistence
+  // effect entirely. `openTab` is also a no-op in pop-out mode (below).
+  const isPopout = isPopoutModeNow();
+
+  // Restore initial state from localStorage (main window only).
+  const persistedState = isPopout ? { openTabs: [], activeTabId: null } : loadPersistedState();
   const [openTabs, setOpenTabs] = useState<ConversationTab[]>(persistedState.openTabs);
   const [activeTabId, setActiveTabId] = useState<string | null>(persistedState.activeTabId);
 
-  // Persist state to localStorage
+  // Persist state to localStorage - GUARDED off in pop-out mode (see above).
   useEffect(() => {
+    if (isPopout) return;
     try {
       localStorage.setItem(
         STORAGE_KEYS.CONVERSATION_TABS,
@@ -94,12 +104,12 @@ export const ConversationTabsProvider: React.FC<{ children: React.ReactNode }> =
     } catch {
       // Ignore storage errors (e.g., quota exceeded)
     }
-  }, [openTabs, activeTabId]);
+  }, [openTabs, activeTabId, isPopout]);
 
   // Get active tab
   const activeTab = openTabs.find((tab) => tab.id === activeTabId) || null;
 
-  const openTab = useCallback((conversation: TChatConversation) => {
+  const openTabImpl = useCallback((conversation: TChatConversation) => {
     // Only show tabs for user-specified workspaces, not temporary workspaces
     const customWorkspace = conversation.extra?.customWorkspace;
 
@@ -132,6 +142,15 @@ export const ConversationTabsProvider: React.FC<{ children: React.ReactNode }> =
     // Switch to this tab
     setActiveTabId(conversation.id);
   }, []);
+
+  const openTab = useCallback(
+    (conversation: TChatConversation) => {
+      // Pop-out windows have no tab bar and must not touch the shared tab state.
+      if (isPopout) return;
+      openTabImpl(conversation);
+    },
+    [isPopout, openTabImpl]
+  );
 
   const closeTab = useCallback(
     (conversationId: string) => {

@@ -8,8 +8,9 @@ import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { closestCenter, DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Bot, Plus, X } from 'lucide-react';
+import { Bot, PictureInPicture2, Plus, X } from 'lucide-react';
 import { ipcBridge } from '@/common';
+import { isElectronDesktop } from '@/renderer/utils/platform';
 import { CUSTOM_AVATAR_IMAGE_MAP } from '@/renderer/pages/guid/constants';
 import { getAgentLogo } from '@/renderer/utils/model/agentLogo';
 import { emitter } from '@/renderer/utils/emitter';
@@ -38,9 +39,14 @@ interface ConversationTabViewProps {
   tabName: string;
   isActive: boolean;
   isMobile: boolean;
+  /** This tab's conversation is open in a pop-out window (dimmed, non-navigable). */
+  isPoppedOut: boolean;
+  /** Pop-out is available (Electron desktop only). */
+  canPopout: boolean;
   contextMenu: React.ReactNode;
   onSwitch: (tabId: string) => void;
   onClose: (tabId: string) => void;
+  onPopout: (tabId: string) => void;
 }
 
 const ConversationTabView: React.FC<ConversationTabViewProps> = ({
@@ -48,21 +54,41 @@ const ConversationTabView: React.FC<ConversationTabViewProps> = ({
   tabName,
   isActive,
   isMobile,
+  isPoppedOut,
+  canPopout,
   contextMenu,
   onSwitch,
   onClose,
+  onPopout,
 }) => {
-  const tabClassName = `flex items-center gap-8px px-12px h-full max-w-240px cursor-pointer transition-all duration-200 shrink-0 border-r border-[color:var(--border-base)] ${isActive ? 'bg-1 text-[color:var(--color-text-1)] font-medium' : 'bg-2 text-[color:var(--color-text-3)] hover:text-[color:var(--color-text-2)] border-b border-[color:var(--border-base)]'}`;
+  const { t } = useTranslation();
+  const tabClassName = `group/tab flex items-center gap-8px px-12px h-full max-w-240px transition-all duration-200 shrink-0 border-r border-[color:var(--border-base)] ${
+    isPoppedOut ? 'opacity-50 cursor-default' : 'cursor-pointer'
+  } ${isActive && !isPoppedOut ? 'bg-1 text-[color:var(--color-text-1)] font-medium' : 'bg-2 text-[color:var(--color-text-3)] hover:text-[color:var(--color-text-2)] border-b border-[color:var(--border-base)]'}`;
 
   return (
     <Dropdown droplist={contextMenu} trigger='contextMenu' position='bl'>
       <div
         className={tabClassName}
         style={{ borderRight: '1px solid var(--border-base)' }}
-        onClick={() => onSwitch(tabId)}
-        title={isMobile ? undefined : tabName}
+        // A popped-out tab is a non-navigable placeholder; clicking it focuses
+        // the pop-out window instead of switching the main view.
+        onClick={() => (isPoppedOut ? onPopout(tabId) : onSwitch(tabId))}
+        title={isPoppedOut ? t('conversation.tabs.poppedOut') : isMobile ? undefined : tabName}
       >
         <span className='text-15px whitespace-nowrap overflow-hidden text-ellipsis select-none flex-1'>{tabName}</span>
+        {canPopout && !isPoppedOut && (
+          <PictureInPicture2
+            size={13}
+            color={iconColors.secondary}
+            className='shrink-0 opacity-0 group-hover/tab:opacity-100 transition-opacity duration-200 hover:text-[var(--brand)]'
+            aria-label={t('conversation.tabs.popOut')}
+            onClick={(event) => {
+              event.stopPropagation();
+              onPopout(tabId);
+            }}
+          />
+        )}
         <X
           size={14}
           color={iconColors.secondary}
@@ -141,6 +167,11 @@ const ConversationTabs: React.FC = () => {
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   const [tabFadeState, setTabFadeState] = useState<TabFadeState>({ left: false, right: false });
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  // #27 phase 2: conversation ids currently open in a pop-out window. Their tab
+  // stays in the bar as a dimmed, non-navigable placeholder until the pop-out
+  // closes (restored via the conversation.popoutClosed emitter below).
+  const [poppedOutIds, setPoppedOutIds] = useState<Set<string>>(() => new Set());
+  const canPopout = isElectronDesktop();
 
   // PointerSensor with an 8px activation distance so a plain click still switches/closes a tab
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
@@ -206,6 +237,50 @@ const ConversationTabs: React.FC = () => {
     },
     [switchTab, navigate]
   );
+
+  // Pop a tab out into its own OS window (or focus the existing one). Optimistic:
+  // mark popped immediately; the main-process dedupe is idempotent.
+  const handlePopoutTab = useCallback((tabId: string) => {
+    cleanupSiderTooltips();
+    setPoppedOutIds((prev) => {
+      if (prev.has(tabId)) return prev;
+      const next = new Set(prev);
+      next.add(tabId);
+      return next;
+    });
+    void ipcBridge.conversation.popout.invoke({ conversation_id: tabId }).catch((error) => {
+      console.error('[Popout] Failed to open pop-out window:', error);
+      // Roll back the placeholder if the window could not be opened.
+      setPoppedOutIds((prev) => {
+        if (!prev.has(tabId)) return prev;
+        const next = new Set(prev);
+        next.delete(tabId);
+        return next;
+      });
+    });
+  }, []);
+
+  // Dock a popped-out tab back into the main window (close its pop-out). The
+  // conversation.popoutClosed emitter clears the placeholder.
+  const handleDockBackTab = useCallback((tabId: string) => {
+    void ipcBridge.conversation.dockBack.invoke({ conversation_id: tabId }).catch((error) => {
+      console.error('[Popout] Failed to dock-back:', error);
+    });
+  }, []);
+
+  // Restore a placeholder tab when its pop-out closes by any path (dock-back, OS
+  // close, app quit). Broadcast to all windows by the main process.
+  useEffect(() => {
+    if (!canPopout) return;
+    return ipcBridge.conversation.popoutClosed.on(({ conversation_id }) => {
+      setPoppedOutIds((prev) => {
+        if (!prev.has(conversation_id)) return prev;
+        const next = new Set(prev);
+        next.delete(conversation_id);
+        return next;
+      });
+    });
+  }, [canPopout]);
 
   // Close tab
   const handleCloseTab = useCallback(
@@ -382,11 +457,18 @@ const ConversationTabs: React.FC = () => {
       const hasLeftTabs = tabIndex > 0;
       const hasRightTabs = tabIndex < openTabs.length - 1;
       const hasOtherTabs = openTabs.length > 1;
+      const isPoppedOut = poppedOutIds.has(tabId);
 
       return (
         <Menu
           onClickMenuItem={(key) => {
             switch (key) {
+              case 'pop-out':
+                handlePopoutTab(tabId);
+                break;
+              case 'dock-back':
+                handleDockBackTab(tabId);
+                break;
               case 'close-all':
                 closeAllTabs();
                 void navigate('/guid');
@@ -404,6 +486,12 @@ const ConversationTabs: React.FC = () => {
             }
           }}
         >
+          {canPopout &&
+            (isPoppedOut ? (
+              <Menu.Item key='dock-back'>{t('conversation.tabs.dockBack')}</Menu.Item>
+            ) : (
+              <Menu.Item key='pop-out'>{t('conversation.tabs.popOut')}</Menu.Item>
+            ))}
           <Menu.Item key='close-others' disabled={!hasOtherTabs}>
             {t('conversation.tabs.closeOthers')}
           </Menu.Item>
@@ -417,7 +505,19 @@ const ConversationTabs: React.FC = () => {
         </Menu>
       );
     },
-    [openTabs, closeAllTabs, closeTabsToLeft, closeTabsToRight, closeOtherTabs, navigate, t]
+    [
+      openTabs,
+      closeAllTabs,
+      closeTabsToLeft,
+      closeTabsToRight,
+      closeOtherTabs,
+      navigate,
+      t,
+      canPopout,
+      poppedOutIds,
+      handlePopoutTab,
+      handleDockBackTab,
+    ]
   );
 
   const { left: showLeftFade, right: showRightFade } = tabFadeState;
@@ -456,9 +556,12 @@ const ConversationTabs: React.FC = () => {
                   tabName={tab.name}
                   isActive={tab.id === activeTabId}
                   isMobile={isMobile}
+                  isPoppedOut={poppedOutIds.has(tab.id)}
+                  canPopout={canPopout}
                   contextMenu={getContextMenu(tab.id)}
                   onSwitch={handleSwitchTab}
                   onClose={handleCloseTab}
+                  onPopout={handlePopoutTab}
                 />
               ))}
             </SortableContext>

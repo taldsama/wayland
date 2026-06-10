@@ -26,13 +26,11 @@ import { cleanupSiderTooltips } from '@renderer/utils/ui/siderTooltip';
 import { useConversationShortcuts } from '@renderer/hooks/ui/useConversationShortcuts';
 import { useGlobalKeybind } from '@renderer/hooks/settings/useGlobalKeybind';
 import { CommandPalette } from '@renderer/components/cmdk';
-import type {
-  PaletteAssistant,
-  PaletteStarterPrompt,
-} from '@renderer/components/cmdk';
+import type { PaletteAssistant, PaletteStarterPrompt } from '@renderer/components/cmdk';
 import { getAgentKey } from '@renderer/pages/guid/hooks/agentSelectionUtils';
 import type { AcpBackend } from '@/common/types/acpTypes';
 import { isElectronDesktop } from '@renderer/utils/platform';
+import { useIsPopoutMode } from '@renderer/hooks/system/useIsPopoutMode';
 import { computeCssSyncDecision, resolveCssByActiveTheme } from '@renderer/utils/theme/themeCssSync';
 import '@renderer/styles/layout.css';
 
@@ -68,6 +66,11 @@ const useDevToolsEscapeHatch = () => {
 };
 
 const UpdateModal = React.lazy(() => import('@/renderer/components/settings/UpdateModal'));
+
+// Stable no-op sider setter for pop-out mode (no sider exists to collapse). The
+// Titlebar suppresses its sider toggle in pop-out mode via useIsPopoutMode, so
+// this is never invoked - it just satisfies the LayoutContext shape.
+const noopSetSiderCollapsed = (_value: boolean): void => {};
 
 const DEFAULT_SIDER_WIDTH = 240;
 const DESKTOP_COLLAPSED_WIDTH = 64;
@@ -110,6 +113,10 @@ const Layout: React.FC<{
   useNotificationClick();
   const navigate = useNavigate();
   useConversationShortcuts({ navigate });
+  // #27 phase 2: pop-out chat windows render a stripped shell (no sider, no
+  // onboarding, no command palette) - just the custom titlebar + the routed
+  // conversation. Fixed for the window's lifetime.
+  const isPopout = useIsPopoutMode();
 
   // Logo click: plain click goes home; Cmd/Ctrl + triple-click opens DevTools.
   const handleLogoClick = useCallback(
@@ -505,6 +512,26 @@ const Layout: React.FC<{
         overflow: 'visible' as const,
       };
 
+  if (isPopout) {
+    // Pop-out shell: custom Wayland titlebar (standalone, no sider toggle) + the
+    // routed conversation. `setSiderCollapsed` is intentionally omitted so the
+    // Titlebar suppresses its sider toggle and keeps macOS traffic-light spacing.
+    return (
+      <LayoutContext.Provider value={{ isMobile, siderCollapsed: true, setSiderCollapsed: noopSetSiderCollapsed }}>
+        <NavigationHistoryProvider>
+          <div className='app-shell app-shell--popout flex flex-col size-full min-h-0'>
+            <Titlebar workspaceAvailable={workspaceAvailable} />
+            <div className='bg-1 layout-content flex flex-col flex-1 min-h-0'>
+              <Outlet />
+              {multiAgentContextHolder}
+              {directorySelectionContextHolder}
+            </div>
+          </div>
+        </NavigationHistoryProvider>
+      </LayoutContext.Provider>
+    );
+  }
+
   return (
     <LayoutContext.Provider value={{ isMobile, siderCollapsed: collapsed, setSiderCollapsed: setCollapsed }}>
       <NavigationHistoryProvider>
@@ -574,7 +601,9 @@ const Layout: React.FC<{
                   </svg>
                 </div>
                 <div className='flex-1 flex flex-col gap-2px collapsed-hidden min-w-0'>
-                  <span className='text-14px font-700 text-t-primary leading-none tracking-[0.01em]'>{t('common.brand')}</span>
+                  <span className='text-14px font-700 text-t-primary leading-none tracking-[0.01em]'>
+                    {t('common.brand')}
+                  </span>
                   <span className='text-10px font-500 uppercase tracking-[0.16em] text-[var(--text-dim,#555)] leading-none'>
                     {t('common.brandTagline')}
                   </span>
@@ -586,11 +615,7 @@ const Layout: React.FC<{
                     onClick={() => setCollapsed(true)}
                     aria-label='Collapse sidebar'
                   >
-                    {collapsed ? (
-                      <PanelLeftOpen size={18} />
-                    ) : (
-                      <PanelLeftClose size={18} />
-                    )}
+                    {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
                   </button>
                 )}
                 {/* Sidebar folding handled by Titlebar toggle */}

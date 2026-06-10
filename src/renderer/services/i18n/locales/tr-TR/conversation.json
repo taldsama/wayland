@@ -86,7 +86,10 @@
     "closeAll": "Tümünü Kapat",
     "closeLeft": "Sol tarafı kapat",
     "closeRight": "Sağ tarafı kapat",
-    "closeOthers": "Diğerlerini Kapat"
+    "closeOthers": "Diğerlerini Kapat",
+    "popOut": "Ayrı pencerede aç",
+    "dockBack": "Geri yerleştir",
+    "poppedOut": "Ayrı bir pencerede açık"
   },
   "workspace": {
     "title": "Çalışma Alanı",

@@ -93,7 +93,10 @@
     "closeAll": "すべて閉じる",
     "closeLeft": "左側を閉じる",
     "closeRight": "右側を閉じる",
-    "closeOthers": "他を閉じる"
+    "closeOthers": "他を閉じる",
+    "popOut": "別ウィンドウで開く",
+    "dockBack": "元に戻す",
+    "poppedOut": "別ウィンドウで開いています"
   },
   "workspace": {
     "title": "ワークスペース",

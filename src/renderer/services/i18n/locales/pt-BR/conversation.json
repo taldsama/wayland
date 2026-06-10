@@ -86,7 +86,10 @@
     "closeAll": "Fechar todas",
     "closeLeft": "Fechar à esquerda",
     "closeRight": "Fechar à direita",
-    "closeOthers": "Fechar outras"
+    "closeOthers": "Fechar outras",
+    "popOut": "Abrir em janela",
+    "dockBack": "Reacoplar",
+    "poppedOut": "Aberto em uma janela separada"
   },
   "dropdown": {
     "cliAgents": "Agentes CLI",

@@ -86,7 +86,10 @@
     "closeAll": "Close All",
     "closeLeft": "Close to the Left",
     "closeRight": "Close to the Right",
-    "closeOthers": "Close Others"
+    "closeOthers": "Close Others",
+    "popOut": "Pop Out",
+    "dockBack": "Dock Back",
+    "poppedOut": "Open in a separate window"
   },
   "dropdown": {
     "cliAgents": "CLI Agents",

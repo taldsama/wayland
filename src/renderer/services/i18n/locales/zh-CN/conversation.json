@@ -86,7 +86,10 @@
     "closeAll": "关闭全部",
     "closeLeft": "关闭左侧",
     "closeRight": "关闭右侧",
-    "closeOthers": "关闭其他"
+    "closeOthers": "关闭其他",
+    "popOut": "弹出窗口",
+    "dockBack": "停靠回来",
+    "poppedOut": "在独立窗口中打开"
   },
   "dropdown": {
     "cliAgents": "CLI Agents",

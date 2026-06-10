@@ -86,7 +86,10 @@
     "closeAll": "Alle schließen",
     "closeLeft": "Nach links schließen",
     "closeRight": "Nach rechts schließen",
-    "closeOthers": "Andere schließen"
+    "closeOthers": "Andere schließen",
+    "popOut": "Abdocken",
+    "dockBack": "Andocken",
+    "poppedOut": "In separatem Fenster geöffnet"
   },
   "dropdown": {
     "cliAgents": "CLI-Agenten",

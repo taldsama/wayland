@@ -93,7 +93,10 @@
     "closeAll": "全部關閉",
     "closeLeft": "關閉左側",
     "closeRight": "關閉右側",
-    "closeOthers": "關閉其他"
+    "closeOthers": "關閉其他",
+    "popOut": "彈出視窗",
+    "dockBack": "停靠回來",
+    "poppedOut": "在獨立視窗中開啟"
   },
   "workspace": {
     "title": "工作空間",

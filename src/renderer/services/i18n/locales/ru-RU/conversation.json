@@ -86,7 +86,10 @@
     "closeAll": "Закрыть все",
     "closeLeft": "Закрыть слева",
     "closeRight": "Закрыть справа",
-    "closeOthers": "Закрыть остальные"
+    "closeOthers": "Закрыть остальные",
+    "popOut": "В отдельном окне",
+    "dockBack": "Вернуть на место",
+    "poppedOut": "Открыто в отдельном окне"
   },
   "dropdown": {
     "cliAgents": "CLI-агенты",
