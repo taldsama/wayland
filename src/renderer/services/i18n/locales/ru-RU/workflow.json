@@ -6,10 +6,12 @@
   },
   "transcript": {
     "activity": "Activity · {{count}} actions",
-    "you": "S",
+    "you": "You",
     "assistant": "W",
     "starting": "Starting...",
     "stepTag": "Step {{n}} · {{title}}",
+    "stepLabel": "Step {{n}} · {{title}}",
+    "working": "working",
     "thinking": "Thinking..."
   },
   "complete": {

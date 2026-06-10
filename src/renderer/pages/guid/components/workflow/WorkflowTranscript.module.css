@@ -3,8 +3,9 @@
  * Copyright 2026 Ferrox Labs
  * SPDX-License-Identifier: Apache-2.0
  *
- * WorkflowTranscript - consulting-style transcript view.
- * All colors use semantic tokens; no hardcoded hex values.
+ * WorkflowTranscript - step-panel run surface.
+ * All colors use semantic tokens; no hardcoded hex values (except success green
+ * fallback, which mirrors Arco's own token fallback).
  */
 
 .root {
@@ -19,124 +20,182 @@
 .scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 24px;
+  padding: 18px 24px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
 
-/* Generous bottom spacing so content clears the composer */
+.column {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .spacer {
-  height: 24px;
+  height: 16px;
   flex-shrink: 0;
 }
 
-/* Empty state */
-.empty {
-  flex: 1;
+/* ---- starting / empty state ---- */
+.starting {
   display: flex;
   align-items: center;
+  gap: 9px;
   justify-content: center;
+  padding: 40px 0;
   color: var(--color-text-3);
   font-size: 13px;
-  font-style: italic;
 }
 
-/* Step tag divider */
-.steptag {
+/* ---- step panel ---- */
+.panel {
+  border: 1px solid var(--color-border-2);
+  border-radius: 12px;
+  background: var(--color-bg-2);
+  overflow: hidden;
+}
+
+/* Active step: accent border + faint tint + lift, so the live step reads as
+   the focal point of the run (mockup: the "now" card). */
+.panelActive {
+  border-color: var(--color-primary-light-3, rgba(var(--primary-6), 0.35));
+  background: var(--color-bg-2);
+  box-shadow:
+    0 0 0 1px var(--color-primary-light-3, rgba(var(--primary-6), 0.18)),
+    0 8px 28px rgba(0, 0, 0, 0.22);
+}
+
+.panelDone {
+  background: var(--color-bg-1);
+}
+
+.panelErrored {
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+/* ---- panel header (the step tag) ---- */
+.panelHeader {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 0 4px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  gap: 9px;
+  padding: 11px 16px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  border-bottom: 1px solid var(--color-border-2);
+  background: var(--color-fill-1);
   color: var(--color-text-3);
-  border-top: 1px solid var(--color-border-2);
-  margin-top: 12px;
 }
 
-.steptag:first-child {
-  border-top: none;
-  margin-top: 0;
+.panelHeader[data-status='now'],
+.panelHeader[data-status='review'],
+.panelHeader[data-status='ask'] {
+  color: var(--color-primary-6, rgb(var(--primary-6)));
+  background: var(--color-primary-light-1, rgba(var(--primary-6), 0.08));
+  border-bottom-color: var(--color-primary-light-3, rgba(var(--primary-6), 0.25));
 }
 
-.steptagDone {
+.panelHeader[data-status='done'] {
   color: var(--color-success, #16a34a);
 }
 
-.steptagIcon {
-  font-size: 9px;
-  opacity: 0.7;
+.panelHeader[data-status='errored'] {
+  color: #f87171;
 }
 
-/* Message row */
-.row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 8px 0;
-  max-width: 780px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.rowUser {
-  flex-direction: row-reverse;
-}
-
-.rowAssistant {
-  flex-direction: row;
-}
-
-.rowPermission {
-  flex-direction: column;
-  gap: 0;
-}
-
-/* Avatar badges */
-.avatar {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+.panelIcon {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-  margin-top: 2px;
+  flex-shrink: 0;
 }
 
-.avatarW {
-  background-color: var(--color-primary-light-2, rgba(var(--primary-6), 0.15));
-  color: var(--color-primary-6, rgb(var(--primary-6)));
-  border: 1px solid var(--color-primary-light-3, rgba(var(--primary-6), 0.3));
-}
-
-.avatarS {
-  background-color: var(--color-fill-3);
-  color: var(--color-text-2);
-  border: 1px solid var(--color-border-2);
-}
-
-/* Message body */
-.body {
+.panelLabel {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panelSub {
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-3);
+}
+
+.panelLive {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-primary-6, rgb(var(--primary-6)));
+  background: var(--color-primary-light-1, rgba(var(--primary-6), 0.12));
+  border: 1px solid var(--color-primary-light-3, rgba(var(--primary-6), 0.3));
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 10px;
+}
+
+/* ---- panel body ---- */
+.panelBody {
+  padding: 13px 16px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prose {
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.62;
   color: var(--color-text-1);
 }
 
-/* Activity collapsible */
+.prose :global(p:first-child) {
+  margin-top: 0;
+}
+.prose :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+.permission {
+  margin: 4px 0;
+}
+
+/* ---- user inset (your turns, never a chat bubble) ---- */
+.userInset {
+  border-left: 2px solid var(--color-primary-light-3, rgba(var(--primary-6), 0.45));
+  padding: 2px 0 2px 14px;
+  margin: 2px 0 2px 4px;
+}
+
+.userLabel {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-3);
+  margin-bottom: 3px;
+}
+
+.userBody {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--color-text-2);
+}
+.userBody :global(p:first-child) {
+  margin-top: 0;
+}
+.userBody :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+/* ---- activity collapsible ---- */
 .activity {
-  padding: 4px 0;
-  max-width: 780px;
-  margin: 0 auto;
-  width: 100%;
+  padding: 2px 0;
 }
 
 .activityHeader {
@@ -147,7 +206,7 @@
   background: none;
   border: none;
   padding: 4px 6px;
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--color-text-3);
   font-size: 12px;
   transition: background-color 0.15s;
@@ -190,4 +249,15 @@
   content: '\2022';
   margin-right: 6px;
   opacity: 0.5;
+}
+
+/* ---- spinner ---- */
+.spin {
+  animation: workflow-transcript-spin 1s linear infinite;
+}
+
+@keyframes workflow-transcript-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

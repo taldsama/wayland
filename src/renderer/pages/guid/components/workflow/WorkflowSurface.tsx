@@ -110,9 +110,13 @@ export const WorkflowSurface: React.FC<WorkflowSurfaceProps> = ({
   // label its step-tag dividers (it is mounted deep inside the chat tree and has
   // no other access to the session's steps).
   const viewModeProviderValue = useMemo(
-    () => ({ ...viewModeValue, stepTitles: (data?.steps ?? []).map((s) => s.title) }),
+    () => ({
+      ...viewModeValue,
+      stepTitles: (data?.steps ?? []).map((s) => s.title),
+      session: data ?? undefined,
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [viewModeValue.mode, viewModeValue.isWorkflow, data?.steps]
+    [viewModeValue.mode, viewModeValue.isWorkflow, data]
   );
 
   const handleClarifyStart = useCallback((note: string) => {

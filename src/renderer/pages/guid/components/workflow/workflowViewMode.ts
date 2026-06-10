@@ -5,6 +5,7 @@
  */
 
 import React, { createContext, useContext, useState } from 'react';
+import type { WorkflowSession } from '@/common/types/workflowTypes';
 
 export type WorkflowViewMode = 'workflow' | 'conversation';
 
@@ -14,6 +15,12 @@ export type WorkflowViewModeContextValue = {
   isWorkflow: boolean;
   /** Step titles (1-based by index) so the transcript can label step-tag dividers. */
   stepTitles?: string[];
+  /**
+   * The live workflow session. The transcript is mounted deep in the chat tree
+   * and has no other access to step statuses / current_step / run_mode, which
+   * it needs to render the step-panel surface (not just a chat).
+   */
+  session?: WorkflowSession;
 };
 
 const defaultValue: WorkflowViewModeContextValue = {
