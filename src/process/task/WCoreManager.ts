@@ -244,6 +244,28 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
     await agent.start();
     this.agent = agent;
     this._capabilities = agent.capabilities ?? null;
+
+    // #50: On resume, seed recent persisted history so the rebuilt engine keeps
+    // prior context. The engine's --resume does not reliably restore history
+    // (and falls back to a fresh session on failure), so mirror the proven
+    // Gemini precedent and replay the last messages over the existing
+    // init_history channel. New sessions have nothing to replay. The current
+    // user turn is not persisted yet at start(), so it is not double-injected.
+    if (sessionArgs.resume) {
+      try {
+        const historyDb = await getDatabase();
+        const history = historyDb.getConversationMessages(this.conversation_id, 0, 10000);
+        const lines = (history.data ?? [])
+          .filter((m): m is Extract<TMessage, { type: 'text' }> => m.type === 'text')
+          .slice(-20)
+          .map((m) => `${m.position === 'right' ? 'User' : 'Assistant'}: ${m.content.content || ''}`);
+        const text = lines.join('\n').slice(-4000);
+        if (text) await agent.injectConversationHistory(text);
+      } catch {
+        // Best-effort: resume still proceeds without seeded history.
+      }
+    }
+
     // Mirror the resolved CLI budget (which may be the reasoning-model default
     // from envBuilder) into manager data so detectTruncation can compare
     // output_tokens against the real budget. Only fill the gap - never
