@@ -613,10 +613,15 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
   setupZoomForWindow(mainWindow);
   registerWindowMaximizeListeners(mainWindow);
 
-  // Initialize auto-updater service (skip when disabled via env, e.g. E2E / CI)
+  // Initialize auto-updater service (skip when disabled via env, e.g. E2E / CI,
+  // and in unpackaged dev where there is no installed app to update - the updater
+  // would otherwise hit the GitHub feed on every dev launch and log spurious errors)
   const isCiRuntime = process.env.CI === 'true' || process.env.CI === '1' || process.env.GITHUB_ACTIONS === 'true';
   const disableAutoUpdater =
-    process.env.WAYLAND_DISABLE_AUTO_UPDATE === '1' || process.env.WAYLAND_E2E_TEST === '1' || isCiRuntime;
+    !app.isPackaged ||
+    process.env.WAYLAND_DISABLE_AUTO_UPDATE === '1' ||
+    process.env.WAYLAND_E2E_TEST === '1' ||
+    isCiRuntime;
   if (!disableAutoUpdater) {
     Promise.all([import('./process/services/autoUpdaterService'), import('./process/bridge/updateBridge')])
       .then(([{ autoUpdaterService }, { createAutoUpdateStatusBroadcast }]) => {
