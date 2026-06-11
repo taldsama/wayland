@@ -281,7 +281,7 @@ const Titlebar: React.FC<TitlebarProps> = ({ workspaceAvailable }) => {
     // Reserve room for the macOS traffic lights whenever the menu sits to their
     // right: normally that's when the sider toggle shows, but a pop-out window
     // has no sider toggle yet still has traffic lights, so reserve there too.
-    if (!isMacRuntime || (!showSiderToggle && !isPopout)) return {};
+    if (!isMacRuntime || (!showSiderToggle && !isPopout && !showBackToChatButton)) return {};
     // macOS: sit the menu buttons right next to the traffic lights (which occupy
     // ~70px). This block only runs in the macOS desktop app, where the traffic
     // lights are present at every window width - including a narrow window that
@@ -289,7 +289,7 @@ const Titlebar: React.FC<TitlebarProps> = ({ workspaceAvailable }) => {
     return {
       marginLeft: '76px',
     };
-  }, [isMacRuntime, showSiderToggle, isPopout]);
+  }, [isMacRuntime, showSiderToggle, isPopout, showBackToChatButton]);
 
   return (
     <div
@@ -310,7 +310,9 @@ const Titlebar: React.FC<TitlebarProps> = ({ workspaceAvailable }) => {
             onClick={handleBackToChat}
             aria-label={backToChatTooltip}
           >
-            <ArrowLeftCircle size={iconSize} />
+            {/* Match the sidebar toggle's compact 18px size; don't balloon to
+                24px on mobile (it read as clunky against the macOS controls). */}
+            <ArrowLeftCircle size={18} />
           </button>
         )}
         {showSiderToggle && (
