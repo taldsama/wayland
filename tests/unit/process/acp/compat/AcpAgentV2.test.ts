@@ -2,6 +2,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AcpAgentV2, SESSION_START_TIMEOUT_MS } from '@process/acp/compat/AcpAgentV2';
+import { getFullAutoMode } from '@/common/types/agentModes';
 import type { SessionCallbacks } from '@process/acp/types';
 import type { OldAcpAgentConfig } from '@process/acp/compat/typeBridge';
 
@@ -1039,19 +1040,21 @@ describe('AcpAgentV2 - Config/Model/Mode Methods', () => {
   });
 
   describe('enableYoloMode()', () => {
-    it('should delegate to setMode with bypassPermissions', async () => {
+    it('should delegate to setMode with the backend full-auto (guarded) mode', async () => {
       const agent = await createStartedAgent();
 
-      // Mock setMode to trigger onModeUpdate after a tick
+      // enableYoloMode now routes through getFullAutoMode so the guardrail's
+      // "auto guarded" mode is used instead of raw bypassPermissions.
+      const expectedMode = getFullAutoMode('claude');
       mockSessionMethods.setMode.mockImplementation(() => {
         setTimeout(() => {
-          capturedCallbacks.onModeUpdate({ currentMode: 'bypassPermissions' });
+          capturedCallbacks.onModeUpdate({ currentMode: expectedMode });
         }, 0);
       });
 
       await agent.enableYoloMode();
 
-      expect(mockSessionMethods.setMode).toHaveBeenCalledWith('bypassPermissions');
+      expect(mockSessionMethods.setMode).toHaveBeenCalledWith(expectedMode);
     });
 
     it('should propagate result from setMode', async () => {

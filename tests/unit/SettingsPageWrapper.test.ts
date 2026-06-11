@@ -30,6 +30,7 @@ describe('getBuiltinSettingsNavItems', () => {
     expect(items.map((item) => item.id)).toEqual([
       'assistants',
       'skills',
+      'commands',
       'constitution',
       'models',
       'agents',
@@ -45,12 +46,14 @@ describe('getBuiltinSettingsNavItems', () => {
       'notifications',
       'storage',
       'ijfw',
+      'doctor',
       'about',
     ]);
 
     expect(items.map((item) => item.label)).toEqual([
       'Assistants',
       'Skills & Tools',
+      'Slash Commands',
       'Constitution',
       'Models',
       'Agents',
@@ -66,6 +69,7 @@ describe('getBuiltinSettingsNavItems', () => {
       'Notifications',
       'Storage',
       'IJFW Memory',
+      'Doctor',
       'About',
     ]);
   });
