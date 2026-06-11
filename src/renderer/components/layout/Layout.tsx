@@ -74,6 +74,10 @@ const noopSetSiderCollapsed = (_value: boolean): void => {};
 
 const DEFAULT_SIDER_WIDTH = 280;
 const DESKTOP_COLLAPSED_WIDTH = 64;
+// Between the mobile overlay breakpoint (768) and this width, the sidebar
+// auto-collapses to the icon rail so a narrowed desktop window keeps a readable
+// content column. At/above this width it expands back to the full sidebar.
+const NARROW_RAIL_MAX_WIDTH = 1024;
 const SIDER_DRAG_SNAP_THRESHOLD = Math.round((DEFAULT_SIDER_WIDTH + DESKTOP_COLLAPSED_WIDTH) / 2);
 const SIDER_DRAG_HYSTERESIS = 6;
 const MOBILE_SIDER_WIDTH_RATIO = 0.67;
@@ -360,6 +364,14 @@ const Layout: React.FC<{
     }
     setCollapsed(true);
   }, [isMobile]);
+
+  // Responsive rail: on a narrowed desktop window (between the mobile overlay
+  // breakpoint and NARROW_RAIL_MAX_WIDTH) auto-collapse to the icon rail, and
+  // expand back when widened. The mobile path (above) owns sub-768 behavior.
+  useEffect(() => {
+    if (isMobile || viewportWidth <= 0) return;
+    setCollapsed(viewportWidth < NARROW_RAIL_MAX_WIDTH);
+  }, [isMobile, viewportWidth]);
 
   // Clean up sider Tooltip leftovers to prevent floating panels stuck in the top-left after mobile route changes
   useEffect(() => {
