@@ -208,9 +208,21 @@ export class AcpRuntime {
     this.sessions.clear();
   }
 
+  /**
+   * Refresh a session's idle clock on any agent activity. Without this the
+   * IdleReclaimer only ever sees lastActiveAt updated on send, so a session
+   * that is actively streaming (or that the user is reading) gets suspended
+   * after the idle timeout mid-conversation, killing the bridge. See #60.
+   */
+  private touchActivity(convId: string): void {
+    const entry = this.sessions.get(convId);
+    if (entry) entry.lastActiveAt = Date.now();
+  }
+
   private buildCallbacks(convId: string): SessionCallbacks {
     return {
       onMessage: (message) => {
+        this.touchActivity(convId);
         this.onStreamEvent(convId, message);
       },
       onSessionId: (_sessionId) => {
@@ -218,6 +230,7 @@ export class AcpRuntime {
         // this.acpSessionRepo.updateSessionId(convId, sessionId);
       },
       onStatusChange: (status) => {
+        this.touchActivity(convId);
         // TODO(ACP Discovery): Re-enable after fixing agent_id.
         // this.persistStatus(convId, status);
         this.onSignalEvent(convId, { type: 'status_change', status });
