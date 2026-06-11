@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Bot, Plus } from 'lucide-react';
+import { Bot, ChevronDown, Plus } from 'lucide-react';
 import { agentLogoDarkFilter, resolveAgentLogo } from '@/renderer/utils/model/agentLogo';
 import { resolveExtensionAssetUrl } from '@/renderer/utils/platform';
 import { getLucideIcon } from '@/renderer/utils/lucideAvatar';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import type { AcpBackend, AvailableAgent } from '../types';
-import { Tooltip } from '@arco-design/web-react';
+import { Dropdown, Menu, Tooltip } from '@arco-design/web-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +24,37 @@ type AgentPillBarProps = {
   suppressSelectionAnimation?: boolean;
 };
 
+/** Resolve an agent's avatar to a renderable icon (Lucide glyph, emoji, logo,
+ *  or the Bot fallback). Shared by the desktop pills and the mobile dropdown. */
+const renderAgentIcon = (agent: AvailableAgent, size: number): React.ReactNode => {
+  const LucideIconComponent = getLucideIcon(agent.avatar);
+  if (LucideIconComponent) {
+    return <LucideIconComponent size={size} className='flex-shrink-0 text-[var(--color-text-1)]' />;
+  }
+  const extensionAvatar = resolveExtensionAssetUrl(agent.isExtension ? agent.avatar : undefined);
+  const emojiAvatar = agent.backend === 'remote' && agent.avatar ? agent.avatar : undefined;
+  if (emojiAvatar && !extensionAvatar) {
+    return <span style={{ fontSize: size, lineHeight: 1, flexShrink: 0 }}>{emojiAvatar}</span>;
+  }
+  const logoSrc =
+    extensionAvatar ||
+    resolveAgentLogo({ backend: agent.backend, customAgentId: agent.customAgentId, isExtension: agent.isExtension });
+  if (logoSrc) {
+    return (
+      <img
+        src={logoSrc}
+        alt={`${agent.backend} logo`}
+        width={size}
+        height={size}
+        style={{ objectFit: 'contain', flexShrink: 0, filter: agentLogoDarkFilter(agent.backend) }}
+      />
+    );
+  }
+  return <Bot size={size} style={{ flexShrink: 0 }} />;
+};
+
+const DISCOVER_AGENTS_KEY = '__discover_agents__';
+
 const AgentPillBar: React.FC<AgentPillBarProps> = ({
   availableAgents,
   selectedAgentKey,
@@ -35,6 +66,65 @@ const AgentPillBar: React.FC<AgentPillBarProps> = ({
   const isMobile = layout?.isMobile ?? false;
   const navigate = useNavigate();
   const { t } = useTranslation();
+
+  const selectableAgents = availableAgents.filter((agent) => !agent.isPreset);
+
+  // Mobile: the inline icon strip overflows and gets clipped. Collapse it into a
+  // single dropdown showing the selected agent, opening the full list on tap.
+  if (isMobile) {
+    const selected = selectableAgents.find((agent) => getAgentKey(agent) === selectedAgentKey) ?? selectableAgents[0];
+    const droplist = (
+      <Menu
+        selectedKeys={selected ? [getAgentKey(selected)] : []}
+        onClickMenuItem={(key) => {
+          if (key === DISCOVER_AGENTS_KEY) {
+            navigate('/settings/agent?tab=local');
+            return;
+          }
+          onSelectAgent(key);
+        }}
+      >
+        {selectableAgents.map((agent) => (
+          <Menu.Item key={getAgentKey(agent)}>
+            <span className='flex items-center gap-8px'>
+              {renderAgentIcon(agent, 18)}
+              <span className='truncate'>{agent.name}</span>
+            </span>
+          </Menu.Item>
+        ))}
+        <Menu.Item key={DISCOVER_AGENTS_KEY}>
+          <span className='flex items-center gap-8px'>
+            <Plus size={18} className='shrink-0' />
+            <span>{t('settings.agentManagement.discoverMoreAgents', { defaultValue: 'Discover more agents' })}</span>
+          </span>
+        </Menu.Item>
+      </Menu>
+    );
+
+    return (
+      <div className='w-full flex justify-center' style={{ marginBottom: 20 }}>
+        <Dropdown droplist={droplist} trigger='click' position='bl'>
+          <div
+            data-agent-pill='true'
+            data-agent-key={selected ? getAgentKey(selected) : ''}
+            className='flex items-center gap-8px cursor-pointer'
+            style={{
+              padding: '8px 14px',
+              borderRadius: '9999px',
+              backgroundColor: 'var(--color-fill-2)',
+              border: '1px solid var(--color-border-1)',
+              maxWidth: '100%',
+              color: 'var(--text-primary)',
+            }}
+          >
+            {selected ? renderAgentIcon(selected, 20) : <Bot size={20} style={{ flexShrink: 0 }} />}
+            <span className='font-semibold text-14px truncate'>{selected?.name ?? ''}</span>
+            <ChevronDown size={16} className='shrink-0 opacity-60' />
+          </div>
+        </Dropdown>
+      </div>
+    );
+  }
 
   return (
     <div className='w-full flex justify-center'>
