@@ -39,7 +39,7 @@ const AgentPillBar: React.FC<AgentPillBarProps> = ({
   return (
     <div className='w-full flex justify-center'>
       <div
-        className='flex items-center justify-center'
+        className={`flex items-center ${isMobile ? 'justify-start' : 'justify-center'}`}
         style={{
           marginBottom: 20,
           padding: '6px',
@@ -48,13 +48,17 @@ const AgentPillBar: React.FC<AgentPillBarProps> = ({
           border: '1px solid var(--color-border-2)',
           boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
           transition: 'background-color 0.35s ease',
-          width: isMobile ? 'calc(100% + 28px)' : 'fit-content',
-          maxWidth: isMobile ? 'none' : '100%',
-          marginLeft: isMobile ? -14 : 0,
-          marginRight: isMobile ? -14 : 0,
-          overflow: isMobile ? 'visible' : 'hidden',
+          width: isMobile ? '100%' : 'fit-content',
+          maxWidth: '100%',
+          // Mobile: a single scrollable row (scroll-snap) instead of wrapping the
+          // agent icons into a ragged two-row block. The icons stay one row and
+          // scroll horizontally - the #1 mobile layout complaint.
+          overflowX: isMobile ? 'auto' : 'hidden',
+          overflowY: 'hidden',
+          scrollSnapType: isMobile ? 'x proximity' : undefined,
+          WebkitOverflowScrolling: 'touch',
           gap: isMobile ? 6 : 4,
-          flexWrap: isMobile ? 'wrap' : 'nowrap',
+          flexWrap: 'nowrap',
           color: 'var(--text-primary)',
         }}
       >
@@ -89,7 +93,7 @@ const AgentPillBar: React.FC<AgentPillBarProps> = ({
                   data-agent-key={getAgentKey(agent)}
                   data-agent-backend={agent.backend}
                   data-agent-selected={isSelected ? 'true' : 'false'}
-                  className={`group relative flex items-center cursor-pointer whitespace-nowrap overflow-hidden ${isSelected ? `opacity-100 px-12px py-8px rd-20px mx-2px ${styles.agentItemSelected}` : isMobile ? 'opacity-70 p-4px' : 'opacity-60 p-4px hover:opacity-100'}`}
+                  className={`group relative flex items-center shrink-0 cursor-pointer whitespace-nowrap overflow-hidden ${isSelected ? `opacity-100 px-12px py-8px rd-20px mx-2px ${styles.agentItemSelected}` : isMobile ? 'opacity-70 p-4px' : 'opacity-60 p-4px hover:opacity-100'}`}
                   style={
                     isSelected
                       ? {
