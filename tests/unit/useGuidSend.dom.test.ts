@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import type { GuidSendDeps } from '../../src/renderer/pages/guid/hooks/useGuidSend';
+import type { TProviderWithModel } from '../../src/common/config/storage';
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -231,22 +232,33 @@ describe('useGuidSend', () => {
   });
 
   describe('isButtonDisabled', () => {
+    // A minimal connected-model binding so the input-gate tests isolate input
+    // from the no-model gate that drives the new-chat CTA + disabled send (#52).
+    const MODEL = { useModel: 'test-model', name: 'Test', platform: 'remote' } as unknown as TProviderWithModel;
+
     it('is true when input is empty', () => {
-      const deps = makeDeps({ input: '' });
+      const deps = makeDeps({ input: '', currentModel: MODEL });
       const { result } = renderHook(() => useGuidSend(deps));
       expect(result.current.isButtonDisabled).toBe(true);
     });
 
     it('is true when input is whitespace only', () => {
-      const deps = makeDeps({ input: '   ' });
+      const deps = makeDeps({ input: '   ', currentModel: MODEL });
       const { result } = renderHook(() => useGuidSend(deps));
       expect(result.current.isButtonDisabled).toBe(true);
     });
 
     it('is false when input has content', () => {
-      const deps = makeDeps({ input: 'hello' });
+      const deps = makeDeps({ input: 'hello', currentModel: MODEL });
       const { result } = renderHook(() => useGuidSend(deps));
       expect(result.current.isButtonDisabled).toBe(false);
+    });
+
+    it('is true when no model is configured even with content', () => {
+      const deps = makeDeps({ input: 'hello', currentModel: undefined, isGoogleAuth: false });
+      const { result } = renderHook(() => useGuidSend(deps));
+      expect(result.current.isButtonDisabled).toBe(true);
+      expect(result.current.noModelConfigured).toBe(true);
     });
   });
 
