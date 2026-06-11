@@ -69,7 +69,15 @@ const SiderItem: React.FC<SiderItemProps> = ({
             : undefined
         }
         onClick={onClick}
-        onContextMenu={onContextMenu}
+        onContextMenu={(e) => {
+          // Right-click opens the item's own action menu (rename / delete / pin).
+          // Only items that supply menuItems are affected; others just forward.
+          if (hasMenu) {
+            e.preventDefault();
+            setMenuVisible(true);
+          }
+          onContextMenu?.(e);
+        }}
       >
         {/* Active-rail: 2px brand orange with subtle glow, only when selected */}
         {selected && (
