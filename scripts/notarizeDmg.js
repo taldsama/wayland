@@ -2,6 +2,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { runBounded } = require('./signingExec');
 
 /**
  * afterAllArtifactBuild — notarize + staple the .dmg artifacts.
@@ -48,7 +49,7 @@ exports.default = async function notarizeDmg(buildResult) {
     const name = path.basename(dmg);
     try {
       console.log(`notarizeDmg: code-signing ${name} with Developer ID…`);
-      execSync(`codesign --force --sign "${identity}" --timestamp "${dmg}"`, { stdio: 'inherit' });
+      signDmgWithTimestamp(identity, dmg);
 
       console.log(`notarizeDmg: submitting ${name} to Apple notary service…`);
       const submitCmd = [
@@ -65,8 +66,11 @@ exports.default = async function notarizeDmg(buildResult) {
         env: { ...process.env, NOTARYTOOL_PWD: appleIdPassword },
       });
 
-      // Staple the ticket so Gatekeeper validates the dmg offline.
-      execSync(`xcrun stapler staple "${dmg}"`, { stdio: 'inherit' });
+      // Staple the ticket so Gatekeeper validates the dmg offline. `stapler`
+      // contacts Apple's ticket servers with no client timeout, so bound it too.
+      if (!runBounded('xcrun', ['stapler', 'staple', dmg], { timeoutMs: 300000, label: `notarizeDmg: stapling ${name}` })) {
+        throw new Error(`stapler staple failed or timed out for ${name}`);
+      }
       console.log(`notarizeDmg: stapled ${name}`);
 
       // Stapling rewrites the dmg bytes, so the updater metadata that referenced
@@ -81,6 +85,61 @@ exports.default = async function notarizeDmg(buildResult) {
     }
   }
 };
+
+/**
+ * Code-sign the dmg with a HARD timeout, signature verification, and retries.
+ *
+ * `codesign --timestamp` contacts Apple's secure timestamp server
+ * (timestamp.apple.com). codesign has no client-side timeout, so when that
+ * server stalls codesign blocks forever and wedges the whole build — three
+ * consecutive v0.9.7 release runs hung 90-160 min at exactly this step (both
+ * arch legs, orphaned `codesign` processes) until cancelled. The caller's
+ * try/catch only anticipated notary *failure*; a *hang* never throws, so it
+ * never degraded gracefully.
+ *
+ * `runBounded` spawns codesign DIRECTLY (no shell) so the timeout's SIGKILL
+ * lands on codesign itself. Two further guards from the cross-audit: (1) a
+ * SIGKILLed attempt can leave a partial signature, so before each retry we clear
+ * it (`--remove-signature`, best-effort) rather than let `--force` layer onto a
+ * corrupt one; (2) codesign can exit 0 yet leave an *invalid* dmg signature
+ * (Apple TN2206), so we `--verify --strict` before trusting it.
+ *
+ * On exhaustion we throw so the caller degrades to "signed-but-unstapled" and
+ * the release smoke gate blocks publishing; CI auto-retry — or a later run once
+ * the TSA recovers — then produces a clean dmg. A no-timestamp fallback is NOT a
+ * viable degradation: Apple notarization REQUIRES a secure timestamp, so an
+ * un-timestamped dmg would be rejected by notarytool anyway.
+ */
+function signDmgWithTimestamp(identity, dmg) {
+  const SIGN_MS = 180000; // 3 min ceiling per timestamped sign (healthy: seconds)
+  const SHORT_MS = 60000; // local, no-network codesign ops
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    if (attempt > 1) {
+      // Clear any partial signature a SIGKILLed prior attempt may have left.
+      runBounded('codesign', ['--remove-signature', dmg], {
+        timeoutMs: SHORT_MS,
+        label: `notarizeDmg: clearing partial signature before retry ${attempt}`,
+      });
+    }
+    const signed = runBounded('codesign', ['--force', '--sign', identity, '--timestamp', dmg], {
+      timeoutMs: SIGN_MS,
+      label: `notarizeDmg: codesign attempt ${attempt}/${MAX_ATTEMPTS}`,
+    });
+    if (
+      signed &&
+      runBounded('codesign', ['--verify', '--strict', dmg], {
+        timeoutMs: SHORT_MS,
+        label: `notarizeDmg: verifying signature (attempt ${attempt}/${MAX_ATTEMPTS})`,
+      })
+    ) {
+      return;
+    }
+  }
+  throw new Error(
+    `notarizeDmg: dmg codesign + verify failed after ${MAX_ATTEMPTS} attempts (likely an Apple timestamp-server outage)`
+  );
+}
 
 /**
  * Update the dmg's sha512 + size in latest-mac.yml after stapling changed its

@@ -99,6 +99,12 @@ jobs:
   build:
     name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
+    # Defense in depth: without this, a hung step (e.g. codesign blocking on
+    # Apple's timestamp server) rides GitHub's 6h default — three v0.9.7 runs
+    # wedged 90-160 min before manual cancel. 120 sits clear of a slow-but-healthy
+    # build (~50-60 min build + two ~20 min notary waits can stack) yet still cuts
+    # a true wedge well before 6h so auto-retry kicks in.
+    timeout-minutes: 120
     needs: code-quality
     if: ${{ always() && (inputs.skip_code_quality || needs.code-quality.result == 'success') }}
 
