@@ -94,14 +94,15 @@ const AgentPillBar: React.FC<AgentPillBarProps> = ({
                   data-agent-backend={agent.backend}
                   data-agent-selected={isSelected ? 'true' : 'false'}
                   className={`group relative flex items-center shrink-0 cursor-pointer whitespace-nowrap overflow-hidden ${isSelected ? `opacity-100 px-12px py-8px rd-20px mx-2px ${styles.agentItemSelected}` : isMobile ? 'opacity-70 p-4px' : 'opacity-60 p-4px hover:opacity-100'}`}
-                  style={
-                    isSelected
+                  style={{
+                    scrollSnapAlign: isMobile ? 'start' : undefined,
+                    ...(isSelected
                       ? {
                           ...(isMobile ? { transition: 'opacity 0.2s ease, background-color 0.2s ease' } : undefined),
                           ...(isMobile || suppressSelectionAnimation ? { animation: 'none' } : undefined),
                         }
-                      : { transition: 'opacity 0.2s ease' }
-                  }
+                      : { transition: 'opacity 0.2s ease' }),
+                  }}
                   onClick={() => onSelectAgent(getAgentKey(agent))}
                 >
                   {LucideIconComponent ? (
