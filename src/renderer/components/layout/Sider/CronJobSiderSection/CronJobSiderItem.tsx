@@ -298,7 +298,7 @@ const CronJobSiderItem: React.FC<CronJobSiderItemProps> = ({
       {/* Header - arrow toggles expand, text navigates to detail */}
       <div
         className={classNames(
-          'flex items-center gap-8px h-28px px-8px rd-8px transition-colors min-w-0',
+          'flex items-center gap-8px h-26px px-8px rd-8px transition-colors min-w-0',
           pathname === `/scheduled/${job.id}` ? 'bg-[rgba(var(--primary-6),0.12)]' : 'hover:bg-fill-3 active:bg-fill-4'
         )}
       >
@@ -324,7 +324,7 @@ const CronJobSiderItem: React.FC<CronJobSiderItemProps> = ({
           className='flex-1 min-w-0 overflow-hidden cursor-pointer'
           onClick={() => onNavigate(`/scheduled/${job.id}`)}
         >
-          <div className='flex items-center gap-8px text-13px min-w-0'>
+          <div className='flex items-center gap-8px text-12px min-w-0'>
             <span className='font-medium truncate flex-1 text-t-primary min-w-0'>{job.name}</span>
           </div>
         </div>
@@ -343,7 +343,7 @@ const CronJobSiderItem: React.FC<CronJobSiderItemProps> = ({
                   onToggle={() => toggleWorkspace(ws)}
                   siderCollapsed={false}
                   header={
-                    <div className='flex items-center gap-8px text-13px min-w-0'>
+                    <div className='flex items-center gap-8px text-12px min-w-0'>
                       <span className='font-medium truncate flex-1 text-t-primary min-w-0'>
                         {getWorkspaceDisplayName(ws)}
                       </span>

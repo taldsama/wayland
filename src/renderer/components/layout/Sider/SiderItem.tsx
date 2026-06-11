@@ -55,7 +55,7 @@ const SiderItem: React.FC<SiderItemProps> = ({
     >
       <div
         className={classNames(
-          'h-28px rd-8px flex items-center gap-8px px-8px cursor-pointer relative overflow-hidden shrink-0 group min-w-0 transition-colors',
+          'h-26px rd-8px flex items-center gap-8px px-8px cursor-pointer relative overflow-hidden shrink-0 group min-w-0 transition-colors',
           {
             'hover:bg-[rgba(var(--primary-6),0.14)]': true,
           }
@@ -106,7 +106,7 @@ const SiderItem: React.FC<SiderItemProps> = ({
         >
           <div
             className={classNames(
-              'overflow-hidden text-ellipsis block w-full text-13px lh-20px whitespace-nowrap min-w-0 group-hover:text-1',
+              'overflow-hidden text-ellipsis block w-full text-12px lh-20px whitespace-nowrap min-w-0 group-hover:text-1',
               selected ? 'text-1 font-medium' : 'text-2'
             )}
           >

@@ -34,7 +34,7 @@ const SiderProjectsEntry: React.FC<SiderProjectsEntryProps> = ({
       <Tooltip {...siderTooltipProps} content={label} position='right'>
         <div
           className={classNames(
-            'w-full h-28px flex items-center justify-center cursor-pointer transition-colors rd-8px text-t-primary',
+            'w-full h-26px flex items-center justify-center cursor-pointer transition-colors rd-8px text-t-primary',
             isActive ? 'bg-[rgba(var(--primary-6),0.12)] text-primary' : 'hover:bg-fill-3 active:bg-fill-4'
           )}
           onClick={onClick}
@@ -50,7 +50,7 @@ const SiderProjectsEntry: React.FC<SiderProjectsEntryProps> = ({
     <Tooltip {...siderTooltipProps} content={label} position='right'>
       <div
         className={classNames(
-          'box-border h-28px w-full flex items-center justify-start gap-8px px-8px rd-0.5rem cursor-pointer shrink-0 transition-all text-t-primary',
+          'box-border h-26px w-full flex items-center justify-start gap-8px px-8px rd-0.5rem cursor-pointer shrink-0 transition-all text-t-primary',
           isMobile && 'sider-action-btn-mobile',
           isActive ? 'bg-[rgba(var(--primary-6),0.12)] text-primary' : 'hover:bg-fill-3 active:bg-fill-4'
         )}
@@ -60,7 +60,7 @@ const SiderProjectsEntry: React.FC<SiderProjectsEntryProps> = ({
         <span className='w-20px h-20px flex items-center justify-center shrink-0'>
           <FolderKanban size={16} className='block leading-none' style={{ lineHeight: 0 }} />
         </span>
-        <span className='collapsed-hidden text-t-primary text-13px font-medium leading-20px'>{label}</span>
+        <span className='collapsed-hidden text-t-primary text-12px font-medium leading-20px'>{label}</span>
       </div>
     </Tooltip>
   );
