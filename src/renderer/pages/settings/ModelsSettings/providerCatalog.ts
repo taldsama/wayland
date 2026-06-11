@@ -35,6 +35,13 @@ export type ProviderMeta = {
   darkText: boolean;
   /** Browse-modal group this provider belongs to (spec §4.6). */
   group: ProviderGroup;
+  /**
+   * Held out of the Browse grid + provider lists while a provider is built but
+   * not yet user-ready (e.g. chatgpt-subscription, gated until its inference
+   * seam is verified). Keeps the Record<NativeProviderId> complete without
+   * exposing a dead connect path.
+   */
+  hidden?: boolean;
 };
 
 /**
@@ -79,6 +86,8 @@ export const PROVIDER_META: Record<NativeProviderId, ProviderMeta> = {
     bg: '#10a37f',
     darkText: false,
     group: 'frontier',
+    // Gated until the codex/Responses inference seam is wired + live-verified.
+    hidden: true,
   },
   mistral: { id: 'mistral', displayName: 'Mistral', mono: 'M', bg: '#fa5111', darkText: false, group: 'frontier' },
   cohere: { id: 'cohere', displayName: 'Cohere', mono: 'C', bg: '#39594d', darkText: false, group: 'frontier' },
@@ -216,7 +225,7 @@ export function providerMeta(id: ProviderId): ProviderMeta {
 export const PROVIDER_GROUP_ORDER: readonly ProviderGroup[] = ['frontier', 'cloud', 'open', 'chinese', 'voice'];
 
 /** All provider metadata in a stable order (frontier → voice, declaration order within). */
-export const ALL_PROVIDERS: readonly ProviderMeta[] = Object.values(PROVIDER_META);
+export const ALL_PROVIDERS: readonly ProviderMeta[] = Object.values(PROVIDER_META).filter((p) => !p.hidden);
 
 /** Providers belonging to one Browse group, in declaration order. */
 export function providersInGroup(group: ProviderGroup): ProviderMeta[] {
