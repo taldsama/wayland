@@ -333,5 +333,12 @@
       "sublabel": "기존 Claude Code 로그인으로 실행 — 별도 키 관리가 필요 없습니다.",
       "action": "사용"
     }
+  },
+  "noModelCta": {
+    "title": "No model configured yet",
+    "bodyDesktop": "Set one up to start chatting.",
+    "bodyRemote": "Connect Flux or set up a model on the server to start chatting.",
+    "button": "Set up a model",
+    "sendTooltip": "Connect a model to start sending"
   }
 }

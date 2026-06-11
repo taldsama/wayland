@@ -333,5 +333,12 @@
       "sublabel": "Execute com seu login atual do Claude Code — sem chaves extras para gerenciar.",
       "action": "Usar"
     }
+  },
+  "noModelCta": {
+    "title": "No model configured yet",
+    "bodyDesktop": "Set one up to start chatting.",
+    "bodyRemote": "Connect Flux or set up a model on the server to start chatting.",
+    "button": "Set up a model",
+    "sendTooltip": "Connect a model to start sending"
   }
 }
