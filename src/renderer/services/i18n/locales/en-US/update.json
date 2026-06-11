@@ -27,5 +27,11 @@
     "metadataMissing": "Could not find signed update metadata (latest.yml) for this release. Refusing to open an unverified installer.",
     "assetNotInMetadata": "The downloaded file \"{{name}}\" is not listed in the signed update metadata. Refusing to open an unverified installer.",
     "checksumMismatch": "The downloaded update failed integrity verification (checksum mismatch) and was discarded. Do not run it. Please retry or download from the Releases page."
+  },
+  "pill": {
+    "available": "Update",
+    "downloading": "Updating...",
+    "ready": "Restart to update",
+    "tooltip": "Update available: {{version}}"
   }
 }

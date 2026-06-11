@@ -20,6 +20,7 @@ import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useNavigationHistory } from '@/renderer/hooks/context/NavigationHistoryContext';
 import { isElectronDesktop, isMacOS } from '@/renderer/utils/platform';
 import { useIsPopoutMode } from '@/renderer/hooks/system/useIsPopoutMode';
+import UpdatePill from './UpdatePill';
 // Full brand lockups (orbit mark + wordmark + ™). Dark wordmark shows on light
 // theme, white wordmark on dark theme - toggled purely via CSS on [data-theme].
 import lockupDark from '@renderer/assets/logos/brand/wayland-lockup-dark.png';
@@ -352,6 +353,7 @@ const Titlebar: React.FC<TitlebarProps> = ({ workspaceAvailable }) => {
           </>
         )}
       </div>
+      <UpdatePill />
       <div
         className='app-titlebar__brand'
         aria-label={layout?.isMobile ? mobileCenterTitle : appTitle}
