@@ -1707,7 +1707,13 @@
       "errorNoModels": "{{provider}} подключён, но не вернул моделей. Попробуйте обновить его в «Управлении».",
       "errorUnknown": "Не удалось подключиться к {{provider}}. Повторите попытку.",
       "undecryptableHint": "Your saved key for this provider is unreadable. Please re-enter it.",
-      "fromDeepLink": "Из глубокой ссылки"
+      "fromDeepLink": "Из глубокой ссылки",
+      "xaiPasteHint": "Taking a while? Copy the code from the x.ai page and paste it here to finish.",
+      "xaiPastePlaceholder": "Paste code from x.ai",
+      "xaiPasteSubmit": "Finish",
+      "xaiPasteCancel": "Cancel",
+      "xaiCodeNotAccepted": "That code could not be used. Click Sign in with X to start again.",
+      "xaiWaiting": "Finishing sign-in in your browser. Approve it in the tab that opened - this completes on its own."
     },
     "flux": {
       "name": "Flux Router",

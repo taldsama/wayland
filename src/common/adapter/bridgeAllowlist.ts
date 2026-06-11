@@ -274,6 +274,7 @@ const REMOTE_DENIED_KEYS: ReadonlySet<string> = new Set([
   //     trigger a refresh-token exchange. ---
   'xai.auth.login',
   'xai.auth.refresh',
+  'xai.auth.submit-code',
   // --- Native "Sign in with ChatGPT" OAuth. Both mint/persist the
   //     `chatgpt-subscription` provider bundle (refresh + access tokens) via the
   //     OAuth flow - same credential-minting class as xai.auth.* above. A remote

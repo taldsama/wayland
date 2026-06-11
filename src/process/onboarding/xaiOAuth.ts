@@ -38,6 +38,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 
 import { shell } from 'electron';
+import log from 'electron-log';
 
 import type { XaiOAuthResult } from '@/common/types/onboarding';
 import type { ProviderId } from '@process/providers/types';
@@ -75,6 +76,27 @@ type XaiOAuthError = 'cancelled' | 'timeout' | 'unauthorized' | 'no-credit' | 'o
 /** Outcome of waiting on the loopback callback. */
 type CallbackOutcome = { kind: 'code'; code: string } | { kind: 'error'; error: XaiOAuthError };
 
+/**
+ * Handle to feed a manually-pasted code into the in-flight loopback flow. xAI's
+ * desktop consent screen shows a code to copy ("Copy the code below into Grok
+ * Build...") rather than redirecting to the loopback, so the renderer offers a
+ * paste box; submitting the code resolves the same flow the loopback would have.
+ * Null when no sign-in is currently awaiting a code.
+ */
+let activeManualSubmit: ((code: string) => void) | null = null;
+
+/**
+ * Complete an in-flight xAI sign-in with the code the user copied from the xAI
+ * consent page. Returns false when no sign-in is awaiting a code. Never throws.
+ */
+export function xaiSubmitManualCode(code: string): boolean {
+  const trimmed = code.trim();
+  log.info('[xai] manual submit', { active: activeManualSubmit !== null, len: trimmed.length });
+  if (!activeManualSubmit || trimmed.length === 0) return false;
+  activeManualSubmit(trimmed);
+  return true;
+}
+
 // ─── Public entry points ──────────────────────────────────────────────────────
 
 /**
@@ -86,6 +108,7 @@ export async function xaiOAuthLogin(): Promise<XaiOAuthResult> {
   try {
     // 1. Reuse an existing Grok CLI credential if it is still usable.
     const reused = await tryReuseGrokCli();
+    log.info('[xai] login start', { reusedCli: reused !== null });
     if (reused) return reused;
 
     // 2. Browser PKCE flow.
@@ -102,9 +125,12 @@ export async function xaiOAuthLogin(): Promise<XaiOAuthResult> {
       redirectUri,
       clientId,
     });
+    log.info('[xai] exchange result', { ok: !('error' in tokens), error: 'error' in tokens ? tokens.error : undefined });
     if ('error' in tokens) return { ok: false, error: tokens.error };
 
-    return await registerTokens(tokens, false);
+    const result = await registerTokens(tokens, false);
+    log.info('[xai] register result', { ok: result.ok, error: 'error' in result ? result.error : undefined });
+    return result;
   } catch {
     return { ok: false, error: 'unknown' };
   }
@@ -247,7 +273,9 @@ function authorizeViaLoopback(
 
     const finish = (outcome: CallbackOutcome): void => {
       if (settled) return;
+      log.info('[xai] flow finish', { kind: outcome.kind, error: outcome.kind === 'error' ? outcome.error : undefined });
       settled = true;
+      activeManualSubmit = null;
       if (timer) clearTimeout(timer);
       closeServer(server);
       resolve({ outcome, redirectUri });
@@ -255,6 +283,12 @@ function authorizeViaLoopback(
 
     const onRequest = (req: IncomingMessage, res: ServerResponse): void => {
       const requestUrl = new URL(req.url ?? '/', 'http://127.0.0.1');
+      log.info('[xai] loopback request', {
+        path: requestUrl.pathname,
+        hasCode: requestUrl.searchParams.has('code'),
+        error: requestUrl.searchParams.get('error'),
+        stateMatch: requestUrl.searchParams.get('state') === pkce.state,
+      });
       if (requestUrl.pathname !== '/callback') {
         res.writeHead(404).end();
         return;
@@ -293,6 +327,10 @@ function authorizeViaLoopback(
 
       redirectUri = `http://127.0.0.1:${address.port}/callback`;
       timer = setTimeout(() => finish({ kind: 'error', error: 'timeout' }), FLOW_TIMEOUT_MS);
+      // xAI may show a copy-this-code page instead of redirecting; let a pasted
+      // code complete the same flow (loopback callback still wins if it fires).
+      activeManualSubmit = (code) => finish({ kind: 'code', code });
+      log.info('[xai] loopback listening, opening browser', { redirectUri });
 
       const url = buildAuthorizeUrl(authorizeUrl, {
         clientId,

@@ -1740,7 +1740,13 @@
       "errorNoModels": "{{provider}} se conectó pero no devolvió modelos. Prueba a actualizarlo desde Gestionar.",
       "errorUnknown": "No se pudo conectar a {{provider}}. Inténtalo de nuevo.",
       "undecryptableHint": "Tu clave guardada para este proveedor no se puede leer. Vuelve a introducirla.",
-      "fromDeepLink": "Desde enlace profundo"
+      "fromDeepLink": "Desde enlace profundo",
+      "xaiPasteHint": "Taking a while? Copy the code from the x.ai page and paste it here to finish.",
+      "xaiPastePlaceholder": "Paste code from x.ai",
+      "xaiPasteSubmit": "Finish",
+      "xaiPasteCancel": "Cancel",
+      "xaiCodeNotAccepted": "That code could not be used. Click Sign in with X to start again.",
+      "xaiWaiting": "Finishing sign-in in your browser. Approve it in the tab that opened - this completes on its own."
     },
     "flux": {
       "name": "Flux Router",

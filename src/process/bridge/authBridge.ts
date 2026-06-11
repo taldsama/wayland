@@ -14,7 +14,7 @@ import {
 } from '@office-ai/aioncli-core';
 import { ipcBridge } from '@/common';
 import { promises as fsAsync } from 'node:fs';
-import { xaiOAuthLogin, xaiRefreshToken } from '@process/onboarding/xaiOAuth';
+import { xaiOAuthLogin, xaiRefreshToken, xaiSubmitManualCode } from '@process/onboarding/xaiOAuth';
 import { chatgptOAuthLogin, chatgptRefreshToken } from '@process/onboarding/chatgptOAuth';
 
 export function initAuthBridge(): void {
@@ -25,6 +25,9 @@ export function initAuthBridge(): void {
   // on the returned `XaiOAuthResult`.
   ipcBridge.xaiAuth.login.provider(() => xaiOAuthLogin());
   ipcBridge.xaiAuth.refresh.provider(() => xaiRefreshToken());
+  // xAI shows a code to copy rather than redirecting to the loopback; the
+  // renderer's paste box feeds it back here to complete the in-flight flow.
+  ipcBridge.xaiAuth.submitCode.provider(async ({ code }) => ({ accepted: xaiSubmitManualCode(code) }));
 
   // Native "Sign in with ChatGPT" OAuth - PKCE loopback against
   // auth.openai.com (the same path the Codex CLI uses), persisted as the

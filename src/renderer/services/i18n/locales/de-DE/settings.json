@@ -1740,7 +1740,13 @@
       "errorNoModels": "{{provider}} verbunden, aber keine Modelle zurückgegeben. Versuche, es über Verwalten zu aktualisieren.",
       "errorUnknown": "Verbindung zu {{provider}} fehlgeschlagen. Bitte versuche es erneut.",
       "undecryptableHint": "Dein gespeicherter Schlüssel für diesen Anbieter ist unlesbar. Bitte gib ihn erneut ein.",
-      "fromDeepLink": "Aus Deep Link"
+      "fromDeepLink": "Aus Deep Link",
+      "xaiPasteHint": "Taking a while? Copy the code from the x.ai page and paste it here to finish.",
+      "xaiPastePlaceholder": "Paste code from x.ai",
+      "xaiPasteSubmit": "Finish",
+      "xaiPasteCancel": "Cancel",
+      "xaiCodeNotAccepted": "That code could not be used. Click Sign in with X to start again.",
+      "xaiWaiting": "Finishing sign-in in your browser. Approve it in the tab that opened - this completes on its own."
     },
     "flux": {
       "name": "Flux Router",

@@ -557,6 +557,12 @@ export const xaiAuth = {
    * token and re-register it. Surfaced for the 401 re-auth path.
    */
   refresh: buildProvider<XaiOAuthResult, void>('xai.auth.refresh'),
+  /**
+   * Complete an in-flight sign-in with the code the user copied from the xAI
+   * consent page (xAI shows a code to paste rather than redirecting to the
+   * loopback). Returns `{ accepted }` - false when no flow is awaiting a code.
+   */
+  submitCode: buildProvider<{ accepted: boolean }, { code: string }>('xai.auth.submit-code'),
 };
 
 export const chatgptAuth = {
