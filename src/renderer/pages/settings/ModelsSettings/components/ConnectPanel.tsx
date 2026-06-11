@@ -257,6 +257,9 @@ const ConnectPanel: React.FC<Props> = ({
       <div className={styles.googleBtn}>
         <XGrokButton />
       </div>
+      {/* #56 ChatGPT subscription sign-in (native OAuth + token store + provider) is built
+          but held until the codex/Responses inference seam (registerChatGptSubscription) is
+          wired and live-verified. Re-enable by importing + rendering <ChatGptButton /> here. */}
 
       <div className={styles.browseLink}>
         <Button type='text' size='small' onClick={() => onBrowse()}>

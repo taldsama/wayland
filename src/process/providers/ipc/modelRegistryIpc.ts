@@ -71,6 +71,10 @@ import { ProviderCatalogStore, loadBaselineProviderCatalog } from '../catalog/pr
 import type { CatalogProviderEntry } from '../catalog/catalogProvider';
 import { FLUX_PROVIDER_ID, isFluxModelId } from '@/common/config/flux';
 import { injectFluxVirtualModels } from '../catalog/fluxVirtualModels';
+import {
+  buildChatGptSubscriptionCatalog,
+  CHATGPT_SUBSCRIPTION_PROVIDER_ID,
+} from '../catalog/chatgptSubscriptionModels';
 import { ConnectionTester } from '../detection/ConnectionTester';
 import { KeyDiscovery } from '../detection/KeyDiscovery';
 import { ModelsDevClient } from '../enrichment/ModelsDevClient';
@@ -624,10 +628,15 @@ export function createModelRegistryHandlers(deps: ModelRegistryDeps): ModelRegis
         // `not-found` - no row to test.
         if (stored.status !== 'ok') return { ok: false, error: 'unrecognized' };
 
-        if (CLOUD_PROVIDERS.has(providerId) || stored.creds.useGoogleAuth === true) {
-          // Cloud + google-auth - neither can be HTTP-probed via the standard
-          // `/v1/models` path. A stored credential is the strongest available
-          // signal; treat it as connected.
+        if (
+          CLOUD_PROVIDERS.has(providerId) ||
+          providerId === CHATGPT_SUBSCRIPTION_PROVIDER_ID ||
+          stored.creds.useGoogleAuth === true
+        ) {
+          // Cloud + google-auth + chatgpt-subscription - none can be HTTP-probed
+          // via the standard `/v1/models` path (the ChatGPT backend has no model
+          // listing and its token is rejected by api.openai.com). A stored
+          // credential is the strongest available signal; treat it as connected.
           repo.updateRegistryProviderState(providerId, 'connected');
           return { ok: true };
         }
@@ -1811,6 +1820,50 @@ export async function connectModelRegistryProvider(
   // must surface too, so emit always.
   ipcBridge.modelRegistry.listChanged.emit();
   return result;
+}
+
+/**
+ * Register a ChatGPT subscription connected via OAuth (`chatgpt-subscription`).
+ *
+ * This provider CANNOT go through `connectModelRegistryProvider`: a ChatGPT
+ * subscription access token is rejected by `api.openai.com`, and the ChatGPT
+ * backend (`chatgpt.com/backend-api`) exposes no `/v1/models` listing - so the
+ * standard HTTP-probe + models.dev catalog build would both fail. Like the
+ * cloud / google-auth providers, connection is verified by the OAuth module that
+ * minted the token, so we skip the probe and seed a STATIC catalog of the model
+ * ids the Responses path accepts.
+ *
+ * The access token is stored on the registry row as `creds.key` and the ChatGPT
+ * backend base as `creds.baseUrl` so the legacy bridge writes an
+ * `openai-compatible` row pointing at the backend. The custom Responses headers
+ * + body translation are NOT wired here - see the inference seam documented in
+ * `chatgptOAuth.ts` (registerChatGptSubscription).
+ *
+ * Returns `{ ok: false, error: 'unknown' }` if called before the registry repo
+ * is initialized.
+ */
+export function connectChatGptSubscriptionProvider(params: {
+  accessToken: string;
+  baseUrl: string;
+}): IModelRegistryConnectResult {
+  if (!_repo) {
+    console.error('[modelRegistry] connectChatGptSubscriptionProvider called before IPC init');
+    return { ok: false, error: 'unknown' };
+  }
+  try {
+    _repo.upsertRegistryProvider({
+      providerId: CHATGPT_SUBSCRIPTION_PROVIDER_ID,
+      connectedVia: 'ChatGPT subscription',
+      state: 'connected',
+      creds: { key: params.accessToken, baseUrl: params.baseUrl },
+    });
+    _repo.replaceRegistryCatalog(CHATGPT_SUBSCRIPTION_PROVIDER_ID, buildChatGptSubscriptionCatalog());
+    void mirrorConnectOrRekey(_repo, CHATGPT_SUBSCRIPTION_PROVIDER_ID);
+    ipcBridge.modelRegistry.listChanged.emit();
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'unknown' };
+  }
 }
 
 /**

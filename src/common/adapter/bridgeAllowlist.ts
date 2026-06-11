@@ -274,6 +274,12 @@ const REMOTE_DENIED_KEYS: ReadonlySet<string> = new Set([
   //     trigger a refresh-token exchange. ---
   'xai.auth.login',
   'xai.auth.refresh',
+  // --- Native "Sign in with ChatGPT" OAuth. Both mint/persist the
+  //     `chatgpt-subscription` provider bundle (refresh + access tokens) via the
+  //     OAuth flow - same credential-minting class as xai.auth.* above. A remote
+  //     WS caller must never drive an OAuth mint or a refresh-token exchange. ---
+  'chatgpt.auth.login',
+  'chatgpt.auth.refresh',
   // --- Cost observability (WS-D / WS-F). The whole cost.* namespace is already
   //     denied to remote callers via the `cost.` prefix above; these exact keys
   //     are enumerated for documentation + defence-in-depth. byConversation +

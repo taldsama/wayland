@@ -15,6 +15,7 @@ import {
 import { ipcBridge } from '@/common';
 import { promises as fsAsync } from 'node:fs';
 import { xaiOAuthLogin, xaiRefreshToken } from '@process/onboarding/xaiOAuth';
+import { chatgptOAuthLogin, chatgptRefreshToken } from '@process/onboarding/chatgptOAuth';
 
 export function initAuthBridge(): void {
   // Native xAI "Sign in with X (Grok)" OAuth - PKCE loopback against
@@ -24,6 +25,14 @@ export function initAuthBridge(): void {
   // on the returned `XaiOAuthResult`.
   ipcBridge.xaiAuth.login.provider(() => xaiOAuthLogin());
   ipcBridge.xaiAuth.refresh.provider(() => xaiRefreshToken());
+
+  // Native "Sign in with ChatGPT" OAuth - PKCE loopback against
+  // auth.openai.com (the same path the Codex CLI uses), persisted as the
+  // `chatgpt-subscription` provider. Both handlers are remote-denied in
+  // `bridgeAllowlist.ts` (they mint/persist a credential). They never reject -
+  // the renderer branches on the returned `ChatGptOAuthResult`.
+  ipcBridge.chatgptAuth.login.provider(() => chatgptOAuthLogin());
+  ipcBridge.chatgptAuth.refresh.provider(() => chatgptRefreshToken());
 
   ipcBridge.googleAuth.status.provider(async ({ proxy }) => {
     try {

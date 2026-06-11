@@ -93,6 +93,25 @@ export type XaiOAuthResult =
   | { ok: false; error: 'cancelled' | 'timeout' | 'unauthorized' | 'no-credit' | 'offline' | 'unknown' };
 
 /**
+ * Result of the native "Sign in with ChatGPT" OAuth connect
+ * (`ipcBridge.chatgptAuth.login`).
+ *
+ * On success the ChatGPT-subscription token obtained via the standard OAuth 2.0
+ * PKCE flow against `auth.openai.com` (the same path the Codex CLI uses) has been
+ * persisted - the encrypted bundle for inference/refresh is saved and the
+ * `chatgpt-subscription` provider is registered. `planType` is surfaced so the
+ * UI can confirm the tier ("Pro", "Plus", ...).
+ *
+ * On failure the `error` is a stable, renderer-safe reason; it never carries the
+ * token or any raw network detail.
+ */
+export type ChatGptPlanLabel = 'free' | 'plus' | 'pro' | 'team' | 'enterprise' | 'unknown';
+
+export type ChatGptOAuthResult =
+  | { ok: true; planType: ChatGptPlanLabel }
+  | { ok: false; error: 'cancelled' | 'timeout' | 'unauthorized' | 'no-credit' | 'offline' | 'unknown' };
+
+/**
  * Result of connecting a single pasted API key during onboarding
  * (`ipcBridge.onboarding.connectPastedKey`). The provider is auto-detected via
  * the real `ProviderDetector` + `SkRaceResolver`, so a bare `sk-` key shared by

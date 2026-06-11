@@ -72,6 +72,14 @@ export const PROVIDER_META: Record<NativeProviderId, ProviderMeta> = {
   },
   groq: { id: 'groq', displayName: 'Groq', mono: 'Gq', bg: '#f55036', darkText: false, group: 'open' },
   xai: { id: 'xai', displayName: 'xAI Grok', mono: 'x', bg: '#1a1a1a', darkText: false, group: 'frontier' },
+  'chatgpt-subscription': {
+    id: 'chatgpt-subscription',
+    displayName: 'ChatGPT (subscription)',
+    mono: 'C',
+    bg: '#10a37f',
+    darkText: false,
+    group: 'frontier',
+  },
   mistral: { id: 'mistral', displayName: 'Mistral', mono: 'M', bg: '#fa5111', darkText: false, group: 'frontier' },
   cohere: { id: 'cohere', displayName: 'Cohere', mono: 'C', bg: '#39594d', darkText: false, group: 'frontier' },
   perplexity: {

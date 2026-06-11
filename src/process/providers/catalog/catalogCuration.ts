@@ -34,6 +34,7 @@ const NATIVE_ID_MAP: Record<NativeProviderId, true> = {
   openrouter: true,
   groq: true,
   xai: true,
+  'chatgpt-subscription': true,
   mistral: true,
   cohere: true,
   perplexity: true,

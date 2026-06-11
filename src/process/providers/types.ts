@@ -13,6 +13,7 @@ export type NativeProviderId =
   | 'openrouter'
   | 'groq'
   | 'xai'
+  | 'chatgpt-subscription'
   | 'mistral'
   | 'cohere'
   | 'perplexity'

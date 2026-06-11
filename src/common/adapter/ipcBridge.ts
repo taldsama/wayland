@@ -32,7 +32,12 @@ import type {
   UpdateDownloadResult,
   AutoUpdateStatus,
 } from '../update/updateTypes';
-import type { ConnectFluxResult, ConnectPastedKeyResult, XaiOAuthResult } from '../types/onboarding';
+import type {
+  ChatGptOAuthResult,
+  ConnectFluxResult,
+  ConnectPastedKeyResult,
+  XaiOAuthResult,
+} from '../types/onboarding';
 import type { ProtocolDetectionRequest, ProtocolDetectionResponse } from '../utils/protocolDetector';
 import type { SpeechToTextRequest, SpeechToTextResult } from '../types/speech';
 import type { DownloadResult, VoiceAsset } from '../types/voiceAsset';
@@ -552,6 +557,25 @@ export const xaiAuth = {
    * token and re-register it. Surfaced for the 401 re-auth path.
    */
   refresh: buildProvider<XaiOAuthResult, void>('xai.auth.refresh'),
+};
+
+export const chatgptAuth = {
+  /**
+   * Native "Sign in with ChatGPT" via OAuth 2.0 Authorization Code + PKCE, using
+   * the same flow the Codex CLI uses (`auth.openai.com`, `originator=codex_cli_rs`)
+   * - no `codex` CLI required. Opens the system browser, runs a loopback listener
+   * on `127.0.0.1:1455` (fallback 1457), exchanges the code for the subscription
+   * bundle, persists it encrypted, and registers the `chatgpt-subscription`
+   * provider (inference routes to `https://chatgpt.com/backend-api/codex/responses`).
+   * Resolves `{ ok: true, planType }` or a stable error reason - it never rejects,
+   * so the renderer can branch on the result alone.
+   */
+  login: buildProvider<ChatGptOAuthResult, void>('chatgpt.auth.login'),
+  /**
+   * Silent re-auth: exchange the persisted refresh token for a fresh access
+   * token and re-register it. Surfaced for the proactive + 401 re-auth paths.
+   */
+  refresh: buildProvider<ChatGptOAuthResult, void>('chatgpt.auth.refresh'),
 };
 
 export const onboarding = {
