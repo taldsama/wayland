@@ -1,11 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 💬 Community Discussions
-    url: https://github.com/FerroxLabs/wayland/discussions
-    about: Ask questions, share ideas, and discuss Wayland with the community
-  - name: 📖 Documentation
+  - name: Documentation
     url: https://github.com/FerroxLabs/wayland/wiki
-    about: Check our documentation for setup guides, configuration, and troubleshooting
-  - name: 🔒 Security Issues
-    url: mailto:security@getwayland.com
-    about: Report security vulnerabilities privately (DO NOT create public issues)
+    about: Setup guides, configuration, and troubleshooting.
+  - name: Report a security vulnerability
+    url: https://github.com/FerroxLabs/wayland/security/advisories/new
+    about: Report vulnerabilities privately through GitHub. Do not open a public issue.
