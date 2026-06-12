@@ -48,8 +48,8 @@ exports.default = async function notarizeDmg(buildResult) {
   for (const dmg of dmgs) {
     const name = path.basename(dmg);
     try {
-      console.log(`notarizeDmg: code-signing ${name} with Developer ID…`);
-      signDmgWithTimestamp(identity, dmg);
+      console.log(`notarizeDmg: code-signing ${name} with Developer ID (no timestamp)…`);
+      signDmgNoTimestamp(identity, dmg);
 
       console.log(`notarizeDmg: submitting ${name} to Apple notary service…`);
       const submitCmd = [
@@ -87,58 +87,46 @@ exports.default = async function notarizeDmg(buildResult) {
 };
 
 /**
- * Code-sign the dmg with a HARD timeout, signature verification, and retries.
+ * Code-sign the dmg with Developer ID but WITHOUT a secure timestamp.
  *
- * `codesign --timestamp` contacts Apple's secure timestamp server
- * (timestamp.apple.com). codesign has no client-side timeout, so when that
- * server stalls codesign blocks forever and wedges the whole build — three
- * consecutive v0.9.7 release runs hung 90-160 min at exactly this step (both
- * arch legs, orphaned `codesign` processes) until cancelled. The caller's
- * try/catch only anticipated notary *failure*; a *hang* never throws, so it
- * never degraded gracefully.
+ * codesign timestamps by default for a Developer ID identity — it contacts
+ * Apple's timestamp server (timestamp.apple.com). `--timestamp=none` skips that
+ * TSA round-trip entirely. That TSA call is what wedged the build: three v0.9.7
+ * release runs hung 90-160 min here, always on the *dmg* codesign (the build's
+ * second TSA call), never the app codesign, and the same codesign is sub-second
+ * locally — i.e. GitHub's shared runner egress IP gets rate-limited by Apple's
+ * TSA, not an Apple outage. Removing the TSA dependency removes the hang.
  *
- * `runBounded` spawns codesign DIRECTLY (no shell) so the timeout's SIGKILL
- * lands on codesign itself. Two further guards from the cross-audit: (1) a
- * SIGKILLed attempt can leave a partial signature, so before each retry we clear
- * it (`--remove-signature`, best-effort) rather than let `--force` layer onto a
- * corrupt one; (2) codesign can exit 0 yet leave an *invalid* dmg signature
- * (Apple TN2206), so we `--verify --strict` before trusting it.
+ * The dmg does NOT need its own secure timestamp: it still carries a Developer
+ * ID signature (satisfying Gatekeeper's "must be signed" requirement), and
+ * notarization — whose stapled ticket IS Apple-timestamped — is what makes
+ * Gatekeeper accept the quarantined dmg. Proven end-to-end locally with the real
+ * Ferrox cert: `--timestamp=none` dmg -> notarytool **Accepted** -> stapled ->
+ * `spctl` **accepted (source=Notarized Developer ID)** on a quarantined copy.
  *
- * On exhaustion we throw so the caller degrades to "signed-but-unstapled" and
- * the release smoke gate blocks publishing; CI auto-retry — or a later run once
- * the TSA recovers — then produces a clean dmg. A no-timestamp fallback is NOT a
- * viable degradation: Apple notarization REQUIRES a secure timestamp, so an
- * un-timestamped dmg would be rejected by notarytool anyway.
+ * Still spawned via `runBounded` (no shell, hard timeout) as cheap defense, and
+ * `--verify --strict` confirms the signature before we trust it. A failure here
+ * throws so the caller degrades to "signed-but-unstapled" and the smoke gate
+ * blocks publishing.
  */
-function signDmgWithTimestamp(identity, dmg) {
-  const SIGN_MS = 180000; // 3 min ceiling per timestamped sign (healthy: seconds)
-  const SHORT_MS = 60000; // local, no-network codesign ops
-  const MAX_ATTEMPTS = 3;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    if (attempt > 1) {
-      // Clear any partial signature a SIGKILLed prior attempt may have left.
-      runBounded('codesign', ['--remove-signature', dmg], {
-        timeoutMs: SHORT_MS,
-        label: `notarizeDmg: clearing partial signature before retry ${attempt}`,
-      });
-    }
-    const signed = runBounded('codesign', ['--force', '--sign', identity, '--timestamp', dmg], {
-      timeoutMs: SIGN_MS,
-      label: `notarizeDmg: codesign attempt ${attempt}/${MAX_ATTEMPTS}`,
-    });
-    if (
-      signed &&
-      runBounded('codesign', ['--verify', '--strict', dmg], {
-        timeoutMs: SHORT_MS,
-        label: `notarizeDmg: verifying signature (attempt ${attempt}/${MAX_ATTEMPTS})`,
-      })
-    ) {
-      return;
-    }
+function signDmgNoTimestamp(identity, dmg) {
+  const name = path.basename(dmg);
+  if (
+    !runBounded('codesign', ['--force', '--timestamp=none', '--sign', identity, dmg], {
+      timeoutMs: 60000,
+      label: `notarizeDmg: signing ${name}`,
+    })
+  ) {
+    throw new Error(`codesign (no-timestamp) failed for ${name}`);
   }
-  throw new Error(
-    `notarizeDmg: dmg codesign + verify failed after ${MAX_ATTEMPTS} attempts (likely an Apple timestamp-server outage)`
-  );
+  if (
+    !runBounded('codesign', ['--verify', '--strict', dmg], {
+      timeoutMs: 60000,
+      label: `notarizeDmg: verifying ${name}`,
+    })
+  ) {
+    throw new Error(`codesign --verify failed for ${name}`);
+  }
 }
 
 /**
