@@ -614,7 +614,12 @@ ${collectedResponses.join('\n')}`;
       // config (and active profile) stays native for non-flux model picks.
       if (data.backend === 'hermes') {
         try {
-          mergedEnv.HERMES_HOME = await materializeFluxHermesHome(app.getPath('userData'));
+          // hermes ignores FLUX_API_KEY for a custom provider, so the connector
+          // writes the connected flux key inline into the scoped config.
+          mergedEnv.HERMES_HOME = await materializeFluxHermesHome(
+            app.getPath('userData'),
+            decision.env.FLUX_API_KEY ?? ''
+          );
         } catch (err) {
           mainWarn('[AcpAgentManager]', 'materializeFluxHermesHome failed', err);
         }
