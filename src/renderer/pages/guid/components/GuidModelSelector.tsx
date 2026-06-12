@@ -20,6 +20,7 @@ import { useRecentlyUsedModels } from '@/renderer/hooks/usage/useRecentlyUsedMod
 import { pinKey, usePinnedModels } from '@/renderer/hooks/usage/usePinnedModels';
 import { resolveAgentScope } from '@/renderer/pages/settings/AgentSettings/agentScopes';
 import { iconColors } from '@/renderer/styles/colors';
+import { formatModifierShortcut } from '@/renderer/utils/platform';
 import FluxRouterMark from '@/renderer/components/icons/FluxRouterMark';
 import { getModelDisplayLabel } from '@/renderer/utils/model/agentLogo';
 import { formatAcpModelDisplayLabel, getAcpModelSourceLabel } from '@/renderer/utils/model/modelSource';
@@ -915,7 +916,7 @@ export const ModelSelectorPanel: React.FC<ModelSelectorPanelProps> = ({
             size='small'
           />
         </div>
-        {!searching && <span className={styles.kbdHint}>⌘K</span>}
+        {!searching && <span className={styles.kbdHint}>{formatModifierShortcut('K')}</span>}
       </div>
 
       <div className={styles.scrollArea}>
