@@ -6,6 +6,7 @@ import type {
 } from '@agentclientprotocol/sdk';
 import * as path from 'node:path';
 import { AcpError } from '@process/acp/errors/AcpError';
+import { buildAcpSetupGuidance } from '@process/acp/errors/setupFailure';
 import type { ClientFactory, DisconnectInfo } from '@process/acp/infra/IAcpClient';
 import { noopMetrics, type AcpMetrics } from '@process/acp/metrics/AcpMetrics';
 import { ConfigTracker } from '@process/acp/session/ConfigTracker';
@@ -414,10 +415,15 @@ export class AcpSession {
   }
 
   enterError(message: string): void {
+    // If the backend failed because it's installed but missing a runtime extra
+    // (e.g. Hermes without the ACP adapter), rewrite the raw stderr into
+    // actionable install guidance with the correct command. Otherwise pass the
+    // original message through unchanged.
+    const displayMessage = buildAcpSetupGuidance(this.agentConfig.agentBackend, message) ?? message;
     this.promptExecutor.clearPending();
-    this.permissionResolver.rejectAll(new Error(message));
+    this.permissionResolver.rejectAll(new Error(displayMessage));
     this.promptExecutor.stopTimer();
     this.setStatus('error');
-    this.callbacks.onSignal({ type: 'error', message, recoverable: false });
+    this.callbacks.onSignal({ type: 'error', message: displayMessage, recoverable: false });
   }
 }
