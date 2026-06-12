@@ -11,6 +11,7 @@ import { uuid } from '@/common/utils';
 import { cronService } from './cron/cronServiceSingleton';
 import { SqliteProjectRepository } from '@process/services/database/SqliteProjectRepository';
 import { loadProjectKnowledgeBlock } from '@process/services/projectKnowledge/knowledge';
+import { enforceProjectWorkspace } from '@process/services/projectWorkspace';
 import {
   createGeminiAgent,
   createAcpAgent,
@@ -152,25 +153,14 @@ export class ConversationServiceImpl implements IConversationService {
   }
 
   /**
-   * #30: A chat created inside a project carries extra.projectId, but its
-   * workspace can arrive empty (the project route may pass an undefined project
-   * workspace). When the workspace is empty the agent factory substitutes a
-   * throwaway `wcore-temp-*` dir, so a project chat drifts off its project
-   * workspace. Fill the workspace from the project at create time. A
-   * user-chosen custom workspace is never overwritten; if the project itself
-   * has no workspace, the temp fallback still applies.
+   * #30 NO-DRIFT: a chat created inside a project (extra.projectId) is pinned to
+   * its project workspace before the agent factory runs, so it never drifts to a
+   * throwaway `*-temp-*` dir. Delegates to the shared enforcer (also run at spawn
+   * time for resumed/migrated rows). A user-chosen custom workspace is never
+   * overwritten; if the project has no workspace the temp fallback still applies.
    */
   private async reconcileProjectWorkspace(params: CreateConversationParams): Promise<void> {
-    const extra = params.extra as Record<string, unknown> | undefined;
-    const projectId = extra?.projectId as string | undefined;
-    if (!extra || !projectId) return;
-    if (extra.customWorkspace || (typeof extra.workspace === 'string' && extra.workspace.trim())) return;
-    try {
-      const project = await new SqliteProjectRepository().getProject(projectId);
-      if (project?.workspace) extra.workspace = project.workspace;
-    } catch (err) {
-      console.error('[ConversationServiceImpl] project workspace reconcile failed:', err);
-    }
+    await enforceProjectWorkspace(params.extra as Record<string, unknown> | undefined);
   }
 
   async createConversation(params: CreateConversationParams): Promise<TChatConversation> {
