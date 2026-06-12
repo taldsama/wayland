@@ -12,7 +12,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { existsSync, mkdtempSync } from 'fs';
-import { readFile, rm } from 'fs/promises';
+import { readFile, rm, stat } from 'fs/promises';
 import { homedir, tmpdir } from 'os';
 import { join } from 'path';
 import { FLUX_SURFACE } from '@/common/config/flux';
@@ -65,6 +65,15 @@ describe('materializeFluxHermesHome', () => {
     const dir = await materializeFluxHermesHome(userData, "ab'cd");
     const yaml = await readFile(join(dir, 'config.yaml'), 'utf8');
     expect(yaml).toContain("api_key: 'ab''cd'");
+  });
+
+  it.skipIf(process.platform === 'win32')('writes the credential file owner-only (0o600) in a 0o700 dir', async () => {
+    const userData = makeUserData();
+    const dir = await materializeFluxHermesHome(userData, TEST_KEY);
+    const fileMode = (await stat(join(dir, 'config.yaml'))).mode & 0o777;
+    const dirMode = (await stat(dir)).mode & 0o777;
+    expect(fileMode).toBe(0o600);
+    expect(dirMode).toBe(0o700);
   });
 
   it('honors an explicit Flux Desktop daemon base_url', async () => {

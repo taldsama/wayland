@@ -5,7 +5,7 @@
  */
 
 import { FLUX_AUTO_MODEL, FLUX_SURFACE } from '@/common/config/flux';
-import { mkdir, writeFile } from 'fs/promises';
+import { chmod, mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 
 /**
@@ -56,7 +56,16 @@ export async function materializeFluxHermesHome(
     '',
   ].join('\n');
 
-  await mkdir(hermesHomeDir, { recursive: true });
-  await writeFile(configPath, content, 'utf8');
+  // config.yaml holds the flux key inline, so lock it down to owner-only. mkdir's
+  // `mode` only applies when it CREATES the dir (the scoped home persists across
+  // spawns, so chmod it explicitly too); writeFile's `mode` is umask-masked, so a
+  // follow-up chmod guarantees 0o600 regardless of umask. chmod is a POSIX no-op
+  // on Windows, where per-user userData isolation is the protection.
+  await mkdir(hermesHomeDir, { recursive: true, mode: 0o700 });
+  await writeFile(configPath, content, { encoding: 'utf8', mode: 0o600 });
+  if (process.platform !== 'win32') {
+    await chmod(hermesHomeDir, 0o700);
+    await chmod(configPath, 0o600);
+  }
   return hermesHomeDir;
 }
