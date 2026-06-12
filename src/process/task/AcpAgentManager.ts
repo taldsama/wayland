@@ -44,6 +44,7 @@ import {
   writeCodexSandboxMode,
 } from '@process/task/codexConfig';
 import { materializeFluxClaudeConfigDir } from '@process/task/claudeConfig';
+import { materializeFluxHermesHome } from '@process/task/hermesConfig';
 import { app } from 'electron';
 import BaseAgentManager from './BaseAgentManager';
 import { IpcAgentEventEmitter } from './IpcAgentEventEmitter';
@@ -603,6 +604,19 @@ ${collectedResponses.join('\n')}`;
           mergedEnv.CLAUDE_CONFIG_DIR = await materializeFluxClaudeConfigDir(app.getPath('userData'));
         } catch (err) {
           mainWarn('[AcpAgentManager]', 'materializeFluxClaudeConfigDir failed', err);
+        }
+      }
+
+      // hermes selects its provider from <HERMES_HOME>/config.yaml, not from env.
+      // Point flux-routed hermes spawns at a Wayland-scoped HERMES_HOME whose
+      // config pins model.provider=custom at the Flux openai surface + flux-auto
+      // (reading FLUX_API_KEY at request time), so the user's real ~/.hermes
+      // config (and active profile) stays native for non-flux model picks.
+      if (data.backend === 'hermes') {
+        try {
+          mergedEnv.HERMES_HOME = await materializeFluxHermesHome(app.getPath('userData'));
+        } catch (err) {
+          mainWarn('[AcpAgentManager]', 'materializeFluxHermesHome failed', err);
         }
       }
     }
