@@ -506,7 +506,7 @@ const ManageProvider: React.FC<Props> = ({ provider, onBack, onDisconnected }) =
         okButtonProps={{ disabled: !rekeyValue.trim() }}
       >
         <div className='flex flex-col gap-8px'>
-          <div className='text-12px text-[var(--color-text-2)] leading-1.5'>
+          <div className='text-12px text-[var(--color-text-2)] leading-relaxed'>
             {t('settings.modelsPage.manage.rekeyBody')}
           </div>
           <Input.Password
