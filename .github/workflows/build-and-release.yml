@@ -354,7 +354,10 @@ jobs:
         # want rc tags to stay flagged as prereleases instead.
         run: |
           TAG="${{ steps.tag.outputs.tag_name }}"
-          echo "Both smoke gates green — publishing $TAG (latest, not-prerelease)"
-          gh release edit "$TAG" --draft=false --latest --prerelease=false
+          echo "Both smoke gates green - publishing $TAG (latest, not-prerelease)"
+          # This job does not checkout the repo, so gh has no .git to infer the
+          # repo from; pass --repo explicitly or gh dies "not a git repository"
+          # (which left v0.9.7 stuck as a draft after both gates passed).
+          gh release edit "$TAG" --repo "${{ github.repository }}" --draft=false --latest --prerelease=false
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
