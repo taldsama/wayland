@@ -19,6 +19,14 @@
   "readyToInstallDesc": "Обновление загружено. Нажмите кнопку ниже для перезапуска и установки обновления.",
   "installNow": "Установить и перезапустить",
   "autoUpdateMode": "Режим автообновления",
+  "ijfw": {
+    "availableTitle": "Доступно обновление IJFW",
+    "pathIssueTitle": "Путь к команде IJFW требует внимания",
+    "pathIssueBody": "IJFW установлен, но команда ijfw отсутствует в PATH. Wayland по-прежнему может использовать локальную установку.",
+    "updateButton": "Обновить IJFW",
+    "updateStarted": "Обновление IJFW запущено. Перезапустите Wayland после подготовки новой версии.",
+    "versionLine": "IJFW {{current}} → {{latest}}"
+  },
   "showInFolder": "Показать в папке",
   "openFile": "Открыть файл",
   "errorTitle": "Ошибка обновления",

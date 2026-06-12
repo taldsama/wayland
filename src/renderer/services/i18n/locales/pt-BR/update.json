@@ -19,6 +19,14 @@
   "readyToInstallDesc": "A atualização foi baixada. Clique no botão abaixo para reiniciar e instalar a atualização.",
   "installNow": "Instalar e reiniciar",
   "autoUpdateMode": "Modo de atualização automática",
+  "ijfw": {
+    "availableTitle": "Atualização do IJFW disponível",
+    "pathIssueTitle": "O caminho do comando IJFW precisa de atenção",
+    "pathIssueBody": "O IJFW está instalado, mas o comando ijfw não está no PATH. O Wayland ainda pode usar a instalação local.",
+    "updateButton": "Atualizar IJFW",
+    "updateStarted": "Atualização do IJFW iniciada. Reinicie o Wayland depois que ela preparar a nova versão.",
+    "versionLine": "IJFW {{current}} → {{latest}}"
+  },
   "showInFolder": "Mostrar na pasta",
   "openFile": "Abrir arquivo",
   "errorTitle": "Falha na atualização",

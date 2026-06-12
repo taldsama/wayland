@@ -19,6 +19,14 @@
   "readyToInstallDesc": "업데이트가 다운로드되었습니다. 아래 버튼을 클릭하여 재시작하고 업데이트를 설치하세요.",
   "installNow": "지금 설치 및 재시작",
   "autoUpdateMode": "자동 업데이트 모드",
+  "ijfw": {
+    "availableTitle": "IJFW 업데이트 사용 가능",
+    "pathIssueTitle": "IJFW 명령 경로에 주의가 필요합니다",
+    "pathIssueBody": "IJFW가 설치되어 있지만 ijfw 명령이 PATH에 없습니다. Wayland는 로컬 설치를 계속 사용할 수 있습니다.",
+    "updateButton": "IJFW 업데이트",
+    "updateStarted": "IJFW 업데이트를 시작했습니다. 새 버전이 준비된 후 Wayland를 다시 시작하세요.",
+    "versionLine": "IJFW {{current}} → {{latest}}"
+  },
   "showInFolder": "폴더에서 보기",
   "openFile": "파일 열기",
   "errorTitle": "업데이트 실패",
