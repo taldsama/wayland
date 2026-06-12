@@ -90,10 +90,27 @@ const AcpModelSelector: React.FC<{
   const hasUserChangedModel = useRef(false);
   // Track the last conversationId to detect tab switches
   const prevConversationIdRef = useRef(conversationId);
+  // A user-selected Flux tier (flux-auto, ...) is carried by the spawn env, so the
+  // agent never reports it as its current model. Pin it so model-info reloads, the
+  // claude 1.5s poll, and stream updates do not wipe the selection back to the
+  // native model (mirrors AcpAgentManager's isFluxOnFluxBackend guard).
+  const selectedFluxModelRef = useRef<FluxModelId | null>(
+    isFluxModelId(initialModelId) ? (initialModelId as FluxModelId) : null
+  );
 
-  const updateModelInfo = useCallback((nextModelInfo: AcpModelInfo) => {
-    setModelInfo((prev) => (isSameModelInfo(prev, nextModelInfo) ? prev : nextModelInfo));
-  }, []);
+  const updateModelInfo = useCallback(
+    (nextModelInfo: AcpModelInfo) => {
+      setModelInfo((prev) => {
+        const pinned = selectedFluxModelRef.current;
+        const next =
+          pinned && showFlux
+            ? { ...nextModelInfo, currentModelId: pinned, currentModelLabel: FLUX_MODEL_DISPLAY[pinned] }
+            : nextModelInfo;
+        return isSameModelInfo(prev, next) ? prev : next;
+      });
+    },
+    [showFlux]
+  );
 
   const loadCachedModelInfo = useCallback(
     async (backendKey: string, options?: { preserveInitialModel?: boolean }) => {
@@ -247,6 +264,8 @@ const AcpModelSelector: React.FC<{
   const handleSelectModel = useCallback(
     (modelId: string) => {
       hasUserChangedModel.current = true;
+      // Pin or clear the Flux selection so reloads/polls/streams cannot overwrite it.
+      selectedFluxModelRef.current = isFluxModelId(modelId) ? (modelId as FluxModelId) : null;
       const fluxLabel = isFluxModelId(modelId) ? FLUX_MODEL_DISPLAY[modelId as FluxModelId] : undefined;
       setModelInfo((prev) => {
         if (!prev) return prev;

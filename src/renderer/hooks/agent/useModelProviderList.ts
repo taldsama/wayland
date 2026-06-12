@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import { useGeminiGoogleAuthModels } from './useGeminiGoogleAuthModels';
 import type { GeminiModeOption } from './useModeModeList';
 import { hasSpecificModelCapability } from '@/renderer/utils/model/modelCapabilities';
+import { FLUX_MODEL_DISPLAY, isFluxModelId, type FluxModelId } from '@/common/config/flux';
 
 export interface ModelProviderListResult {
   providers: IProvider[];
@@ -99,6 +100,9 @@ export const useModelProviderList = (): ModelProviderListResult => {
   const formatModelLabel = useCallback(
     (provider: { platform?: string } | undefined, modelName?: string) => {
       if (!modelName) return '';
+      // Flux routing aliases (flux-auto, ...) carry a raw id but should read as
+      // their brand name ("Flux Auto") everywhere they surface.
+      if (isFluxModelId(modelName)) return FLUX_MODEL_DISPLAY[modelName as FluxModelId] ?? modelName;
       const isGoogleAuthProvider = provider?.platform?.toLowerCase().includes('gemini-with-google-auth');
       if (isGoogleAuthProvider) {
         return geminiModeLookup.get(modelName)?.label || modelName;

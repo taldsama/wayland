@@ -15,6 +15,11 @@ import classNames from 'classnames';
 import useSWR from 'swr';
 import { ipcBridge } from '@/common';
 import type { IProvider } from '@/common/config/storage';
+import { FLUX_MODEL_DISPLAY, isFluxModelId, type FluxModelId } from '@/common/config/flux';
+
+/** Render a Flux routing alias (flux-auto, ...) as its brand name ("Flux Auto"). */
+const toDisplayName = (modelName: string): string =>
+  isFluxModelId(modelName) ? FLUX_MODEL_DISPLAY[modelName as FluxModelId] : modelName;
 
 const WCoreModelSelector: React.FC<{
   selection?: WCoreModelSelection;
@@ -76,7 +81,7 @@ const WCoreModelSelector: React.FC<{
 
   const label = getModelDisplayLabel({
     selectedValue: currentModel?.useModel,
-    selectedLabel: currentModel?.useModel || '',
+    selectedLabel: currentModel?.useModel ? toDisplayName(currentModel.useModel) : '',
     defaultModelLabel,
     fallbackLabel: t('conversation.welcome.selectModel'),
   });
@@ -112,7 +117,7 @@ const WCoreModelSelector: React.FC<{
                         {healthStatus !== 'unknown' && (
                           <div className={`w-6px h-6px rounded-full shrink-0 ${healthColor}`} />
                         )}
-                        <span>{modelName}</span>
+                        <span>{toDisplayName(modelName)}</span>
                       </div>
                     </Menu.Item>
                   );

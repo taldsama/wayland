@@ -76,18 +76,20 @@ async function resolvePreferredAcpModelId(backend: string): Promise<string | und
     return cachedModelId;
   }
 
-  if (backend === 'codex' && DEFAULT_CODEX_MODELS.length > 0) {
-    return DEFAULT_CODEX_MODELS[0]?.id;
-  }
-
   // Toggle default role (R5): with no explicit per-chat pin, a Flux-capable
   // backend defaults its model to flux-auto when "Route all agents through Flux"
-  // is on AND Flux is connected, so the toggle still routes new chats through
-  // Flux. The user can override per chat via the picker; an explicit native pick
-  // is written into preferredModelId/cachedModels above and wins here, matching
-  // the resolveFluxRouting rule (explicit native pick stays native).
+  // is on AND Flux is connected, so the toggle routes new chats through Flux.
+  // Checked BEFORE the codex native default below, otherwise codex's early return
+  // blocked Flux defaulting entirely. An explicit native pick is written into
+  // preferredModelId/cachedModels above and wins here (explicit native stays native).
   if (await shouldDefaultToFluxAuto(backend)) {
     return FLUX_AUTO_MODEL;
+  }
+
+  // Codex needs a native default (its picker is empty pre-session); applies only
+  // when Flux defaulting above did not fire.
+  if (backend === 'codex' && DEFAULT_CODEX_MODELS.length > 0) {
+    return DEFAULT_CODEX_MODELS[0]?.id;
   }
 
   return undefined;

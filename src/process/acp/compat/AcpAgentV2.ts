@@ -337,7 +337,11 @@ export class AcpAgentV2 {
           this.onStreamEvent({
             type: 'agent_status',
             conversation_id: this.conversationId,
-            msg_id: `status_${Date.now()}`,
+            // Stable per-conversation id so the renderer upserts (collapses) the
+            // status banner instead of appending a new one per spawn. A Date.now()
+            // id made every respawn a distinct row, stacking "Active session"
+            // banners. The legacy agent used a fixed id; V2 had dropped it.
+            msg_id: `status_${this.conversationId}`,
             data: { status: oldStatusName, backend: this.agentConfig.agentBackend },
           });
         }
