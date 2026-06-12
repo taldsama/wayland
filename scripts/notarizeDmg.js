@@ -89,20 +89,20 @@ exports.default = async function notarizeDmg(buildResult) {
 /**
  * Code-sign the dmg with Developer ID but WITHOUT a secure timestamp.
  *
- * codesign timestamps by default for a Developer ID identity — it contacts
- * Apple's timestamp server (timestamp.apple.com). `--timestamp=none` skips that
- * TSA round-trip entirely. That TSA call is what wedged the build: three v0.9.7
- * release runs hung 90-160 min here, always on the *dmg* codesign (the build's
- * second TSA call), never the app codesign, and the same codesign is sub-second
- * locally — i.e. GitHub's shared runner egress IP gets rate-limited by Apple's
- * TSA, not an Apple outage. Removing the TSA dependency removes the hang.
- *
  * The dmg does NOT need its own secure timestamp: it still carries a Developer
  * ID signature (satisfying Gatekeeper's "must be signed" requirement), and
  * notarization — whose stapled ticket IS Apple-timestamped — is what makes
  * Gatekeeper accept the quarantined dmg. Proven end-to-end locally with the real
  * Ferrox cert: `--timestamp=none` dmg -> notarytool **Accepted** -> stapled ->
  * `spctl` **accepted (source=Notarized Developer ID)** on a quarantined copy.
+ * `--timestamp=none` also drops an unnecessary Apple TSA round-trip.
+ *
+ * NOTE on the original v0.9.7 "codesign hang": it was NOT the Apple TSA. The
+ * build's temp keychain auto-locks at the 300s default, and the dmg is signed
+ * minutes after the app — past the lock — so codesign hung waiting for an
+ * unlock prompt that never comes in CI. The real fix is
+ * `security set-keychain-settings -t <long>` in the workflow's keychain setup;
+ * codesign needs the unlocked keychain regardless of the timestamp flag.
  *
  * Still spawned via `runBounded` (no shell, hard timeout) as cheap defense, and
  * `--verify --strict` confirms the signature before we trust it. A failure here

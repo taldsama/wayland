@@ -34,7 +34,7 @@ function runBounded(file, args, { timeoutMs, label }) {
     // signal (`error.killed` is undefined on the sync path).
     const timedOut = Boolean(error && error.code === 'ETIMEDOUT');
     const detail = timedOut
-      ? `timed out after ${Math.round(timeoutMs / 1000)}s (Apple server unresponsive)`
+      ? `timed out after ${Math.round(timeoutMs / 1000)}s (no response — in CI usually a locked signing keychain)`
       : 'failed';
     console.warn(`${label}: ${detail}: ${error && error.message}`);
     return false;
