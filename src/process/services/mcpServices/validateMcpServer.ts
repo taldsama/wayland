@@ -14,6 +14,24 @@ import type { IMcpServer } from '@/common/config/storage';
 const SAFE_MCP_NAME = /^[A-Za-z0-9_.-]+$/;
 
 /**
+ * Coerce an arbitrary MCP server name into the conservative identifier that
+ * {@link validateMcpServer} (and every per-CLI agent config writer) requires.
+ *
+ * Catalog ids carry characters the agent CLIs reject - notably the reverse-DNS
+ * slash in `com.slack/slack-mcp`. The renderer install flow sanitizes at
+ * add-time, but a server can reach the sync path with an unsanitized name (older
+ * installs, JSON import, one-click). Applying the SAME transform at the sync /
+ * remove chokepoint guarantees the agent-config key is always valid and that
+ * sync and remove derive the identical key, so a server can be cleanly removed.
+ *
+ * Any character outside `[A-Za-z0-9_.-]` becomes `-`. Result always satisfies
+ * SAFE_MCP_NAME for any non-empty input.
+ */
+export function sanitizeMcpServerName(name: string): string {
+  return name.replace(/[^A-Za-z0-9_.-]/g, '-');
+}
+
+/**
  * Environment variable KEYS that ride into per-CLI agent argv (e.g. as
  * `-e KEY=VALUE` / `--env KEY=VALUE`) must be a POSIX-style identifier so they
  * cannot smuggle a leading `-` (option) or argv-breaking characters into the

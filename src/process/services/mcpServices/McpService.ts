@@ -15,7 +15,7 @@ import { CodexMcpAgent } from './agents/CodexMcpAgent';
 import { OpencodeMcpAgent } from './agents/OpencodeMcpAgent';
 import { WCoreMcpAgent } from './agents/WCoreMcpAgent';
 import type { IMcpProtocol, DetectedMcpServer, McpConnectionTestResult, McpSyncResult, McpSource } from './McpProtocol';
-import { validateMcpServer } from './validateMcpServer';
+import { validateMcpServer, sanitizeMcpServerName } from './validateMcpServer';
 
 /**
  * MCP service - coordinates the MCP operation protocol across agents
@@ -263,8 +263,14 @@ export class McpService {
       cliPath?: string;
     }>
   ): Promise<McpSyncResult> {
-    // Only sync enabled MCP servers
-    const enabledServers = mcpServers.filter((server) => server.enabled);
+    // Only sync enabled MCP servers. Sanitize each name into the conservative
+    // identifier the agent CLIs require BEFORE validating - a stored server can
+    // carry a raw catalog id with a slash (e.g. "com.slack/slack-mcp") that
+    // older installs / JSON imports never sanitized, which would otherwise crash
+    // every sync. removeMcpFromAgents applies the same transform so the keys match.
+    const enabledServers = mcpServers
+      .filter((server) => server.enabled)
+      .map((server) => ({ ...server, name: sanitizeMcpServerName(server.name) }));
 
     if (enabledServers.length === 0) {
       return Promise.resolve({ success: true, results: [] });
@@ -327,6 +333,10 @@ export class McpService {
       cliPath?: string;
     }>
   ): Promise<McpSyncResult> {
+    // Match the key syncMcpToAgents wrote so a server installed under a
+    // sanitized name (e.g. com.slack/slack-mcp -> com.slack-slack-mcp) is
+    // actually found and removed from each agent config.
+    const safeName = sanitizeMcpServerName(mcpServerName);
     return this.withServiceLock(async () => {
       // Ensure native Gemini CLI is also in the removal list
       const allAgents = this.addNativeGeminiIfNeeded(agents);
@@ -344,7 +354,7 @@ export class McpService {
             };
           }
 
-          const result = await agentInstance.removeMcpServer(mcpServerName);
+          const result = await agentInstance.removeMcpServer(safeName);
           return {
             agent: `${agent.backend}:${agent.name}`,
             success: result.success,
