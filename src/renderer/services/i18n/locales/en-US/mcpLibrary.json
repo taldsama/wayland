@@ -58,5 +58,26 @@
     "browse": "Browse",
     "installed": "Installed",
     "aria": "MCP Library sections"
+  },
+  "urlAdd": {
+    "title": "Add an MCP server",
+    "placeholder": "https://mcp.example.com/mcp",
+    "hint": "Paste a server URL from the vendor. Wayland detects the transport and sign-in for you.",
+    "connect": "Connect",
+    "connecting": "Connecting…",
+    "connected": "Connected. {{count}} tools available.",
+    "needsAuth": "This server needs to authenticate",
+    "tokenPlaceholder": "Paste an API key / access token",
+    "headerPlaceholder": "Header name (e.g. X-Access-Token)",
+    "advancedHeader": "Uses a custom header? (e.g. Readwise X-Access-Token)",
+    "connectWithToken": "Connect",
+    "addAndSignIn": "Add & sign in later",
+    "addServer": "Add server",
+    "useJson": "Paste JSON instead",
+    "addedDescription": "Added by URL",
+    "invalidUrl": "Enter a valid https:// server URL.",
+    "unreachable": "Could not reach that server. Check the URL and try again.",
+    "tokenRejected": "The server rejected that token. Double-check it and retry.",
+    "failed": "Connection failed."
   }
 }
