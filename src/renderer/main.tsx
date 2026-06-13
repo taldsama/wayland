@@ -149,3 +149,14 @@ const root = createRoot(document.getElementById('root')!);
 root.render(
   React.createElement(ErrorBoundary, null, React.createElement(AppProviders, null, React.createElement(App)))
 );
+
+// Re-arm the web-only blank-root recovery guard (index.html) once the app has
+// actually mounted, so a later blank in the same session can recover again.
+// Clearing only after a confirmed mount keeps the one-shot loop guard intact.
+requestAnimationFrame(() => {
+  try {
+    sessionStorage.removeItem('__wayland_blankRootRecovered');
+  } catch {
+    /* sessionStorage unavailable (private mode / SSR) - non-fatal */
+  }
+});
