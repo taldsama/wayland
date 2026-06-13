@@ -2,6 +2,7 @@
 import type { IResponseMessage } from '@/common/adapter/ipcBridge';
 import type { IMessageAcpToolCall, TMessage } from '@/common/chat/chatLib';
 import { NavigationInterceptor } from '@/common/chat/navigation';
+import { isFluxModelId } from '@/common/config/flux';
 import type { AcpModelInfo, AcpResult, AcpSessionConfigOption } from '@/common/types/acpTypes';
 import { AcpErrorType, getCurrentWrapperVersion, parseInitializeResult } from '@/common/types/acpTypes';
 import { buildHistoryReplayContext } from '@process/acp/historyReplay';
@@ -725,7 +726,10 @@ export class AcpAgentV2 {
       // Re-assert model override before every prompt (mirrors V1 behavior).
       // V1's userModelOverride is never cleared - it re-checks on every prompt
       // to recover from CLI-internal state loss (e.g. Claude compaction).
-      if (this.userModelOverride && this.session) {
+      // EXCEPT a Flux id: it is carried by the spawn env (ANTHROPIC_MODEL=
+      // flux-auto) and pushing it through set_model makes the claude binary
+      // reject it (JSON-RPC -32601). Skip the re-assert for Flux ids (mirrors V1).
+      if (this.userModelOverride && !isFluxModelId(this.userModelOverride) && this.session) {
         const currentModel = this.cachedModelInfo?.currentModelId;
         if (currentModel !== this.userModelOverride) {
           try {
@@ -825,6 +829,13 @@ export class AcpAgentV2 {
 
   async setModelByConfigOption(modelId: string): Promise<AcpModelInfo | null> {
     this.userModelOverride = modelId;
+    // A Flux id is carried by the spawn env (ANTHROPIC_MODEL/OPENAI_MODEL=
+    // flux-auto), not by an in-place set_model. Pushing it through the bridge
+    // makes the claude binary validate it against its catalog and reject it
+    // (JSON-RPC -32601). Record the override and skip the call (mirrors V1).
+    if (isFluxModelId(modelId)) {
+      return this.cachedModelInfo;
+    }
     // Queue model switch notice for Claude (ACP set_model is silent, AI doesn't know)
     if (this.agentConfig.agentBackend === 'claude') {
       this.pendingModelSwitchNotice = modelId;
