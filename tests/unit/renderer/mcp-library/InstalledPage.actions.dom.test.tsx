@@ -201,13 +201,16 @@ test('status strip derives running/warn/error/tools counts', () => {
   // Tools: 2 (runningServer.tools.length)
   // Scope to the status strip so the ServerRow pills (which now use i18n'd labels
   // like "Running" / "Needs re-authorization") don't collide with the strip labels.
+  // Strip is now a clickable status filter: [All, Running, Needs sign-in, Error, Tools].
   const strip = container.querySelector('.mcp-status-strip') as HTMLElement;
   const cells = strip.querySelectorAll('.mcp-status-cell');
-  const runningCell = cells[0];
-  const warnCell = cells[1];
-  const errorCell = cells[2];
-  const toolsCell = cells[3];
+  const allCell = cells[0];
+  const runningCell = cells[1];
+  const warnCell = cells[2];
+  const errorCell = cells[3];
+  const toolsCell = cells[4];
 
+  expect(allCell.querySelector('b')?.textContent).toBe('2');
   expect(runningCell.querySelector('b')?.textContent).toBe('1');
   expect(warnCell.querySelector('b')?.textContent).toBe('1');
   expect(errorCell.querySelector('b')?.textContent).toBe('0');
@@ -230,12 +233,14 @@ test('toggle button calls handleToggleMcpServer with flipped enabled value', asy
   expect(handleToggleMcpServer).toHaveBeenCalledWith(RUNNING_ID, false);
 });
 
-test('re-authorize button calls login with the full server object', async () => {
+test('sign-in action calls login with the full server object', async () => {
   login.mockResolvedValue({ success: true });
   renderInstalled();
 
-  // Only the warn server renders a "Re-authorize" button (needsLogin === true).
-  const reauthBtn = screen.getByRole('button', { name: /Re-authorize/i });
+  // The warn server (needsLogin === true) renders an inline issue strip whose
+  // primary action is "Sign in" (the re-auth affordance moved out of the row
+  // into the strip so the row's action cluster stays a fixed width).
+  const reauthBtn = screen.getByRole('button', { name: /Sign in/i });
   await act(async () => {
     fireEvent.click(reauthBtn);
   });

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { CatalogIndexEntry } from '../types';
+import type { UIStatus } from '../status';
 import { McpCard } from './McpCard';
 
 const labels: Record<string, string> = {
@@ -35,10 +36,11 @@ interface Props {
   category: string;
   entries: CatalogIndexEntry[];
   installedIds: Set<string>;
+  statusByLibraryId?: Record<string, UIStatus>;
   onSelect: (id: string) => void;
 }
 
-export function CategorySection({ category, entries, installedIds, onSelect }: Props) {
+export function CategorySection({ category, entries, installedIds, statusByLibraryId, onSelect }: Props) {
   if (entries.length === 0) return null;
   return (
     <section className="mcp-cat-section">
@@ -52,6 +54,7 @@ export function CategorySection({ category, entries, installedIds, onSelect }: P
             key={e.id}
             entry={e}
             installed={installedIds.has(e.id)}
+            status={statusByLibraryId?.[e.id]}
             onClick={() => onSelect(e.id)}
           />
         ))}

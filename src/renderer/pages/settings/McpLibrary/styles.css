@@ -120,15 +120,34 @@
 .mcp-filter-bar {
   display: flex;
   align-items: center;
-  gap: 14px;
+  flex-wrap: wrap;
+  gap: 10px 14px;
   margin: 18px 0;
   padding: 12px 14px;
   background: var(--mcp-bg-1);
   border: 1px solid var(--mcp-border);
   border-radius: 10px;
 }
+/* Availability filter sits at the right, separated from the tier chips. */
+.mcp-avail-filter {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  padding-left: 14px;
+  border-left: 1px solid var(--mcp-border-bright);
+}
+.mcp-chip.mcp-chip-attention {
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #f87171;
+}
+.mcp-chip.mcp-chip-attention.is-active {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.6);
+  color: #f87171;
+}
 .mcp-search {
   flex: 1;
+  min-width: 200px;
   padding: 8px 12px;
   background: var(--mcp-bg-base);
   border: 1px solid var(--mcp-border-bright);
@@ -274,6 +293,14 @@
 .mcp-card.is-installed {
   border-color: rgba(74, 222, 128, 0.3);
 }
+/* Installed but broken / needs sign-in: override the green with a warning accent
+ * so a connector that needs the user's attention stands out on the grid. */
+.mcp-card.is-attention.status-error {
+  border-color: rgba(248, 113, 113, 0.55);
+}
+.mcp-card.is-attention.status-warn {
+  border-color: var(--mcp-brand-border);
+}
 .mcp-card.is-wayland-built {
   background: linear-gradient(180deg, rgba(255, 107, 53, 0.04) 0%, var(--mcp-bg-card) 70%);
   border-color: var(--mcp-brand-border);
@@ -403,6 +430,16 @@
   color: var(--mcp-tier-core);
   border-color: var(--mcp-tier-core-border);
   background: var(--mcp-tier-core-bg);
+}
+.mcp-install-btn.is-attention.status-error {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(248, 113, 113, 0.1);
+}
+.mcp-install-btn.is-attention.status-warn {
+  color: var(--mcp-brand);
+  border-color: var(--mcp-brand-border);
+  background: var(--mcp-brand-soft);
 }
 
 /* Detail page */
@@ -757,7 +794,7 @@
 /* Installed page */
 .mcp-status-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -768,6 +805,22 @@
   padding: 12px 14px;
   font-size: 12px;
   color: var(--mcp-text-muted);
+  text-align: left;
+  font-family: inherit;
+}
+/* The four status cells are filter buttons; the tools cell is a plain readout. */
+button.mcp-status-cell {
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+button.mcp-status-cell:hover {
+  border-color: var(--mcp-border-bright);
+}
+button.mcp-status-cell.is-active {
+  border-color: var(--mcp-brand);
+  background: var(--mcp-brand-soft-bg, rgba(255, 107, 53, 0.08));
 }
 .mcp-status-cell b {
   font-size: 18px;
@@ -820,21 +873,43 @@
   text-align: center;
 }
 
+/* URL-add example nudge chips (rendered inside the Add-MCP modal portal). */
+.mcp-url-example {
+  padding: 3px 10px;
+  background: var(--mcp-bg-2);
+  border: 1px solid var(--mcp-border-bright);
+  border-radius: 999px;
+  color: var(--mcp-text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.mcp-url-example:hover {
+  border-color: var(--mcp-brand-border);
+  color: var(--mcp-brand);
+}
+
 /* Server row */
 .mcp-server-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.mcp-server-row {
-  display: grid;
-  grid-template-columns: 40px 1fr auto auto auto;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 14px;
+/* The card wraps the row AND its (optional) issue strip so the status accent
+ * and border surround both. Fixed grid columns keep the toggle + action icons
+ * in a straight vertical line regardless of status-label or tool-count width. */
+.mcp-server-card {
   background: var(--mcp-bg-card);
   border: 1px solid var(--mcp-border-card);
   border-radius: 8px;
+  overflow: hidden;
+}
+.mcp-server-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 64px 148px 132px;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
 }
 .mcp-server-logo {
   width: 32px;
@@ -867,6 +942,8 @@
   font-size: 11.5px;
   color: var(--mcp-text-muted);
   font-family: 'JetBrains Mono', monospace;
+  text-align: right;
+  white-space: nowrap;
 }
 .mcp-status-pill {
   display: inline-flex;
@@ -910,8 +987,13 @@
     transform: rotate(360deg);
   }
 }
+/* Fixed-width, right-aligned cluster: always [toggle][settings][logs][remove].
+ * Variable status-specific actions (Sign in / Retry) live in the issue strip
+ * below, so this cluster never changes width and the toggles stay aligned. */
 .mcp-server-actions {
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 4px;
 }
 .mcp-server-actions button {
@@ -919,13 +1001,14 @@
   border: 1px solid var(--mcp-border-bright);
   color: var(--mcp-text-secondary);
   border-radius: 6px;
-  padding: 6px 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
   font-family: inherit;
-  font-size: 11.5px;
 }
 .mcp-server-actions button:hover {
   background: var(--mcp-bg-3);
@@ -935,9 +1018,64 @@
   color: #f87171;
   border-color: rgba(248, 113, 113, 0.25);
 }
-.mcp-server-actions button.mcp-btn-warn {
+
+/* Inline issue strip: what's wrong + how to fix + one primary action. */
+.mcp-server-issue {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--mcp-border-card);
+}
+.mcp-server-issue-error {
+  background: rgba(248, 113, 113, 0.08);
+}
+.mcp-server-issue-warn {
+  background: rgba(251, 191, 36, 0.08);
+}
+.mcp-issue-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.mcp-server-issue-error .mcp-issue-icon {
+  color: #f87171;
+}
+.mcp-server-issue-warn .mcp-issue-icon {
   color: var(--mcp-badge-official);
-  border-color: rgba(251, 191, 36, 0.25);
+}
+.mcp-issue-body {
+  min-width: 0;
+  flex: 1;
+}
+.mcp-issue-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--mcp-text-primary);
+}
+.mcp-issue-detail {
+  font-size: 11.5px;
+  color: var(--mcp-text-muted);
+  word-break: break-word;
+}
+.mcp-issue-action {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.mcp-issue-action-primary {
+  background: var(--mcp-brand);
+  color: #fff;
+}
+.mcp-issue-action-primary:hover {
+  background: var(--mcp-brand-hover, #ff8255);
 }
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -950,16 +1088,16 @@
  * Mockup: installed-servers.html lines 192-195 (.server.{state}).
  * Brand discipline: 'stopped' gets NO chromatic accent
  * (per feedback-brand-palette-discipline memory + RECON.md §5). */
-.mcp-installed-page .mcp-server-row.mcp-server-running {
+.mcp-installed-page .mcp-server-card.mcp-server-running {
   border-left: 2px solid rgba(74, 222, 128, 0.55);
 }
-.mcp-installed-page .mcp-server-row.mcp-server-warn {
+.mcp-installed-page .mcp-server-card.mcp-server-warn {
   border-left: 2px solid var(--mcp-brand);
 }
-.mcp-installed-page .mcp-server-row.mcp-server-error {
+.mcp-installed-page .mcp-server-card.mcp-server-error {
   border-left: 2px solid rgba(248, 113, 113, 0.7);
 }
-.mcp-installed-page .mcp-server-row.mcp-server-stopped {
+.mcp-installed-page .mcp-server-card.mcp-server-stopped {
   /* no accent - neutral state */
 }
 
@@ -985,10 +1123,15 @@
   background: var(--mcp-text-muted);
 }
 
-/* Server status cell - wrapper around the pill in ServerRow grid column. */
+/* Server status cell - wrapper around the pill in ServerRow grid column.
+ * Left-aligned in its fixed-width column so the pill start edge lines up. */
 .mcp-installed-page .mcp-server-status {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: flex-start;
+}
+.mcp-status-pill {
+  white-space: nowrap;
 }
 
 /* Setup step body - inert flex/text container for the step content next to

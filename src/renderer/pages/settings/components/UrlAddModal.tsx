@@ -6,14 +6,21 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Input, Button, Link, Spin } from '@arco-design/web-react';
+import { Input, Button, Link } from '@arco-design/web-react';
 import { Check, CloseOne, Key, Components } from '@icon-park/react';
+import WaylandModal from '@/renderer/components/base/WaylandModal';
 import { mcpService } from '@/common/adapter/ipcBridge';
 import type { IMcpServer } from '@/common/config/storage';
 
 type ServerData = Omit<IMcpServer, 'id' | 'createdAt' | 'updatedAt'>;
 
 type Phase = 'input' | 'probing' | 'needsAuth' | 'connected' | 'error';
+
+/** A couple of known-good public servers to remove blank-page paralysis. */
+const EXAMPLES: { label: string; url: string }[] = [
+  { label: 'DeepWiki', url: 'https://mcp.deepwiki.com/mcp' },
+  { label: 'Readwise', url: 'https://mcp.readwise.io/mcp' },
+];
 
 /**
  * Renderer-side SSRF guard mirroring validateMcpServer's intent so the PROBE
@@ -118,9 +125,8 @@ const UrlAddModal: React.FC<{
         source: 'custom',
         status: enabled ? 'connected' : 'disconnected',
         transport: { type: 'streamable_http', url: url.trim(), ...(headers ? { headers } : {}) },
-        ...(tools > 0 ? {} : {}),
       }) as ServerData,
-    [url, headers, tools, t]
+    [url, headers, t]
   );
 
   const probe = useCallback(async () => {
@@ -175,37 +181,89 @@ const UrlAddModal: React.FC<{
     onCancel();
   }, [onSubmit, buildServer, onCancel]);
 
+  const fillExample = useCallback((exampleUrl: string) => {
+    setUrl(exampleUrl);
+    setError('');
+    setPhase('input');
+  }, []);
+
+  const primaryAction =
+    phase === 'connected' ? (
+      <Button type='primary' size='large' onClick={add}>
+        {t('mcpLibrary.urlAdd.addServer', 'Add server')}
+      </Button>
+    ) : phase === 'probing' ? (
+      <Button type='primary' size='large' loading>
+        {t('mcpLibrary.urlAdd.connecting', 'Connecting…')}
+      </Button>
+    ) : (
+      <Button type='primary' size='large' onClick={() => void probe()} disabled={!url.trim()}>
+        {t('mcpLibrary.urlAdd.connect', 'Connect')}
+      </Button>
+    );
+
   return (
-    <Modal
+    <WaylandModal
       visible={visible}
       onCancel={onCancel}
-      footer={null}
-      title={t('mcpLibrary.urlAdd.title', 'Add an MCP server')}
-      style={{ width: 520 }}
-      autoFocus={false}
+      size='medium'
+      header={{
+        title: t('mcpLibrary.urlAdd.title', 'Add an MCP server'),
+        showClose: true,
+      }}
+      footer={
+        <div className='flex items-center justify-between w-full'>
+          <Link onClick={onUseJson} className='text-12px'>
+            {t('mcpLibrary.urlAdd.useJson', 'Paste JSON instead')}
+          </Link>
+          {phase !== 'needsAuth' && primaryAction}
+        </div>
+      }
+      contentStyle={{ padding: '24px' }}
     >
-      <div className='flex flex-col gap-12px'>
+      <div className='flex flex-col gap-14px'>
+        <div className='text-13px text-t-secondary'>
+          {t('mcpLibrary.urlAdd.subtitle', 'Paste a link from the vendor. Wayland detects how to connect and signs you in.')}
+        </div>
+
         <Input
           value={url}
-          onChange={setUrl}
+          onChange={(v) => {
+            setUrl(v);
+            if (phase === 'error') setPhase('input');
+          }}
           allowClear
           placeholder={t('mcpLibrary.urlAdd.placeholder', 'https://mcp.example.com/mcp')}
           onPressEnter={() => void probe()}
           disabled={phase === 'probing'}
           size='large'
         />
-        <div className='text-12px text-t-tertiary'>
-          {t('mcpLibrary.urlAdd.hint', 'Paste a server URL from the vendor. Wayland detects the transport and sign-in for you.')}
-        </div>
+
+        {(phase === 'input' || phase === 'error') && (
+          <div className='flex items-center gap-8px flex-wrap'>
+            <span className='text-12px text-t-tertiary'>{t('mcpLibrary.urlAdd.tryLabel', 'Try:')}</span>
+            {EXAMPLES.map((ex) => (
+              <button
+                key={ex.url}
+                type='button'
+                className='mcp-url-example'
+                onClick={() => fillExample(ex.url)}
+              >
+                {ex.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {phase === 'needsAuth' && (
-          <div className='flex flex-col gap-8px rd-8px p-12px' style={{ background: 'var(--color-fill-1)' }}>
-            <div className='flex items-center gap-6px text-13px font-500'>
-              <Key size={15} /> {t('mcpLibrary.urlAdd.needsAuth', 'This server needs to authenticate')}
+          <div className='flex flex-col gap-8px rd-8px p-14px' style={{ background: 'var(--color-fill-1)' }}>
+            <div className='flex items-center gap-6px text-13px font-500 text-t-primary'>
+              <Key theme='outline' size={15} /> {t('mcpLibrary.urlAdd.needsAuth', 'This server needs you to sign in')}
             </div>
             <Input.Password
               value={token}
               onChange={setToken}
+              size='large'
               placeholder={t('mcpLibrary.urlAdd.tokenPlaceholder', 'Paste an API key / access token')}
               onPressEnter={() => void probe()}
             />
@@ -213,7 +271,7 @@ const UrlAddModal: React.FC<{
               <Input
                 value={headerName}
                 onChange={setHeaderName}
-                prefix={<Components size={14} />}
+                prefix={<Components theme='outline' size={14} />}
                 placeholder={t('mcpLibrary.urlAdd.headerPlaceholder', 'Header name (e.g. X-Access-Token)')}
               />
             ) : (
@@ -223,7 +281,7 @@ const UrlAddModal: React.FC<{
             )}
             {error && <div className='text-12px text-danger'>{error}</div>}
             <div className='flex items-center gap-8px mt-4px'>
-              <Button type='primary' loading={false} onClick={() => void probe()} disabled={!token.trim()}>
+              <Button type='primary' onClick={() => void probe()} disabled={!token.trim()}>
                 {t('mcpLibrary.urlAdd.connectWithToken', 'Connect')}
               </Button>
               <Button onClick={addForSignIn}>{t('mcpLibrary.urlAdd.addAndSignIn', 'Add & sign in later')}</Button>
@@ -233,40 +291,24 @@ const UrlAddModal: React.FC<{
 
         {phase === 'connected' && (
           <div
-            className='flex items-center gap-8px rd-8px p-12px text-13px'
-            style={{ background: 'rgba(46, 213, 115, 0.10)', color: 'var(--color-text-1)' }}
+            className='flex items-center gap-8px rd-8px p-14px text-13px'
+            style={{ background: 'var(--success-soft-bg)', color: 'var(--color-text-1)' }}
           >
-            <Check size={16} style={{ color: '#2ed573' }} />
+            <Check theme='filled' size={16} fill='var(--success)' />
             {t('mcpLibrary.urlAdd.connected', 'Connected. {{count}} tools available.', { count: tools })}
           </div>
         )}
 
         {phase === 'error' && error && (
-          <div className='flex items-center gap-8px text-13px text-danger'>
-            <CloseOne size={15} /> {error}
+          <div
+            className='flex items-start gap-8px rd-8px p-12px text-13px'
+            style={{ background: 'var(--danger-soft-bg)', color: 'var(--danger)' }}
+          >
+            <CloseOne theme='outline' size={15} className='shrink-0 mt-1px' /> {error}
           </div>
         )}
-
-        <div className='flex items-center justify-between mt-4px'>
-          <Link onClick={onUseJson} className='text-12px'>
-            {t('mcpLibrary.urlAdd.useJson', 'Paste JSON instead')}
-          </Link>
-          {phase === 'connected' ? (
-            <Button type='primary' onClick={add}>
-              {t('mcpLibrary.urlAdd.addServer', 'Add server')}
-            </Button>
-          ) : phase === 'probing' ? (
-            <Button type='primary' disabled>
-              <Spin size={14} /> {t('mcpLibrary.urlAdd.connecting', 'Connecting…')}
-            </Button>
-          ) : phase === 'input' || phase === 'error' ? (
-            <Button type='primary' onClick={() => void probe()} disabled={!url.trim()}>
-              {t('mcpLibrary.urlAdd.connect', 'Connect')}
-            </Button>
-          ) : null}
-        </div>
       </div>
-    </Modal>
+    </WaylandModal>
   );
 };
 

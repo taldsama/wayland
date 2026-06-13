@@ -815,6 +815,13 @@ export interface IMcpServer {
   tools?: IMcpTool[];
   status?: 'connected' | 'disconnected' | 'error' | 'testing'; // Connection status (also indicates service availability)
   lastConnected?: number;
+  /**
+   * Human-readable reason the last connection attempt failed (set when
+   * status === 'error'). Persisted so the Installed row can show WHY a server
+   * is broken and how to fix it, instead of a bare "Error" badge. Cleared on a
+   * successful connect.
+   */
+  lastError?: string;
   createdAt: number;
   updatedAt: number;
   originalJson: string; // Stores the raw JSON config for accurate display when editing

@@ -10,22 +10,14 @@ import {
   useMcpServerCRUD,
   useMcpConnection,
 } from '@renderer/hooks/mcp';
-import type { McpOAuthStatus } from '@renderer/hooks/mcp/useMcpOAuth';
 import type { IMcpServer } from '@/common/config/storage';
 import AddMcpServerModal from '@renderer/pages/settings/components/AddMcpServerModal';
 import { useMcpLibrary } from './hooks/useMcpLibrary';
-import { ServerRow, type UIStatus } from './components/ServerRow';
+import { ServerRow } from './components/ServerRow';
 import { McpLibraryTabs } from './components/McpLibraryTabs';
+import { deriveStatus, type UIStatus } from './status';
 
-// 4-state UI status derivation per RECON.md §5.
-// error short-circuits first, then warn (needsLogin), then running (enabled + connected),
-// else stopped (which absorbs disconnected / testing / undefined).
-function deriveStatus(s: IMcpServer, oauth: McpOAuthStatus | undefined): UIStatus {
-  if (s.status === 'error') return 'error';
-  if (oauth?.needsLogin === true) return 'warn';
-  if (s.enabled === true && s.status === 'connected') return 'running';
-  return 'stopped';
-}
+type InstalledFilter = 'all' | 'running' | 'warn' | 'error';
 
 export function InstalledPage() {
   const { t } = useTranslation();
@@ -34,6 +26,7 @@ export function InstalledPage() {
 
   const [message, contextHolder] = Message.useMessage();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [filter, setFilter] = useState<InstalledFilter>('all');
   const { mcpServers, saveMcpServers } = useMcpServers();
   const { setAgentInstallStatus, checkSingleServerInstallStatus } = useMcpAgentStatus();
   const { syncMcpToAgents, removeMcpFromAgents } = useMcpOperations(mcpServers, message);
@@ -58,22 +51,41 @@ export function InstalledPage() {
     void refreshServerStatuses(mcpServers);
   }, [mcpServers, refreshServerStatuses]);
 
-  const fromLibrary = useMemo(() => mcpServers.filter((s) => s.source === 'library'), [mcpServers]);
-  const custom = useMemo(() => mcpServers.filter((s) => s.source !== 'library'), [mcpServers]);
+  // Resolve every server's status once so the stat strip, the filter, and the
+  // rows all agree (and we never recompute deriveStatus three times per server).
+  const statusById = useMemo(() => {
+    const map: Record<string, UIStatus> = {};
+    for (const s of mcpServers) map[s.id] = deriveStatus(s, oauthStatus[s.id]);
+    return map;
+  }, [mcpServers, oauthStatus]);
+
+  const matchesFilter = useCallback(
+    (s: IMcpServer) => filter === 'all' || statusById[s.id] === filter,
+    [filter, statusById]
+  );
+
+  const fromLibrary = useMemo(
+    () => mcpServers.filter((s) => s.source === 'library' && matchesFilter(s)),
+    [mcpServers, matchesFilter]
+  );
+  const custom = useMemo(
+    () => mcpServers.filter((s) => s.source !== 'library' && matchesFilter(s)),
+    [mcpServers, matchesFilter]
+  );
 
   const summary = useMemo(() => {
     let running = 0;
     let warn = 0;
     let error = 0;
     for (const s of mcpServers) {
-      const status = deriveStatus(s, oauthStatus[s.id]);
+      const status = statusById[s.id];
       if (status === 'running') running++;
       else if (status === 'warn') warn++;
       else if (status === 'error') error++;
     }
     const tools = mcpServers.reduce((n, s) => n + (s.tools?.length ?? 0), 0);
     return { running, warn, error, tools };
-  }, [mcpServers, oauthStatus]);
+  }, [mcpServers, statusById]);
 
   const handleToggle = useCallback(
     async (s: IMcpServer) => {
@@ -186,7 +198,7 @@ export function InstalledPage() {
   const renderRow = (s: IMcpServer) => {
     const entry = s.libraryEntryId ? library.entries.find((e) => e.id === s.libraryEntryId) : undefined;
     const oauth = oauthStatus[s.id];
-    const status = deriveStatus(s, oauth);
+    const status = statusById[s.id];
     return (
       <ServerRow
         key={s.id}
@@ -199,6 +211,7 @@ export function InstalledPage() {
           toolCount: s.tools?.length ?? 0,
           publisher: entry?.id ?? s.name,
           enabled: s.enabled,
+          lastError: s.lastError,
         }}
         iconUrl={entry?.iconUrl}
         oauthStatus={oauth}
@@ -226,16 +239,39 @@ export function InstalledPage() {
       <McpLibraryTabs active='installed' installedCount={mcpServers.length} />
 
       <div className='mcp-status-strip'>
-        <div className='mcp-status-cell mcp-status-running'>
+        <button
+          type='button'
+          className={`mcp-status-cell mcp-status-all${filter === 'all' ? ' is-active' : ''}`}
+          aria-pressed={filter === 'all'}
+          onClick={() => setFilter('all')}
+        >
+          <b>{mcpServers.length}</b> {t('mcpLibrary.installed.statusAllCountLabel', 'All')}
+        </button>
+        <button
+          type='button'
+          className={`mcp-status-cell mcp-status-running${filter === 'running' ? ' is-active' : ''}`}
+          aria-pressed={filter === 'running'}
+          onClick={() => setFilter((f) => (f === 'running' ? 'all' : 'running'))}
+        >
           <b>{summary.running}</b> {t('mcpLibrary.installed.statusRunningCountLabel', 'Running')}
-        </div>
-        <div className='mcp-status-cell mcp-status-warn'>
-          <b>{summary.warn}</b> {t('mcpLibrary.installed.statusReauthCountLabel', 'Needs re-auth')}
-        </div>
-        <div className='mcp-status-cell mcp-status-error'>
+        </button>
+        <button
+          type='button'
+          className={`mcp-status-cell mcp-status-warn${filter === 'warn' ? ' is-active' : ''}`}
+          aria-pressed={filter === 'warn'}
+          onClick={() => setFilter((f) => (f === 'warn' ? 'all' : 'warn'))}
+        >
+          <b>{summary.warn}</b> {t('mcpLibrary.installed.statusReauthCountLabel', 'Needs sign-in')}
+        </button>
+        <button
+          type='button'
+          className={`mcp-status-cell mcp-status-error${filter === 'error' ? ' is-active' : ''}`}
+          aria-pressed={filter === 'error'}
+          onClick={() => setFilter((f) => (f === 'error' ? 'all' : 'error'))}
+        >
           <b>{summary.error}</b> {t('mcpLibrary.installed.statusErrorCountLabel', 'Error')}
-        </div>
-        <div className='mcp-status-cell'>
+        </button>
+        <div className='mcp-status-cell mcp-status-tools'>
           <b>{summary.tools}</b> {t('mcpLibrary.installed.statusToolCountLabel', 'Tools available')}
         </div>
       </div>
@@ -249,7 +285,9 @@ export function InstalledPage() {
         </header>
         {fromLibrary.length === 0 ? (
           <div className='mcp-empty'>
-            {t('mcpLibrary.installed.empty', 'No MCPs installed yet. Browse the library to add one.')}
+            {filter === 'all'
+              ? t('mcpLibrary.installed.empty', 'No MCPs installed yet. Browse the library to add one.')
+              : t('mcpLibrary.installed.emptyFilter', 'Nothing here matches this filter.')}
           </div>
         ) : (
           <div className='mcp-server-list'>{fromLibrary.map(renderRow)}</div>
@@ -264,7 +302,11 @@ export function InstalledPage() {
           </button>
         </header>
         {custom.length === 0 ? (
-          <div className='mcp-empty'>{t('mcpLibrary.installed.customEmpty', 'No custom MCPs.')}</div>
+          <div className='mcp-empty'>
+            {filter === 'all'
+              ? t('mcpLibrary.installed.customEmpty', 'No custom MCPs.')
+              : t('mcpLibrary.installed.emptyFilter', 'Nothing here matches this filter.')}
+          </div>
         ) : (
           <div className='mcp-server-list'>{custom.map(renderRow)}</div>
         )}

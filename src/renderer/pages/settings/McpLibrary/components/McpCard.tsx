@@ -1,20 +1,29 @@
 import React from 'react';
-import { Check, Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Check, Plus, AlertTriangle, LogIn } from 'lucide-react';
 import type { CatalogIndexEntry } from '../types';
+import type { UIStatus } from '../status';
+import { needsAttention } from '../status';
 import { TierBadge } from './TierBadge';
 import { MaintainerBadge } from './MaintainerBadge';
 
 interface Props {
   entry: CatalogIndexEntry;
   installed: boolean;
+  /** Health of the installed server for this entry, when one exists. */
+  status?: UIStatus;
   onClick: () => void;
 }
 
-export function McpCard({ entry, installed, onClick }: Props) {
+export function McpCard({ entry, installed, status, onClick }: Props) {
+  const { t } = useTranslation();
   const isWaylandBuilt = entry.maintainerType === 'wayland';
+  // An installed connector that is broken or wants a sign-in is surfaced right
+  // on the card so the user can spot it at a glance instead of hunting Installed.
+  const attention = installed && status !== undefined && needsAttention(status);
   return (
     <div
-      className={`mcp-card ${installed ? 'is-installed' : ''} ${isWaylandBuilt ? 'is-wayland-built' : ''}`}
+      className={`mcp-card ${installed ? 'is-installed' : ''} ${attention ? `is-attention status-${status}` : ''} ${isWaylandBuilt ? 'is-wayland-built' : ''}`}
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -44,19 +53,29 @@ export function McpCard({ entry, installed, onClick }: Props) {
       </div>
       <div className="mcp-card-footer">
         <button
-          className={`mcp-install-btn ${installed ? 'is-installed' : ''}`}
+          className={`mcp-install-btn ${installed ? 'is-installed' : ''} ${attention ? `is-attention status-${status}` : ''}`}
           onClick={(e) => {
             e.stopPropagation();
             onClick();
           }}
         >
-          {installed ? (
+          {attention ? (
+            status === 'warn' ? (
+              <>
+                <LogIn size={12} /> {t('mcpLibrary.browse.cardSignIn', 'Sign in')}
+              </>
+            ) : (
+              <>
+                <AlertTriangle size={12} /> {t('mcpLibrary.browse.cardFix', 'Needs attention')}
+              </>
+            )
+          ) : installed ? (
             <>
-              <Check size={12} /> Installed
+              <Check size={12} /> {t('mcpLibrary.browse.cardInstalled', 'Installed')}
             </>
           ) : (
             <>
-              <Plus size={12} /> Install
+              <Plus size={12} /> {t('mcpLibrary.browse.cardInstall', 'Install')}
             </>
           )}
         </button>
