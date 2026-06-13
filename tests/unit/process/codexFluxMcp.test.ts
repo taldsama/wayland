@@ -85,3 +85,36 @@ describe('materializeFluxCodexHome - MCP injection (#56)', () => {
     expect(parsed.model_provider).toBe('flux');
   });
 });
+
+// #68: register a model catalog so codex stops warning "Model metadata not
+// found" for flux-auto. Verified end-to-end against the real codex 0.135 CLI
+// ("config.toml parse ok", model recognized); here we lock the file + config.
+describe('materializeFluxCodexHome - model catalog (#68)', () => {
+  let dataDir: string;
+  beforeEach(async () => {
+    dataDir = await mkdtemp(join(tmpdir(), 'flux-codex-cat-'));
+  });
+  afterEach(async () => {
+    await rm(dataDir, { recursive: true, force: true }).catch(() => {});
+  });
+
+  it('writes a valid flux-model-catalog.json with every flux slug + wires the config keys', async () => {
+    const home = await materializeFluxCodexHome(dataDir, 'workspace-write', undefined, join(dataDir, 'none.toml'));
+    const config = parseToml(await readFile(join(home, 'config.toml'), 'utf8')) as {
+      model_catalog_json?: string;
+      model_auto_compact_token_limit?: number;
+    };
+    expect(config.model_catalog_json).toBe(join(home, 'flux-model-catalog.json'));
+    expect(typeof config.model_auto_compact_token_limit).toBe('number');
+
+    const catalog = JSON.parse(await readFile(join(home, 'flux-model-catalog.json'), 'utf8')) as {
+      models: { slug: string; display_name: string; context_window: number }[];
+    };
+    const slugs = catalog.models.map((m) => m.slug).sort();
+    expect(slugs).toEqual(['flux-auto', 'flux-fast', 'flux-reasoning', 'flux-standard']);
+    // codex matches by model.starts_with(slug) - flux-auto entry must be exact.
+    const auto = catalog.models.find((m) => m.slug === 'flux-auto');
+    expect(auto?.display_name).toBe('Flux Auto');
+    expect(auto?.context_window).toBeGreaterThan(0);
+  });
+});
