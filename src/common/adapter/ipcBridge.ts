@@ -309,7 +309,9 @@ export const fs = {
   copyFilesToWorkspace: buildProvider<
     // Return details for successful and failed copies for better UI feedback
     IBridgeResponse<{ copiedFiles: string[]; failedFiles?: Array<{ path: string; error: string }> }>,
-    { filePaths: string[]; workspace: string; sourceRoot?: string }
+    // allowExternalSource: an explicit user drag-drop/paste authorizes a source
+    // file outside the static roots (still guarded against secrets/traversal).
+    { filePaths: string[]; workspace: string; sourceRoot?: string; allowExternalSource?: boolean }
   >('copy-files-to-workspace'), // Copy files into workspace
   removeEntry: buildProvider<IBridgeResponse, { path: string }>('remove-entry'), // Delete file or folder
   renameEntry: buildProvider<IBridgeResponse<{ newPath: string }>, { path: string; newName: string }>('rename-entry'), // Rename file or folder

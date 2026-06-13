@@ -1013,7 +1013,7 @@ export function initFsBridge(): void {
   });
 
   // Copy files into the workspace
-  ipcBridge.fs.copyFilesToWorkspace.provider(async ({ filePaths, workspace, sourceRoot }) => {
+  ipcBridge.fs.copyFilesToWorkspace.provider(async ({ filePaths, workspace, sourceRoot, allowExternalSource }) => {
     try {
       const copiedFiles: string[] = [];
       const failedFiles: Array<{ path: string; error: string }> = [];
@@ -1036,10 +1036,19 @@ export function initFsBridge(): void {
       for (const filePath of filePaths) {
         try {
           // Confine each source path (SEC-IPC-02): block copying arbitrary
-          // files (e.g. ~/.ssh/id_rsa) into the workspace.
-          const safeFilePath = await confinePath(filePath);
+          // files (e.g. ~/.ssh/id_rsa) into the workspace. A drag-drop/paste is
+          // an explicit user grant of that specific file, so allowExternalSource
+          // permits a source outside the static roots while the
+          // secret/traversal/symlink guards still reject sensitive locations.
+          // The destination workspace above stays strictly confined regardless.
+          const safeFilePath = await confinePath(filePath, { allowOutsideRoots: allowExternalSource === true });
           if (safeFilePath === null) {
-            failedFiles.push({ path: filePath, error: 'Source path is outside the allowed roots' });
+            failedFiles.push({
+              path: filePath,
+              error: allowExternalSource
+                ? 'Blocked: this file is in a protected or unsafe location'
+                : 'Source path is outside the allowed roots',
+            });
             continue;
           }
 
