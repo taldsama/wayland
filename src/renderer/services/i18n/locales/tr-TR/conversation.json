@@ -342,5 +342,30 @@
     "bodyRemote": "Connect Flux or set up a model on the server to start chatting.",
     "button": "Set up a model",
     "sendTooltip": "Connect a model to start sending"
+  },
+  "acpAuthFailure": {
+    "title": "{{backend}} burada oturum açamıyor",
+    "subscriptionExplainer": "Sağlayıcı, bunun gibi üçüncü taraf araçlar içinde abonelikle oturum açmayı engeller. {{backend}}'i burada kullanmaya devam etmek için Flux Router üzerinden yönlendirin, bir sağlayıcı API anahtarı ekleyin veya doğrudan CLI'da oturum açın.",
+    "genericExplainer": "{{backend}} kimlik doğrulaması yapılamadı. Bunu düzeltmek için Flux Router üzerinden yönlendirin, bir sağlayıcı API anahtarı ekleyin veya CLI'da oturum açın.",
+    "wcoreExplainer": "Wayland Core kimlik doğrulaması yapılamadı. Çıkarım sağlayıcısı API anahtarını reddetti (401). Claude Code'un aksine Wayland Core'un geri dönülebilecek bir abonelik oturumu yoktur; bu nedenle çalışan bir sağlayıcı anahtarı ekleyin veya Flux Router üzerinden yönlendirin.",
+    "flux": {
+      "label": "Flux üzerinden yönlendir",
+      "sublabel": "Akıllı yönlendirme her görev için doğru modeli seçer. 1 $ kredi ile ücretsiz başlayın, ardından kullandıkça ödeyin veya bir plan seçin.",
+      "action": "Yönlendir"
+    },
+    "addKey": {
+      "label": "{{provider}} API anahtarı ekle",
+      "sublabel": "Ayarlar'ı açın ve sağlayıcı konsolunuzdan bir API anahtarı yapıştırın.",
+      "action": "Anahtar ekle",
+      "labelAny": "Herhangi bir sağlayıcının API anahtarını ekleyin"
+    },
+    "cliLogin": {
+      "label": "CLI'da oturum aç",
+      "sublabel": "Aboneliğinizle oturum açmak için {{cmd}} komutunu çalıştırın, ardından mesajı tekrar gönderin.",
+      "action": "Komutu kopyala",
+      "copied": "Komut kopyalandı"
+    },
+    "dismiss": "Kapat",
+    "recommended": "(önerilen)"
   }
 }

@@ -340,5 +340,30 @@
     "bodyRemote": "Connect Flux or set up a model on the server to start chatting.",
     "button": "Set up a model",
     "sendTooltip": "Connect a model to start sending"
+  },
+  "acpAuthFailure": {
+    "title": "{{backend}} não consegue entrar aqui",
+    "subscriptionExplainer": "O provedor bloqueia logins por assinatura dentro de ferramentas de terceiros como esta. Para continuar usando {{backend}} aqui, encaminhe-o pelo Flux Router, adicione uma chave de API do provedor ou faça login diretamente na CLI.",
+    "genericExplainer": "Não foi possível autenticar o {{backend}}. Encaminhe-o pelo Flux Router, adicione uma chave de API do provedor ou faça login na CLI para resolver isso.",
+    "wcoreExplainer": "Não foi possível autenticar o Wayland Core. O provedor de inferência rejeitou a chave de API (401). Ao contrário do Claude Code, o Wayland Core não tem login por assinatura como alternativa, então adicione uma chave de provedor que funcione ou encaminhe-o pelo Flux Router.",
+    "flux": {
+      "label": "Encaminhar pelo Flux",
+      "sublabel": "O roteamento inteligente escolhe o modelo certo para cada tarefa. Comece grátis com um crédito de US$ 1 e depois pague conforme o uso ou escolha um plano.",
+      "action": "Encaminhar"
+    },
+    "addKey": {
+      "label": "Adicionar uma chave de API do {{provider}}",
+      "sublabel": "Abra as Configurações e cole uma chave de API do console do seu provedor.",
+      "action": "Adicionar chave",
+      "labelAny": "Adicione a chave de API de qualquer provedor"
+    },
+    "cliLogin": {
+      "label": "Fazer login na CLI",
+      "sublabel": "Execute {{cmd}} para entrar com sua assinatura e envie a mensagem novamente.",
+      "action": "Copiar comando",
+      "copied": "Comando copiado"
+    },
+    "dismiss": "Dispensar",
+    "recommended": "(recomendado)"
   }
 }

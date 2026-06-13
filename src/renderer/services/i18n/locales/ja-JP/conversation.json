@@ -340,5 +340,30 @@
     "bodyRemote": "Connect Flux or set up a model on the server to start chatting.",
     "button": "Set up a model",
     "sendTooltip": "Connect a model to start sending"
+  },
+  "acpAuthFailure": {
+    "title": "{{backend}} はここではサインインできません",
+    "subscriptionExplainer": "プロバイダーは、このようなサードパーティ製ツール内でのサブスクリプションによるログインをブロックしています。ここで {{backend}} を引き続き使用するには、Flux Router 経由でルーティングするか、プロバイダーの API キーを追加するか、CLI に直接サインインしてください。",
+    "genericExplainer": "{{backend}} の認証に失敗しました。Flux Router 経由でルーティングするか、プロバイダーの API キーを追加するか、CLI にサインインして解決してください。",
+    "wcoreExplainer": "Wayland Core の認証に失敗しました。推論プロバイダーが API キーを拒否しました（401）。Claude Code とは異なり、Wayland Core にはフォールバックできるサブスクリプションのサインインがありません。有効なプロバイダーキーを追加するか、Flux Router 経由でルーティングしてください。",
+    "flux": {
+      "label": "Flux 経由でルーティング",
+      "sublabel": "スマートルーティングが各タスクに最適なモデルを選びます。1 ドルのクレジットで無料で始められ、その後は従量課金またはプランを選択できます。",
+      "action": "ルーティング"
+    },
+    "addKey": {
+      "label": "{{provider}} の API キーを追加",
+      "sublabel": "設定を開き、プロバイダーのコンソールから取得した API キーを貼り付けてください。",
+      "action": "キーを追加",
+      "labelAny": "任意のプロバイダーの API キーを追加"
+    },
+    "cliLogin": {
+      "label": "CLI にサインイン",
+      "sublabel": "{{cmd}} を実行してサブスクリプションでサインインし、メッセージをもう一度送信してください。",
+      "action": "コマンドをコピー",
+      "copied": "コマンドをコピーしました"
+    },
+    "dismiss": "閉じる",
+    "recommended": "（推奨）"
   }
 }

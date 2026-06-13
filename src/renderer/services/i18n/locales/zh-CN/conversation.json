@@ -340,5 +340,30 @@
     "bodyRemote": "Connect Flux or set up a model on the server to start chatting.",
     "button": "Set up a model",
     "sendTooltip": "Connect a model to start sending"
+  },
+  "acpAuthFailure": {
+    "title": "{{backend}} 无法在此登录",
+    "subscriptionExplainer": "该供应商禁止在此类第三方工具中使用订阅登录。若要在此继续使用 {{backend}}，请通过 Flux Router 进行路由、添加供应商 API 密钥，或直接登录 CLI。",
+    "genericExplainer": "{{backend}} 无法完成身份验证。请通过 Flux Router 进行路由、添加供应商 API 密钥，或登录 CLI 以解决此问题。",
+    "wcoreExplainer": "Wayland Core 无法完成身份验证。推理供应商拒绝了该 API 密钥（401）。与 Claude Code 不同，Wayland Core 没有可回退的订阅登录方式，因此请添加一个可用的供应商密钥，或通过 Flux Router 进行路由。",
+    "flux": {
+      "label": "通过 Flux 路由",
+      "sublabel": "智能路由会为每个任务挑选合适的模型。先用 1 美元额度免费开始，之后按用量付费或选择套餐。",
+      "action": "路由"
+    },
+    "addKey": {
+      "label": "添加 {{provider}} API 密钥",
+      "sublabel": "打开“设置”，粘贴来自供应商控制台的 API 密钥。",
+      "action": "添加密钥",
+      "labelAny": "添加任意提供商的 API 密钥"
+    },
+    "cliLogin": {
+      "label": "登录 CLI",
+      "sublabel": "运行 {{cmd}} 以使用你的订阅登录，然后重新发送消息。",
+      "action": "复制命令",
+      "copied": "命令已复制"
+    },
+    "dismiss": "关闭",
+    "recommended": "（推荐）"
   }
 }

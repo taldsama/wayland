@@ -340,5 +340,30 @@
     "bodyRemote": "Connect Flux or set up a model on the server to start chatting.",
     "button": "Set up a model",
     "sendTooltip": "Connect a model to start sending"
+  },
+  "acpAuthFailure": {
+    "title": "{{backend}} kann sich hier nicht anmelden",
+    "subscriptionExplainer": "Der Anbieter blockiert Abo-Anmeldungen in Tools von Drittanbietern wie diesem. Um {{backend}} hier weiter zu nutzen, leite es über Flux Router, füge einen Provider-API-Schlüssel hinzu oder melde dich direkt in der CLI an.",
+    "genericExplainer": "{{backend}} konnte nicht authentifiziert werden. Leite es über Flux Router, füge einen Provider-API-Schlüssel hinzu oder melde dich in der CLI an, um das zu beheben.",
+    "wcoreExplainer": "Wayland Core konnte nicht authentifiziert werden. Der Inferenzanbieter hat den API-Schlüssel abgelehnt (401). Anders als Claude Code hat Wayland Core keine Abo-Anmeldung als Rückfallebene. Füge daher einen funktionierenden Provider-Schlüssel hinzu oder leite es über Flux Router.",
+    "flux": {
+      "label": "Über Flux leiten",
+      "sublabel": "Intelligentes Routing wählt das richtige Modell für jede Aufgabe. Starte kostenlos mit einem Guthaben von 1 $, dann zahle nach Verbrauch oder wähle einen Tarif.",
+      "action": "Leiten"
+    },
+    "addKey": {
+      "label": "{{provider}}-API-Schlüssel hinzufügen",
+      "sublabel": "Öffne die Einstellungen und füge einen API-Schlüssel aus der Konsole deines Anbieters ein.",
+      "action": "Schlüssel hinzufügen",
+      "labelAny": "Beliebigen Anbieter-API-Schlüssel hinzufügen"
+    },
+    "cliLogin": {
+      "label": "In der CLI anmelden",
+      "sublabel": "Führe {{cmd}} aus, um dich mit deinem Abo anzumelden, und sende die Nachricht dann erneut.",
+      "action": "Befehl kopieren",
+      "copied": "Befehl kopiert"
+    },
+    "dismiss": "Schließen",
+    "recommended": "(empfohlen)"
   }
 }

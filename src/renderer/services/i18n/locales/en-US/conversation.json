@@ -354,7 +354,8 @@
     "addKey": {
       "label": "Add a {{provider}} API key",
       "sublabel": "Open Settings and paste an API key from your provider console.",
-      "action": "Add key"
+      "action": "Add key",
+      "labelAny": "Add any provider API key"
     },
     "cliLogin": {
       "label": "Sign in to the CLI",
@@ -362,6 +363,7 @@
       "action": "Copy command",
       "copied": "Command copied"
     },
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "recommended": "(recommended)"
   }
 }

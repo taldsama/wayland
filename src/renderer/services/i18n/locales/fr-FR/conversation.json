@@ -340,5 +340,30 @@
     "bodyRemote": "Connect Flux or set up a model on the server to start chatting.",
     "button": "Set up a model",
     "sendTooltip": "Connect a model to start sending"
+  },
+  "acpAuthFailure": {
+    "title": "{{backend}} ne peut pas se connecter ici",
+    "subscriptionExplainer": "Le fournisseur bloque les connexions par abonnement dans les outils tiers comme celui-ci. Pour continuer à utiliser {{backend}} ici, faites-le passer par Flux Router, ajoutez une clé d'API de fournisseur ou connectez-vous directement à la CLI.",
+    "genericExplainer": "{{backend}} n'a pas pu s'authentifier. Faites-le passer par Flux Router, ajoutez une clé d'API de fournisseur ou connectez-vous à la CLI pour résoudre le problème.",
+    "wcoreExplainer": "Wayland Core n'a pas pu s'authentifier. Le fournisseur d'inférence a rejeté la clé d'API (401). Contrairement à Claude Code, Wayland Core n'a pas de connexion par abonnement comme solution de repli ; ajoutez donc une clé de fournisseur valide ou faites-le passer par Flux Router.",
+    "flux": {
+      "label": "Passer par Flux",
+      "sublabel": "Le routage intelligent choisit le bon modèle pour chaque tâche. Commencez gratuitement avec un crédit de 1 $, puis payez à l'usage ou choisissez une formule.",
+      "action": "Router"
+    },
+    "addKey": {
+      "label": "Ajouter une clé d'API {{provider}}",
+      "sublabel": "Ouvrez les Paramètres et collez une clé d'API depuis la console de votre fournisseur.",
+      "action": "Ajouter la clé",
+      "labelAny": "Ajoutez la clé API de n'importe quel fournisseur"
+    },
+    "cliLogin": {
+      "label": "Se connecter à la CLI",
+      "sublabel": "Exécutez {{cmd}} pour vous connecter avec votre abonnement, puis renvoyez le message.",
+      "action": "Copier la commande",
+      "copied": "Commande copiée"
+    },
+    "dismiss": "Ignorer",
+    "recommended": "(recommandé)"
   }
 }

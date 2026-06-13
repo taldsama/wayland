@@ -340,5 +340,30 @@
     "bodyRemote": "Connect Flux or set up a model on the server to start chatting.",
     "button": "Set up a model",
     "sendTooltip": "Connect a model to start sending"
+  },
+  "acpAuthFailure": {
+    "title": "{{backend}} no puede iniciar sesión aquí",
+    "subscriptionExplainer": "El proveedor bloquea los inicios de sesión por suscripción dentro de herramientas de terceros como esta. Para seguir usando {{backend}} aquí, redirígelo a través de Flux Router, añade una clave de API del proveedor o inicia sesión directamente en la CLI.",
+    "genericExplainer": "{{backend}} no pudo autenticarse. Redirígelo a través de Flux Router, añade una clave de API del proveedor o inicia sesión en la CLI para solucionarlo.",
+    "wcoreExplainer": "Wayland Core no pudo autenticarse. El proveedor de inferencia rechazó la clave de API (401). A diferencia de Claude Code, Wayland Core no tiene un inicio de sesión por suscripción como alternativa, así que añade una clave de proveedor que funcione o redirígelo a través de Flux Router.",
+    "flux": {
+      "label": "Redirigir a través de Flux",
+      "sublabel": "El enrutamiento inteligente elige el modelo adecuado para cada tarea. Empieza gratis con un crédito de 1 $ y luego paga según el uso o elige un plan.",
+      "action": "Redirigir"
+    },
+    "addKey": {
+      "label": "Añadir una clave de API de {{provider}}",
+      "sublabel": "Abre Ajustes y pega una clave de API desde la consola de tu proveedor.",
+      "action": "Añadir clave",
+      "labelAny": "Añade la clave API de cualquier proveedor"
+    },
+    "cliLogin": {
+      "label": "Iniciar sesión en la CLI",
+      "sublabel": "Ejecuta {{cmd}} para iniciar sesión con tu suscripción y vuelve a enviar el mensaje.",
+      "action": "Copiar comando",
+      "copied": "Comando copiado"
+    },
+    "dismiss": "Descartar",
+    "recommended": "(recomendado)"
   }
 }

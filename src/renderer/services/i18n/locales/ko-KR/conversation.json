@@ -340,5 +340,30 @@
     "bodyRemote": "Connect Flux or set up a model on the server to start chatting.",
     "button": "Set up a model",
     "sendTooltip": "Connect a model to start sending"
+  },
+  "acpAuthFailure": {
+    "title": "{{backend}}은(는) 여기서 로그인할 수 없습니다",
+    "subscriptionExplainer": "제공업체는 이와 같은 타사 도구 내에서의 구독 로그인을 차단합니다. 여기서 {{backend}}을(를) 계속 사용하려면 Flux Router를 통해 라우팅하거나 제공업체 API 키를 추가하거나 CLI에 직접 로그인하세요.",
+    "genericExplainer": "{{backend}} 인증에 실패했습니다. Flux Router를 통해 라우팅하거나 제공업체 API 키를 추가하거나 CLI에 로그인하여 해결하세요.",
+    "wcoreExplainer": "Wayland Core 인증에 실패했습니다. 추론 제공업체가 API 키를 거부했습니다(401). Claude Code와 달리 Wayland Core에는 대체할 구독 로그인이 없으므로, 작동하는 제공업체 키를 추가하거나 Flux Router를 통해 라우팅하세요.",
+    "flux": {
+      "label": "Flux를 통해 라우팅",
+      "sublabel": "스마트 라우팅이 각 작업에 적합한 모델을 선택합니다. 1달러 크레딧으로 무료로 시작한 다음 사용한 만큼 결제하거나 요금제를 선택하세요.",
+      "action": "라우팅"
+    },
+    "addKey": {
+      "label": "{{provider}} API 키 추가",
+      "sublabel": "설정을 열고 제공업체 콘솔에서 발급받은 API 키를 붙여넣으세요.",
+      "action": "키 추가",
+      "labelAny": "원하는 제공업체의 API 키 추가"
+    },
+    "cliLogin": {
+      "label": "CLI에 로그인",
+      "sublabel": "{{cmd}}을(를) 실행하여 구독으로 로그인한 다음 메시지를 다시 보내세요.",
+      "action": "명령어 복사",
+      "copied": "명령어가 복사되었습니다"
+    },
+    "dismiss": "닫기",
+    "recommended": "(권장)"
   }
 }

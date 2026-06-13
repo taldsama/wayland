@@ -340,5 +340,30 @@
     "bodyRemote": "Connect Flux or set up a model on the server to start chatting.",
     "button": "Set up a model",
     "sendTooltip": "Connect a model to start sending"
+  },
+  "acpAuthFailure": {
+    "title": "{{backend}} 無法在此登入",
+    "subscriptionExplainer": "該供應商禁止在這類第三方工具中使用訂閱登入。若要在此繼續使用 {{backend}}，請透過 Flux Router 進行路由、新增供應商 API 金鑰，或直接登入 CLI。",
+    "genericExplainer": "{{backend}} 無法完成驗證。請透過 Flux Router 進行路由、新增供應商 API 金鑰，或登入 CLI 以解決此問題。",
+    "wcoreExplainer": "Wayland Core 無法完成驗證。推論供應商拒絕了該 API 金鑰（401）。與 Claude Code 不同，Wayland Core 沒有可退回的訂閱登入方式，因此請新增一個可用的供應商金鑰，或透過 Flux Router 進行路由。",
+    "flux": {
+      "label": "透過 Flux 路由",
+      "sublabel": "智慧路由會為每項任務挑選合適的模型。先用 1 美元額度免費開始，之後按用量付費或選擇方案。",
+      "action": "路由"
+    },
+    "addKey": {
+      "label": "新增 {{provider}} API 金鑰",
+      "sublabel": "開啟「設定」，貼上來自供應商主控台的 API 金鑰。",
+      "action": "新增金鑰",
+      "labelAny": "新增任何供應商的 API 金鑰"
+    },
+    "cliLogin": {
+      "label": "登入 CLI",
+      "sublabel": "執行 {{cmd}} 以使用你的訂閱登入，然後重新傳送訊息。",
+      "action": "複製指令",
+      "copied": "指令已複製"
+    },
+    "dismiss": "關閉",
+    "recommended": "（推薦）"
   }
 }
