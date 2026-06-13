@@ -1,0 +1,64 @@
+// @vitest-environment jsdom
+
+/**
+ * #64 - useWCoreModelSelection must drop a selection whose provider was
+ * disconnected (so the composer stops showing a dead model), while never
+ * treating flux-auto as stale (its provider is filtered out of the list but is
+ * always a valid route).
+ */
+
+import { describe, expect, it, vi } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
+import type { IProvider, TProviderWithModel } from '@/common/config/storage';
+
+const providerListState: {
+  providers: IProvider[];
+  getAvailableModels: (p: IProvider) => string[];
+} = {
+  providers: [],
+  getAvailableModels: () => [],
+};
+
+vi.mock('@/renderer/hooks/agent/useModelProviderList', () => ({
+  useModelProviderList: () => ({
+    providers: providerListState.providers,
+    geminiModeLookup: new Map(),
+    getAvailableModels: providerListState.getAvailableModels,
+    formatModelLabel: (_m: unknown, name: string) => name,
+  }),
+}));
+
+import { useWCoreModelSelection } from '@renderer/pages/conversation/platforms/wcore/useWCoreModelSelection';
+
+const openai = { id: 'openai', platform: 'openai', model: ['gpt-5.5'] } as unknown as IProvider;
+const fluxModel = { id: 'flux', useModel: 'flux-auto' } as unknown as TProviderWithModel;
+const onSelectModel = vi.fn().mockResolvedValue(true);
+
+function setList(providers: IProvider[], avail: Record<string, string[]>) {
+  providerListState.providers = providers;
+  providerListState.getAvailableModels = (p) => avail[p.id] ?? [];
+}
+
+describe('useWCoreModelSelection revalidation (#64)', () => {
+  it('keeps a selection whose provider is still connected', async () => {
+    setList([openai], { openai: ['gpt-5.5'] });
+    const initial = { id: 'openai', useModel: 'gpt-5.5' } as unknown as TProviderWithModel;
+    const { result } = renderHook(() => useWCoreModelSelection({ initialModel: initial, onSelectModel }));
+    await waitFor(() => expect(result.current.currentModel?.useModel).toBe('gpt-5.5'));
+  });
+
+  it('drops the model when its provider is disconnected (no longer in the list)', async () => {
+    setList([], {}); // openai disconnected -> not in providers
+    const initial = { id: 'openai', useModel: 'gpt-5.5' } as unknown as TProviderWithModel;
+    const { result } = renderHook(() => useWCoreModelSelection({ initialModel: initial, onSelectModel }));
+    await waitFor(() => expect(result.current.currentModel).toBeUndefined());
+  });
+
+  it('never treats flux-auto as stale, even though its provider is filtered out', async () => {
+    setList([], {}); // flux provider absent from the list (by design)
+    const { result } = renderHook(() => useWCoreModelSelection({ initialModel: fluxModel, onSelectModel }));
+    // give the revalidation effect a chance to (wrongly) clear it
+    await new Promise((r) => setTimeout(r, 30));
+    expect(result.current.currentModel?.useModel).toBe('flux-auto');
+  });
+});
