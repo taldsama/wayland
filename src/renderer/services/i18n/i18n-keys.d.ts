@@ -3823,6 +3823,7 @@ export type I18nKey =
   | 'settings.webui.browserNotSupported'
   | 'settings.webui.browserNotSupportedDesc'
   | 'settings.webui.changePassword'
+  | 'settings.webui.changePasswordDesc'
   | 'settings.webui.checkConsoleForPassword'
   | 'settings.webui.clickCopyToGet'
   | 'settings.webui.configuration'

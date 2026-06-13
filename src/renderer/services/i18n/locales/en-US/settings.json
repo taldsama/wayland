@@ -917,6 +917,7 @@
   "webui.initialPassword": "Initial Password",
   "webui.initialPasswordDesc": "Password generated on first startup, please change it",
   "webui.changePassword": "Change Password",
+  "webui.changePasswordDesc": "Update the admin password for this server.",
   "webui.currentPassword": "Current Password",
   "webui.currentPasswordPlaceholder": "Enter current password",
   "webui.currentPasswordRequired": "Please enter current password",

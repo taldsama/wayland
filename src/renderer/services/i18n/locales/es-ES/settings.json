@@ -915,6 +915,7 @@
   "webui.initialPassword": "Contraseña inicial",
   "webui.initialPasswordDesc": "Contraseña generada en el primer inicio; cámbiala, por favor",
   "webui.changePassword": "Cambiar contraseña",
+  "webui.changePasswordDesc": "Actualiza la contraseña de administrador de este servidor.",
   "webui.currentPassword": "Contraseña actual",
   "webui.currentPasswordPlaceholder": "Introduce la contraseña actual",
   "webui.currentPasswordRequired": "Introduce la contraseña actual",

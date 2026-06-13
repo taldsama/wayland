@@ -680,7 +680,67 @@ const WebuiModalContent: React.FC = () => {
   const displayPassword = getDisplayPassword();
   const displayUsername = status?.adminUsername || 'admin';
 
-  // In browser mode, only show Channels config, not WebUI service config
+  // The change-password modal is rendered in both the headless (browser) and
+  // desktop layouts, so it is defined once here. handleSetNewPassword already
+  // has a browser path that POSTs the authenticated /api/auth/change-password.
+  const passwordModal = (
+    <WaylandModal
+      visible={setPasswordModalVisible}
+      onCancel={() => setSetPasswordModalVisible(false)}
+      onOk={handleSetNewPassword}
+      confirmLoading={passwordLoading}
+      title={t('settings.webui.setNewPassword')}
+      size='small'
+    >
+      <Form form={form} layout='vertical' className='pt-16px'>
+        <Form.Item
+          label={t('settings.webui.currentPassword')}
+          field='currentPassword'
+          rules={[{ required: true, message: t('settings.webui.currentPasswordRequired') }]}
+        >
+          <Input.Password placeholder={t('settings.webui.currentPasswordPlaceholder')} />
+        </Form.Item>
+        <div className='flex justify-end -mt-12px mb-4px'>
+          <Button type='text' size='mini' status='warning' loading={resetLoading} onClick={handleForgotPasswordReset}>
+            {t('settings.webui.forgotPassword', { defaultValue: 'Forgot your password? Reset it' })}
+          </Button>
+        </div>
+        <Form.Item
+          label={t('settings.webui.newPassword')}
+          field='newPassword'
+          rules={[
+            { required: true, message: t('settings.webui.newPasswordRequired') },
+            { minLength: 8, message: t('settings.webui.passwordMinLength') },
+          ]}
+        >
+          <Input.Password placeholder={t('settings.webui.newPasswordPlaceholder')} />
+        </Form.Item>
+        <Form.Item
+          label={t('settings.webui.confirmPassword')}
+          field='confirmPassword'
+          rules={[
+            { required: true, message: t('settings.webui.confirmPasswordRequired') },
+            {
+              validator: (value, callback) => {
+                if (value !== form.getFieldValue('newPassword')) {
+                  callback(t('settings.webui.passwordMismatch'));
+                } else {
+                  callback();
+                }
+              },
+            },
+          ]}
+        >
+          <Input.Password placeholder={t('settings.webui.confirmPasswordPlaceholder')} />
+        </Form.Item>
+      </Form>
+    </WaylandModal>
+  );
+
+  // In browser mode, only show Channels config, not WebUI service config. The
+  // admin account still needs a way to change its password (#26): the desktop
+  // password panel is gated out here, so surface a compact change-password card
+  // wired to the same handler + modal.
   if (!isDesktop) {
     return (
       <div className='flex flex-col h-full w-full'>
@@ -690,8 +750,33 @@ const WebuiModalContent: React.FC = () => {
             <Suspense fallback={<div className='text-13px text-t-secondary'>{t('common.loading')}</div>}>
               <ChannelModalContentLazy />
             </Suspense>
+
+            <div className='px-14px py-12px bg-[var(--color-bg-2)] border-2 border-solid border-[var(--color-border-2)] rd-12px flex items-center justify-between gap-12px'>
+              <div className='min-w-0'>
+                <div className='text-13px text-t-primary font-500'>
+                  {t('settings.webui.changePassword', { defaultValue: 'Change password' })}
+                </div>
+                <div className='text-12px text-t-secondary'>
+                  {t('settings.webui.changePasswordDesc', {
+                    defaultValue: 'Update the admin password for this server.',
+                  })}
+                </div>
+              </div>
+              <Button
+                type='primary'
+                size='small'
+                className='rd-100px shrink-0'
+                onClick={() => {
+                  form.resetFields();
+                  setSetPasswordModalVisible(true);
+                }}
+              >
+                {t('settings.webui.changePassword', { defaultValue: 'Change password' })}
+              </Button>
+            </div>
           </div>
         </WaylandScrollArea>
+        {passwordModal}
       </div>
     );
   }
@@ -987,58 +1072,8 @@ const WebuiModalContent: React.FC = () => {
         </Form>
       </WaylandModal>
 
-      {/* Set New Password Modal */}
-      <WaylandModal
-        visible={setPasswordModalVisible}
-        onCancel={() => setSetPasswordModalVisible(false)}
-        onOk={handleSetNewPassword}
-        confirmLoading={passwordLoading}
-        title={t('settings.webui.setNewPassword')}
-        size='small'
-      >
-        <Form form={form} layout='vertical' className='pt-16px'>
-          <Form.Item
-            label={t('settings.webui.currentPassword')}
-            field='currentPassword'
-            rules={[{ required: true, message: t('settings.webui.currentPasswordRequired') }]}
-          >
-            <Input.Password placeholder={t('settings.webui.currentPasswordPlaceholder')} />
-          </Form.Item>
-          <div className='flex justify-end -mt-12px mb-4px'>
-            <Button type='text' size='mini' status='warning' loading={resetLoading} onClick={handleForgotPasswordReset}>
-              {t('settings.webui.forgotPassword', { defaultValue: 'Forgot your password? Reset it' })}
-            </Button>
-          </div>
-          <Form.Item
-            label={t('settings.webui.newPassword')}
-            field='newPassword'
-            rules={[
-              { required: true, message: t('settings.webui.newPasswordRequired') },
-              { minLength: 8, message: t('settings.webui.passwordMinLength') },
-            ]}
-          >
-            <Input.Password placeholder={t('settings.webui.newPasswordPlaceholder')} />
-          </Form.Item>
-          <Form.Item
-            label={t('settings.webui.confirmPassword')}
-            field='confirmPassword'
-            rules={[
-              { required: true, message: t('settings.webui.confirmPasswordRequired') },
-              {
-                validator: (value, callback) => {
-                  if (value !== form.getFieldValue('newPassword')) {
-                    callback(t('settings.webui.passwordMismatch'));
-                  } else {
-                    callback();
-                  }
-                },
-              },
-            ]}
-          >
-            <Input.Password placeholder={t('settings.webui.confirmPasswordPlaceholder')} />
-          </Form.Item>
-        </Form>
-      </WaylandModal>
+      {/* Set New Password Modal (shared with the headless layout above) */}
+      {passwordModal}
     </div>
   );
 };

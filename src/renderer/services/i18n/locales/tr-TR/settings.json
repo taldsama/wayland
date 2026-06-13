@@ -905,6 +905,7 @@
   "webui.initialPassword": "İlk Şifre",
   "webui.initialPasswordDesc": "İlk açılışta oluşturulan şifre, lütfen değiştirin",
   "webui.changePassword": "Şifreyi Değiştir",
+  "webui.changePasswordDesc": "Bu sunucunun yönetici parolasını güncelleyin.",
   "webui.currentPassword": "Mevcut Şifre",
   "webui.currentPasswordPlaceholder": "Mevcut şifreyi girin",
   "webui.currentPasswordRequired": "Lütfen mevcut şifreyi girin",

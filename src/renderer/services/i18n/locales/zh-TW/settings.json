@@ -905,6 +905,7 @@
   "webui.initialPassword": "初始密碼",
   "webui.initialPasswordDesc": "首次啟動時產生的密碼，建議修改",
   "webui.changePassword": "修改密碼",
+  "webui.changePasswordDesc": "更新此伺服器的管理員密碼。",
   "webui.currentPassword": "目前密碼",
   "webui.currentPasswordPlaceholder": "請輸入目前密碼",
   "webui.currentPasswordRequired": "請輸入目前密碼",

@@ -905,6 +905,7 @@
   "webui.initialPassword": "Початковий пароль",
   "webui.initialPasswordDesc": "Пароль, згенерований при першому запуску, рекомендується змінити",
   "webui.changePassword": "Змінити пароль",
+  "webui.changePasswordDesc": "Оновіть пароль адміністратора для цього сервера.",
   "webui.currentPassword": "Поточний пароль",
   "webui.currentPasswordPlaceholder": "Введіть поточний пароль",
   "webui.currentPasswordRequired": "Введіть поточний пароль",

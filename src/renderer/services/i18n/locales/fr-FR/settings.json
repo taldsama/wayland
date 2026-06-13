@@ -915,6 +915,7 @@
   "webui.initialPassword": "Mot de passe initial",
   "webui.initialPasswordDesc": "Mot de passe généré au premier démarrage, veuillez le changer",
   "webui.changePassword": "Changer le mot de passe",
+  "webui.changePasswordDesc": "Mettez à jour le mot de passe administrateur de ce serveur.",
   "webui.currentPassword": "Mot de passe actuel",
   "webui.currentPasswordPlaceholder": "Saisissez le mot de passe actuel",
   "webui.currentPasswordRequired": "Veuillez saisir le mot de passe actuel",
