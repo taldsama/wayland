@@ -27,6 +27,16 @@ type ToolDef = {
   needsKey?: 'key' | 'auth';
   /** When the backend's key is already satisfied (e.g. the free web_search default). */
   keySatisfied?: boolean;
+  /**
+   * The TWO tools whose switch is a REAL registration gate, not the auto-approve
+   * posture every other tool uses. They write to `[builtin_tools.<gate>] enabled`
+   * (config.rs / tools.rs), not to `[tools].allow_list`:
+   *  - 'script'  → default OFF (turn on to register the Script tool at all)
+   *  - 'repomap' → default ON  (turn off to stop registering RepoMap)
+   * Every other tool is ALWAYS registered; its switch only flips whether it
+   * auto-runs or asks for approval first.
+   */
+  gate?: 'script' | 'repomap';
 };
 
 type ToolCategory = {
@@ -66,9 +76,16 @@ const CATEGORIES: readonly ToolCategory[] = [
       { id: 'Grep', descKey: 'settings.wcoreConfig.tools.descGrep', descDefault: 'Search file contents by regex' },
       { id: 'Bash', descKey: 'settings.wcoreConfig.tools.descBash', descDefault: 'Run shell commands in the sandbox' },
       {
+        id: 'Script',
+        descKey: 'settings.wcoreConfig.tools.descScript',
+        descDefault: 'Run a sandboxed script step (off until you enable it)',
+        gate: 'script',
+      },
+      {
         id: 'RepoMap',
         descKey: 'settings.wcoreConfig.tools.descRepoMap',
         descDefault: 'Map the repository structure & symbols',
+        gate: 'repomap',
       },
     ],
   },
@@ -305,8 +322,27 @@ const CATEGORIES: readonly ToolCategory[] = [
   },
 ];
 
-/** Every known tool id, used to seed "all on" when allow_list is absent. */
-const ALL_TOOL_IDS: readonly string[] = CATEGORIES.flatMap((c) => c.tools.map((t) => t.id));
+/**
+ * The engine's `[tools].allow_list` default (config.rs `default_allow_list`):
+ * the read-only, safe-to-auto-run tools. When the `allow_list` key is ABSENT
+ * from config.toml, the engine seeds exactly these - NOT "every tool" - so the
+ * UI must seed the same set, or it would imply tools auto-run that actually ask.
+ */
+const DEFAULT_ALLOW_LIST: readonly string[] = [
+  'Read',
+  'Grep',
+  'Glob',
+  'web',
+  'WebFetch',
+  'vision_analyze',
+  'transcribe_audio',
+  'ToolSearch',
+  'Skill',
+  'wayland_status',
+  'wayland_telemetry_query',
+];
+
+type ApprovalMode = 'default' | 'auto-edit' | 'force';
 
 type FilterKey = 'all' | ToolCategory['id'];
 
@@ -319,44 +355,95 @@ const ToolsPane: React.FC<ToolsPaneProps> = ({ onGoServices }) => {
   const { t } = useTranslation();
   const { getSection, setSection } = useWcoreConfig();
   const [filter, setFilter] = useState<FilterKey>('all');
-  // `null` until loaded. A Set of enabled tool ids. Absent allow_list => all on.
-  const [enabled, setEnabled] = useState<Set<string> | null>(null);
+  // Auto-approve posture: a Set of tool ids that auto-run (are in allow_list).
+  // Everything NOT in this set asks for approval first. `null` until loaded.
+  const [autoRun, setAutoRun] = useState<Set<string> | null>(null);
+  // Real registration gates (builtin_tools.*). Engine defaults: script off,
+  // repomap on. `null` until loaded.
+  const [scriptOn, setScriptOn] = useState<boolean | null>(null);
+  const [repomapOn, setRepomapOn] = useState<boolean | null>(null);
+  // Global approval posture (`[default].approval_mode`). Master control.
+  const [mode, setMode] = useState<ApprovalMode>('default');
 
   useEffect(() => {
     let cancelled = false;
-    void getSection<{ allow_list?: string[] }>('tools').then((section) => {
+    void Promise.all([
+      getSection<{ allow_list?: string[] }>('tools'),
+      getSection<{ script?: { enabled?: boolean }; repomap?: { enabled?: boolean } }>('builtin_tools'),
+      getSection<{ approval_mode?: ApprovalMode }>('default'),
+    ]).then(([tools, builtin, def]) => {
       if (cancelled) return;
-      const list = section?.allow_list;
-      // An absent/empty allow_list means the engine runs every tool (default).
-      setEnabled(new Set(Array.isArray(list) && list.length > 0 ? list : ALL_TOOL_IDS));
+      const list = tools?.allow_list;
+      // The KEY being present (even as an empty array) is an explicit posture;
+      // only an ABSENT key falls back to the engine default allow-list.
+      setAutoRun(new Set(Array.isArray(list) ? list : DEFAULT_ALLOW_LIST));
+      setScriptOn(builtin?.script?.enabled ?? false);
+      setRepomapOn(builtin?.repomap?.enabled ?? true);
+      setMode(def?.approval_mode ?? 'default');
     });
     return () => {
       cancelled = true;
     };
   }, [getSection]);
 
-  const persist = useCallback(
+  // Persist the auto-approve allow_list, merging so unknown engine keys
+  // (auto_approve, skills, ...) survive the round-trip.
+  const persistAutoRun = useCallback(
     (next: Set<string>): void => {
-      // Persist the full allow_list (names only). We merge into the existing
-      // section so unknown engine keys (auto_approve, skills, ...) survive.
       void getSection<Record<string, unknown>>('tools').then((prev) => {
-        void setSection('tools', { ...prev, allow_list: Array.from(next).sort() });
+        void setSection('tools', { ...prev, allow_list: Array.from(next).toSorted() });
       });
     },
     [getSection, setSection]
   );
 
-  const toggle = useCallback(
+  // Persist a registration gate (builtin_tools.script / .repomap), merging the
+  // OTHER gate + any unknown keys so a single toggle never drops the sibling.
+  const persistGate = useCallback(
+    (gate: 'script' | 'repomap', enabled: boolean): void => {
+      void getSection<Record<string, unknown>>('builtin_tools').then((prev) => {
+        const base = prev ?? {};
+        const prevGate = (base[gate] as Record<string, unknown> | undefined) ?? {};
+        void setSection('builtin_tools', { ...base, [gate]: { ...prevGate, enabled } });
+      });
+    },
+    [getSection, setSection]
+  );
+
+  const toggleAutoRun = useCallback(
     (id: string): void => {
-      setEnabled((cur) => {
-        const next = new Set(cur ?? ALL_TOOL_IDS);
+      setAutoRun((cur) => {
+        const next = new Set(cur ?? DEFAULT_ALLOW_LIST);
         if (next.has(id)) next.delete(id);
         else next.add(id);
-        persist(next);
+        persistAutoRun(next);
         return next;
       });
     },
-    [persist]
+    [persistAutoRun]
+  );
+
+  const toggleGate = useCallback(
+    (gate: 'script' | 'repomap'): void => {
+      const setter = gate === 'script' ? setScriptOn : setRepomapOn;
+      setter((cur) => {
+        const fallback = gate === 'repomap';
+        const nextVal = !(cur ?? fallback);
+        persistGate(gate, nextVal);
+        return nextVal;
+      });
+    },
+    [persistGate]
+  );
+
+  const changeMode = useCallback(
+    (next: ApprovalMode): void => {
+      setMode(next);
+      void getSection<Record<string, unknown>>('default').then((prev) => {
+        void setSection('default', { ...prev, approval_mode: next });
+      });
+    },
+    [getSection, setSection]
   );
 
   const filters = useMemo(
@@ -368,8 +455,39 @@ const ToolsPane: React.FC<ToolsPaneProps> = ({ onGoServices }) => {
     [t]
   );
 
+  const modeOptions = useMemo(
+    () =>
+      [
+        { value: 'default', label: t('settings.wcoreConfig.tools.modeDefault', { defaultValue: 'Ask first' }) },
+        { value: 'auto-edit', label: t('settings.wcoreConfig.tools.modeAutoEdit', { defaultValue: 'Auto-edit' }) },
+        { value: 'force', label: t('settings.wcoreConfig.tools.modeForce', { defaultValue: 'Force' }) },
+      ] as const,
+    [t]
+  );
+
   const visibleCats = filter === 'all' ? CATEGORIES : CATEGORIES.filter((c) => c.id === filter);
-  const on = enabled ?? new Set<string>(ALL_TOOL_IDS);
+  const auto = autoRun ?? new Set<string>(DEFAULT_ALLOW_LIST);
+
+  // Is a given tool ON? Gates use their real registration state; everything else
+  // is "ON" when it auto-runs (is in the allow_list).
+  const isToolOn = (tool: ToolDef): boolean => {
+    if (tool.gate === 'script') return scriptOn ?? false;
+    if (tool.gate === 'repomap') return repomapOn ?? true;
+    return auto.has(tool.id);
+  };
+
+  const modeHint =
+    mode === 'force'
+      ? t('settings.wcoreConfig.tools.modeHintForce', {
+          defaultValue: 'Force: every tool auto-runs, ignoring the per-tool settings below.',
+        })
+      : mode === 'auto-edit'
+        ? t('settings.wcoreConfig.tools.modeHintAutoEdit', {
+            defaultValue: 'Auto-edit: read and edit tools auto-run; commands and sends still ask first.',
+          })
+        : t('settings.wcoreConfig.tools.modeHintDefault', {
+            defaultValue: 'Ask first: tools below marked “Auto-runs” skip the prompt; the rest ask before acting.',
+          });
 
   return (
     <div className={styles.pane}>
@@ -379,11 +497,25 @@ const ToolsPane: React.FC<ToolsPaneProps> = ({ onGoServices }) => {
         <p className={styles.sub}>
           {t('settings.wcoreConfig.tools.subtitle', {
             defaultValue:
-              'Everything the engine can actually do, with sensible defaults already on. Toggle a tool to grant or revoke it across all profiles. Tools that need a credential link straight to where you set it.',
+              'Every tool is always available to the engine. These switches set whether a tool auto-runs or asks for approval first - they do not turn tools off. Script and RepoMap are the only real on/off gates. Tools that need a credential link straight to where you set it.',
           })}
         </p>
         <ScopeLabel />
       </div>
+
+      {/* Global approval posture - the master control over every per-tool row. */}
+      <div className={styles.modeBar}>
+        <span className={styles.modeBarLabel}>
+          {t('settings.wcoreConfig.tools.modeLabel', { defaultValue: 'Approval mode' })}
+        </span>
+        <WcSegmented
+          options={modeOptions}
+          value={mode}
+          onChange={(v) => changeMode(v as ApprovalMode)}
+          label={t('settings.wcoreConfig.tools.modeAria', { defaultValue: 'Default tool approval mode' })}
+        />
+      </div>
+      <div className={styles.modeHint}>{modeHint}</div>
 
       <div style={{ marginBottom: 8 }}>
         <WcSegmented
@@ -395,77 +527,103 @@ const ToolsPane: React.FC<ToolsPaneProps> = ({ onGoServices }) => {
       </div>
 
       {visibleCats.map((cat) => {
-        const onCount = cat.tools.filter((tool) => on.has(tool.id)).length;
+        const autoCount = cat.tools.filter((tool) => !tool.gate && auto.has(tool.id)).length;
+        const postureTotal = cat.tools.filter((tool) => !tool.gate).length;
         return (
           <div key={cat.id} className={styles.toolCat}>
             <div className={styles.toolCatLabel}>
               {t(cat.labelKey, { defaultValue: cat.labelDefault })}
               <span className={styles.toolCatCount}>
                 {t('settings.wcoreConfig.tools.catCount', {
-                  defaultValue: '{{total}} tools · {{on}} on',
+                  defaultValue: '{{total}} tools · {{on}} auto-run',
                   total: cat.tools.length,
-                  on: onCount,
+                  on: `${autoCount}/${postureTotal}`,
                 })}
               </span>
             </div>
             <div className={styles.group}>
-              {cat.tools.map((tool) => (
-                <div key={tool.id} className={styles.toolRow}>
-                  <div>
-                    <div className={styles.toolName}>
-                      {tool.id}
-                      {tool.needsKey &&
-                        (tool.keySatisfied ? (
-                          <span
-                            role='button'
-                            tabIndex={0}
-                            onClick={onGoServices}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                onGoServices();
-                              }
-                            }}
-                            className={classNames(styles.chipKey, styles.ok)}
-                          >
-                            <Check size={9} />
-                            {t('settings.wcoreConfig.tools.chipOnDdg', { defaultValue: 'on · DuckDuckGo' })}
+              {cat.tools.map((tool) => {
+                const on = isToolOn(tool);
+                const isGate = !!tool.gate;
+                return (
+                  <div key={tool.id} className={styles.toolRow}>
+                    <div>
+                      <div className={styles.toolName}>
+                        {tool.id}
+                        {isGate && (
+                          <span className={styles.gateChip}>
+                            {t('settings.wcoreConfig.tools.chipGate', { defaultValue: 'on/off gate' })}
                           </span>
-                        ) : (
-                          <span
-                            role='button'
-                            tabIndex={0}
-                            onClick={onGoServices}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                onGoServices();
-                              }
-                            }}
-                            className={styles.chipKey}
-                          >
-                            <Lock size={9} />
-                            {tool.needsKey === 'auth'
-                              ? t('settings.wcoreConfig.tools.chipNeedsAuth', { defaultValue: 'needs auth' })
-                              : t('settings.wcoreConfig.tools.chipNeedsKey', { defaultValue: 'needs key' })}
-                          </span>
-                        ))}
+                        )}
+                        {tool.needsKey &&
+                          (tool.keySatisfied ? (
+                            <span
+                              role='button'
+                              tabIndex={0}
+                              onClick={onGoServices}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  onGoServices();
+                                }
+                              }}
+                              className={classNames(styles.chipKey, styles.ok)}
+                            >
+                              <Check size={9} />
+                              {t('settings.wcoreConfig.tools.chipOnDdg', { defaultValue: 'on · DuckDuckGo' })}
+                            </span>
+                          ) : (
+                            <span
+                              role='button'
+                              tabIndex={0}
+                              onClick={onGoServices}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  onGoServices();
+                                }
+                              }}
+                              className={styles.chipKey}
+                            >
+                              <Lock size={9} />
+                              {tool.needsKey === 'auth'
+                                ? t('settings.wcoreConfig.tools.chipNeedsAuth', { defaultValue: 'needs auth' })
+                                : t('settings.wcoreConfig.tools.chipNeedsKey', { defaultValue: 'needs key' })}
+                            </span>
+                          ))}
+                      </div>
+                      <div className={styles.toolDesc}>{t(tool.descKey, { defaultValue: tool.descDefault })}</div>
                     </div>
-                    <div className={styles.toolDesc}>{t(tool.descKey, { defaultValue: tool.descDefault })}</div>
+                    <div className={styles.toolCtrl}>
+                      <span className={classNames(styles.posture, on ? styles.postureAuto : styles.postureAsk)}>
+                        {isGate
+                          ? on
+                            ? t('settings.wcoreConfig.tools.stateEnabled', { defaultValue: 'Enabled' })
+                            : t('settings.wcoreConfig.tools.stateOff', { defaultValue: 'Off' })
+                          : on
+                            ? t('settings.wcoreConfig.tools.stateAutoRuns', { defaultValue: 'Auto-runs' })
+                            : t('settings.wcoreConfig.tools.stateAsksFirst', { defaultValue: 'Asks first' })}
+                      </span>
+                      <WcSwitch
+                        size='xs'
+                        checked={on}
+                        onChange={() => (isGate ? toggleGate(tool.gate!) : toggleAutoRun(tool.id))}
+                        label={
+                          isGate
+                            ? t('settings.wcoreConfig.tools.gateAria', {
+                                defaultValue: 'Enable {{tool}}',
+                                tool: tool.id,
+                              })
+                            : t('settings.wcoreConfig.tools.autoRunAria', {
+                                defaultValue: 'Auto-run {{tool}} without asking',
+                                tool: tool.id,
+                              })
+                        }
+                      />
+                    </div>
                   </div>
-                  <div className={styles.toolCtrl}>
-                    <WcSwitch
-                      size='xs'
-                      checked={on.has(tool.id)}
-                      onChange={() => toggle(tool.id)}
-                      label={t('settings.wcoreConfig.tools.toggleLabel', {
-                        defaultValue: 'Enable {{tool}}',
-                        tool: tool.id,
-                      })}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         );
@@ -475,7 +633,7 @@ const ToolsPane: React.FC<ToolsPaneProps> = ({ onGoServices }) => {
         <FileText size={13} />
         {t('settings.wcoreConfig.tools.catalogNote', {
           defaultValue:
-            'Tool list reflects the engine’s built-in catalogue. Enable/disable state is read from and written to your config.toml.',
+            'Tools always run; these switches only set auto-run vs ask-first ([tools].allow_list). Script and RepoMap write their real on/off gate. All read from and written to your config.toml.',
         })}
       </div>
     </div>

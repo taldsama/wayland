@@ -609,6 +609,55 @@
   border-color: rgba(52, 211, 153, 0.4);
 }
 
+/* ---- Approval-mode bar (global posture master control) ---- */
+.modeBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+.modeBarLabel {
+  font-size: 0.66rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--wc-text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.modeHint {
+  font-size: 0.72rem;
+  color: var(--wc-text-muted);
+  margin: 7px 0 14px;
+  line-height: 1.45;
+}
+
+/* ---- Per-tool posture state (auto-runs vs asks first / on/off gate) ---- */
+.posture {
+  font-family: var(--wc-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.postureAuto {
+  color: var(--wc-success);
+}
+.postureAsk {
+  color: var(--wc-text-muted);
+}
+
+/* ---- "on/off gate" chip — marks the two real registration gates ---- */
+.gateChip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--wc-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.02em;
+  color: var(--wc-text-muted);
+  background: var(--wc-hairline);
+  border-radius: 100px;
+  padding: 1px 7px;
+}
+
 /* ---- Slider ---- */
 .sliderWrap {
   display: flex;
