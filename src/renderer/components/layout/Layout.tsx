@@ -24,6 +24,7 @@ import { useMultiAgentDetection } from '@renderer/hooks/agent/useMultiAgentDetec
 import { processCustomCss } from '@renderer/utils/theme/customCssProcessor';
 import { cleanupSiderTooltips } from '@renderer/utils/ui/siderTooltip';
 import { useConversationShortcuts } from '@renderer/hooks/ui/useConversationShortcuts';
+import { useResponsive } from '@renderer/hooks/ui/useResponsive';
 import { useGlobalKeybind } from '@renderer/hooks/settings/useGlobalKeybind';
 import { CommandPalette } from '@renderer/components/cmdk';
 import type { PaletteAssistant, PaletteStarterPrompt } from '@renderer/components/cmdk';
@@ -122,6 +123,11 @@ const Layout: React.FC<{
   // onboarding, no command palette) - just the custom titlebar + the routed
   // conversation. Fixed for the window's lifetime.
   const isPopout = useIsPopoutMode();
+
+  // #47: expose the orthogonal signals alongside the legacy `isMobile` composite
+  // (which is left untouched above) so consumers can pick LAYOUT (isNarrow) vs
+  // INTERACTION (isTouch) intent instead of conflating them.
+  const { isNarrow, isTouch } = useResponsive();
 
   // Logo click: plain click goes home; Cmd/Ctrl + triple-click opens DevTools.
   const handleLogoClick = useCallback(
@@ -538,7 +544,9 @@ const Layout: React.FC<{
     // routed conversation. `setSiderCollapsed` is intentionally omitted so the
     // Titlebar suppresses its sider toggle and keeps macOS traffic-light spacing.
     return (
-      <LayoutContext.Provider value={{ isMobile, siderCollapsed: true, setSiderCollapsed: noopSetSiderCollapsed }}>
+      <LayoutContext.Provider
+        value={{ isMobile, isNarrow, isTouch, siderCollapsed: true, setSiderCollapsed: noopSetSiderCollapsed }}
+      >
         <NavigationHistoryProvider>
           <div className='app-shell app-shell--popout flex flex-col size-full min-h-0'>
             <Titlebar workspaceAvailable={workspaceAvailable} />
@@ -554,7 +562,9 @@ const Layout: React.FC<{
   }
 
   return (
-    <LayoutContext.Provider value={{ isMobile, siderCollapsed: collapsed, setSiderCollapsed: setCollapsed }}>
+    <LayoutContext.Provider
+      value={{ isMobile, isNarrow, isTouch, siderCollapsed: collapsed, setSiderCollapsed: setCollapsed }}
+    >
       <NavigationHistoryProvider>
         <div className='app-shell flex flex-col size-full min-h-0'>
           <Titlebar workspaceAvailable={workspaceAvailable} />
