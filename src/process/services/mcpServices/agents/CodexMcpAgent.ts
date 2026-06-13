@@ -14,7 +14,8 @@ import {
   isBuiltinImageGenTransport,
 } from '@process/resources/builtinMcp/constants';
 import { getEnhancedEnv } from '@process/utils/shellEnv';
-import { safeExecFile } from '@process/utils/safeExec';
+import { safeExecFile, execErrorDetail } from '@process/utils/safeExec';
+import { cliSafeMcpServerName } from '../validateMcpServer';
 import { validateMcpEnvEntry } from '../validateMcpServer';
 
 /** Env options for exec calls - ensures CLI is found from Finder/launchd launches */
@@ -120,8 +121,11 @@ export function parseCodexMcpListOutput(result: string): IMcpServer[] {
 }
 
 export function buildCodexAddArgs(server: IMcpServer): string[] | null {
+  // Codex CLI rejects dots in the server name; use the CLI-safe form (the
+  // remove path applies the identical transform so the keys stay in sync).
+  const cliName = cliSafeMcpServerName(server.name);
   if (server.transport.type === 'stdio') {
-    const args = ['mcp', 'add', server.name];
+    const args = ['mcp', 'add', cliName];
 
     for (const [key, value] of Object.entries(server.transport.env || {})) {
       // Reject argv-breaking keys/values before they ride into the
@@ -136,7 +140,7 @@ export function buildCodexAddArgs(server: IMcpServer): string[] | null {
 
   if (server.transport.type === 'http' || server.transport.type === 'streamable_http') {
     const url = 'url' in server.transport ? server.transport.url : '';
-    return ['mcp', 'add', server.name, '--url', url];
+    return ['mcp', 'add', cliName, '--url', url];
   }
 
   return null;
@@ -230,7 +234,7 @@ export class CodexMcpAgent extends AbstractMcpAgent {
             await safeExecFile('codex', args, { timeout: 5000, ...getExecEnv() });
             console.log(`[CodexMcpAgent] Added MCP server: ${server.name}`);
           } catch (error) {
-            console.warn(`Failed to add MCP ${server.name} to Codex:`, error);
+            console.warn(`Failed to add MCP ${server.name} to Codex: ${execErrorDetail(error)}`);
           }
         }
         return { success: true };
@@ -259,7 +263,7 @@ export class CodexMcpAgent extends AbstractMcpAgent {
 
         for (const candidateName of candidateNames) {
           try {
-            const result = await safeExecFile('codex', ['mcp', 'remove', candidateName], {
+            const result = await safeExecFile('codex', ['mcp', 'remove', cliSafeMcpServerName(candidateName)], {
               timeout: 5000,
               ...getExecEnv(),
             });

@@ -32,6 +32,21 @@ export function sanitizeMcpServerName(name: string): string {
 }
 
 /**
+ * Stricter still: a name safe for CLI agents that reject the dot the app's own
+ * {@link SAFE_MCP_NAME} tolerates. Claude Code ("Names can only contain letters,
+ * numbers, hyphens, and underscores") and Codex ("use letters, numbers, '-',
+ * '_'") both reject dotted names, so a catalog id like
+ * `com.upstash/context7-mcp` (sanitized to `com.upstash-context7-mcp`) fails
+ * `claude mcp add` / `codex mcp add` with exit 1. Collapse every char outside
+ * `[A-Za-z0-9_-]` (dots included) to `-`. Apply at the claude/codex add AND
+ * remove chokepoints so both derive the identical key and a server can be
+ * cleanly removed. Result always matches `^[A-Za-z0-9_-]+$` for non-empty input.
+ */
+export function cliSafeMcpServerName(name: string): string {
+  return name.replace(/[^A-Za-z0-9_-]/g, '-');
+}
+
+/**
  * Environment variable KEYS that ride into per-CLI agent argv (e.g. as
  * `-e KEY=VALUE` / `--env KEY=VALUE`) must be a POSIX-style identifier so they
  * cannot smuggle a leading `-` (option) or argv-breaking characters into the
