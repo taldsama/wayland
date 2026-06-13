@@ -31,10 +31,10 @@ function isSafeRemoteUrl(raw: string): boolean {
   const h = u.hostname.toLowerCase();
   if (h === 'localhost' || h.endsWith('.localhost') || h === '0.0.0.0' || h === '::1') return false;
   if (
-    /^127\./.test(h) ||
-    /^10\./.test(h) ||
-    /^192\.168\./.test(h) ||
-    /^169\.254\./.test(h) ||
+    h.startsWith('127.') ||
+    h.startsWith('10.') ||
+    h.startsWith('192.168.') ||
+    h.startsWith('169.254.') ||
     /^172\.(1[6-9]|2\d|3[01])\./.test(h)
   ) {
     return false;
