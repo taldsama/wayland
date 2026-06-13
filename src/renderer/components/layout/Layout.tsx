@@ -25,6 +25,7 @@ import { processCustomCss } from '@renderer/utils/theme/customCssProcessor';
 import { cleanupSiderTooltips } from '@renderer/utils/ui/siderTooltip';
 import { useConversationShortcuts } from '@renderer/hooks/ui/useConversationShortcuts';
 import { useResponsive } from '@renderer/hooks/ui/useResponsive';
+import { useSidebarWidth } from '@renderer/hooks/ui/useSidebarWidth';
 import { useGlobalKeybind } from '@renderer/hooks/settings/useGlobalKeybind';
 import { CommandPalette } from '@renderer/components/cmdk';
 import type { PaletteAssistant, PaletteStarterPrompt } from '@renderer/components/cmdk';
@@ -111,7 +112,6 @@ const Layout: React.FC<{
     typeof window === 'undefined' ? 390 : window.innerWidth
   );
   const [customCss, setCustomCss] = useState<string>('');
-  const [shouldMountUpdateModal, setShouldMountUpdateModal] = useState(false);
   const { registerModifierClick } = useDevToolsEscapeHatch();
   const { contextHolder: multiAgentContextHolder } = useMultiAgentDetection();
   const { contextHolder: directorySelectionContextHolder } = useDirectorySelection();
@@ -128,6 +128,10 @@ const Layout: React.FC<{
   // (which is left untouched above) so consumers can pick LAYOUT (isNarrow) vs
   // INTERACTION (isTouch) intent instead of conflating them.
   const { isNarrow, isTouch } = useResponsive();
+  // #84: desktop sidebar width comes from the Settings > Theme slider (persisted
+  // + live). Falls back to the legacy default when unset; mobile uses its own
+  // overlay-drawer sizing below and ignores this.
+  const desktopSiderWidth = useSidebarWidth();
 
   // Logo click: plain click goes home; Cmd/Ctrl + triple-click opens DevTools.
   const handleLogoClick = useCallback(
@@ -432,7 +436,6 @@ const Layout: React.FC<{
 
     // Handle pause all tasks request from tray
     const handlePauseAllTasks = async () => {
-      const { ipcBridge } = await import('@/common');
       const result = await ipcBridge.task.stopAll.invoke();
       if (result?.success) {
         // Navigate to settings page to show task status
@@ -471,7 +474,7 @@ const Layout: React.FC<{
     ? // Floating drawer: cap at 300px but always leave a >=56px content peek on
       // the right so it reads as an overlay, not a full split-pane wall.
       Math.max(MOBILE_SIDER_MIN_WIDTH, Math.min(MOBILE_SIDER_MAX_WIDTH, viewportWidth - 56))
-    : DEFAULT_SIDER_WIDTH;
+    : desktopSiderWidth;
   useEffect(() => {
     collapsedRef.current = collapsed;
   }, [collapsed]);
@@ -483,12 +486,12 @@ const Layout: React.FC<{
       dragStateRef.current = {
         active: true,
         startX: event.clientX,
-        startWidth: collapsedRef.current ? DESKTOP_COLLAPSED_WIDTH : DEFAULT_SIDER_WIDTH,
+        startWidth: collapsedRef.current ? DESKTOP_COLLAPSED_WIDTH : desktopSiderWidth,
       };
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
     },
-    [isMobile]
+    [isMobile, desktopSiderWidth]
   );
 
   useEffect(() => {
@@ -653,13 +656,13 @@ const Layout: React.FC<{
               </ArcoLayout.Header>
               <ArcoLayout.Content className='pt-8px px-8px pb-0 layout-sider-content'>
                 {React.isValidElement(sider)
-                  ? React.cloneElement(sider, {
+                  ? React.cloneElement(sider as React.ReactElement<{ onSessionClick?: () => void; collapsed?: boolean }>, {
                       onSessionClick: () => {
                         cleanupSiderTooltips();
                         if (isMobile) setCollapsed(true);
                       },
                       collapsed,
-                    } as any)
+                    })
                   : sider}
               </ArcoLayout.Content>
               {!isMobile && (
