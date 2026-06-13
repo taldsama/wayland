@@ -38,6 +38,16 @@
   background: linear-gradient(150deg, rgb(var(--primary-6) / 0.06), transparent 62%);
 }
 
+/* Connected + active: a persistent green outline so a live connector reads as
+   "connected" at a glance, matching the Channels grid. Placed after .card and
+   .cardFeatured so it wins the resting border/background; .card:hover still
+   lifts to the orange ring on hover (a pseudo-class out-specifies this). */
+.cardConnected {
+  border-color: var(--success);
+  background: var(--success-soft-bg);
+  box-shadow: 0 0 0 1px var(--success);
+}
+
 /* Status chip - shared by Browse cards + Installed rows. Uses the prebuilt
    *-soft-bg tokens (hex status colors don't compose into rgb() / opacity). */
 .statusChip {

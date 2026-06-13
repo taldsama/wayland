@@ -52,6 +52,9 @@ export function McpCard({ entry, installed, status, featured = false, onClick }:
   // An installed connector that is broken or wants a sign-in is surfaced right
   // on the card so the user can spot it at a glance instead of hunting Installed.
   const attention = installed && status !== undefined && needsAttention(status);
+  // Connected + active (enabled + reachable). Gets a persistent green outline so
+  // a live connector reads as "connected" at a glance, matching the Channels grid.
+  const connected = installed && status === 'running';
 
   const maintainerTag = (
     <span className={styles.cardTag}>
@@ -183,7 +186,11 @@ export function McpCard({ entry, installed, status, featured = false, onClick }:
 
   const card = (
     <div
-      className={classNames(styles.card, featured && styles.cardFeatured)}
+      className={classNames(
+        styles.card,
+        featured && styles.cardFeatured,
+        connected && styles.cardConnected,
+      )}
       onClick={onClick}
       role="button"
       tabIndex={0}
