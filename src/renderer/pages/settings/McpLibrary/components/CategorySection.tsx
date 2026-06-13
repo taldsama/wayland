@@ -30,6 +30,14 @@ const labels: Record<string, string> = {
   research: 'Research',
   sales: 'Sales',
   tasks: 'Tasks',
+  design: 'Design',
+  database: 'Databases',
+  ml: 'AI & Machine Learning',
+  security: 'Security',
+  support: 'Customer Support',
+  maps: 'Maps & Location',
+  incidents: 'Incidents & On-call',
+  'api-testing': 'API Testing',
 };
 
 interface Props {

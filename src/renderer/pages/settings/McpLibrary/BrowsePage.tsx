@@ -166,6 +166,20 @@ export function BrowsePage() {
     return map;
   }, [filtered]);
 
+  // Render the curated category order first, then ANY remaining categories
+  // present in the data but missing from the curated list - so a new catalog
+  // category (design / database / ml / ...) can never make its entries
+  // invisible on Browse. Discoverability is non-negotiable: every catalog
+  // entry must be reachable by browsing, not just by name search.
+  const renderCategories = useMemo(() => {
+    const extra = Object.keys(filteredByCategory)
+      .filter((c) => !categoryOrder.includes(c))
+      .sort();
+    return [...categoryOrder, ...extra];
+    // categoryOrder is a module-stable literal; safe to omit from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredByCategory]);
+
   const onSelect = (id: string) =>
     navigate(`/settings/mcp-library/${encodeURIComponent(id)}`);
 
@@ -233,7 +247,7 @@ export function BrowsePage() {
           {t('mcpLibrary.browse.emptyFilter', 'No connectors match your search and filters.')}
         </div>
       ) : (
-        categoryOrder.map((cat) => (
+        renderCategories.map((cat) => (
           <CategorySection
             key={cat}
             category={cat}
