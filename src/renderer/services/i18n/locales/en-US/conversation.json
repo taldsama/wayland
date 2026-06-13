@@ -348,7 +348,7 @@
     "wcoreExplainer": "Wayland Core could not authenticate. The inference provider rejected the API key (401). Unlike Claude Code, Wayland Core has no subscription sign-in to fall back on, so add a working provider key or route it through Flux Router.",
     "flux": {
       "label": "Route through Flux",
-      "sublabel": "Free and card-free. Flux runs the model for you, no provider key needed.",
+      "sublabel": "Smart routing picks the right model for each task. Start free with a $1 credit, then pay as you go or pick a plan.",
       "action": "Route"
     },
     "addKey": {
@@ -358,7 +358,7 @@
     },
     "cliLogin": {
       "label": "Sign in to the CLI",
-      "sublabel": "Run {{cmd}} in your terminal, then send the message again.",
+      "sublabel": "Run {{cmd}} to sign in with your subscription, then send the message again.",
       "action": "Copy command",
       "copied": "Command copied"
     },
