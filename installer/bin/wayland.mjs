@@ -298,7 +298,7 @@ function help() {
 const cmd = (process.argv[2] || 'help').toLowerCase();
 if (cmd === 'setup') await setup();
 else if (cmd === 'start') start();
-else if (cmd === 'resetpass' || cmd === 'reset-password') resetpass();
+else if (cmd === 'resetpass' || cmd === 'reset-password' || cmd === '--resetpass') resetpass();
 else if (cmd === 'version' || cmd === '--version' || cmd === '-v')
   console.log(JSON.parse(readFileSync(join(PKG_ROOT, 'package.json'), 'utf8')).version);
 else help();
