@@ -189,6 +189,22 @@ export function BrowsePage() {
     () => ({
       serverFor: (libraryEntryId) => serverByLibraryId.get(libraryEntryId),
       onToggle: (serverId, enabled) => void crud.handleToggleMcpServer(serverId, enabled),
+      onReconnect: (server) => {
+        // Re-enable re-pushes the server config to every agent; workers pick it up
+        // on their next message. (A later wave wires the live status re-probe.)
+        void crud
+          .handleToggleMcpServer(server.id, true)
+          .then(() =>
+            message.success(
+              t(
+                'mcpLibrary.installed.reconnectToast',
+                'Reconnecting {{name}} - agents will pick it up on the next message.',
+                { name: server.name }
+              )
+            )
+          )
+          .catch(() => message.error(t('settings.mcpSyncError', 'Failed to sync MCP to agents.')));
+      },
       onConfigure: onSelect,
       onRemove: (serverId) => {
         const target = mcpServers.find((s) => s.id === serverId);
@@ -205,7 +221,7 @@ export function BrowsePage() {
     }),
     // onSelect is a stable navigate wrapper; crud/mcpServers/t cover the rest.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [serverByLibraryId, crud, mcpServers, t],
+    [serverByLibraryId, crud, mcpServers, message, t],
   );
 
   return (

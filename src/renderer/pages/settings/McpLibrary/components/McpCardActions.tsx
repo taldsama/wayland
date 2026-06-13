@@ -11,6 +11,8 @@ export interface McpCardActions {
   serverFor: (libraryEntryId: string) => IMcpServer | undefined;
   /** Enable/disable an installed server (syncs/removes it from the agents). */
   onToggle: (serverId: string, enabled: boolean) => void;
+  /** Re-run the connection test for an installed server (the card's Reconnect affordance). */
+  onReconnect: (server: IMcpServer) => void;
   /** Permanently remove an installed server. */
   onRemove: (serverId: string) => void;
   /** Open the entry's detail page (install / configure / disconnect lifecycle). */

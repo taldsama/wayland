@@ -1,26 +1,51 @@
+/**
+ * @license
+ * Copyright 2026 Ferrox Labs
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Message } from '@arco-design/web-react';
-import { Check, ExternalLink } from 'lucide-react';
+import { Message, Switch, Modal } from '@arco-design/web-react';
+import {
+  ArrowLeft,
+  BadgeCheck,
+  Check,
+  Clock,
+  ExternalLink,
+  Info,
+  LogIn,
+  Plug,
+  Plus,
+  RefreshCw,
+  Radio,
+  Shield,
+  ShieldCheck,
+  Trash2,
+  User,
+  Wrench,
+} from 'lucide-react';
 import {
   useMcpServers,
   useMcpAgentStatus,
   useMcpOperations,
   useMcpOAuth,
   useMcpServerCRUD,
+  useMcpConnection,
 } from '@renderer/hooks/mcp';
 import { openExternalUrl } from '@renderer/utils/platform';
 import { mcpService } from '@/common/adapter/ipcBridge';
 import type { IMcpServer, IMcpServerTransport } from '@/common/config/storage';
 import { useMcpLibrary } from './hooks/useMcpLibrary';
 import { SetupGuide } from './components/SetupGuide';
-import { TierBadge } from './components/TierBadge';
-import { MaintainerBadge } from './components/MaintainerBadge';
+import StatusChip from './components/StatusChip';
 import { ByoCredentialsModal, type ByoVendorHint } from './components/ByoCredentialsModal';
+import { deriveStatus, type UIStatus } from './status';
 import type { CatalogEntry } from './types';
+import styles from './DetailPage.module.css';
 
-type Tab = 'overview' | 'setup-guide' | 'tools' | 'permissions' | 'changelog';
+type Tab = 'overview' | 'tools' | 'setup-guide' | 'permissions';
 
 // Allow only http(s) absolute URLs or relative catalog asset paths to flow into
 // <a href> / <img src>. A future catalog entry with a `javascript:` or `data:`
@@ -42,6 +67,60 @@ function normalizeRemoteType(t: string): 'sse' | 'http' | 'streamable_http' {
   if (t === 'streamable-http' || t === 'streamable_http') return 'streamable_http';
   if (t === 'sse') return 'sse';
   return 'http';
+}
+
+// Title-case a single word/token ('communication' -> 'Communication').
+function titleCase(s: string): string {
+  return s.length > 0 ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+// Pretty transport label for the hero tag + Connection panel.
+function transportLabel(t: string): string {
+  if (t === 'streamable-http' || t === 'streamable_http') return 'Streamable HTTP';
+  if (t === 'sse') return 'SSE';
+  if (t === 'stdio') return 'Local (stdio)';
+  if (t === 'http') return 'HTTP';
+  return titleCase(t);
+}
+
+// Friendly auth-method label.
+function authLabel(method: string): string {
+  if (method === 'oauth2-byo') return 'OAuth';
+  if (method === 'api-key') return 'API key';
+  if (method === 'local-credentials') return 'Local credentials';
+  if (method === 'none') return 'None';
+  return titleCase(method);
+}
+
+// Map a raw agent backend source ('claude' / 'codex' / 'gemini' / 'custom-…')
+// to a display name + short avatar initials for the "Available to" badges.
+function agentDisplay(source: string): { name: string; initials: string } {
+  const base = source.startsWith('custom-') ? source.slice('custom-'.length) : source;
+  switch (base) {
+    case 'claude':
+      return { name: 'Claude Code', initials: 'C' };
+    case 'codex':
+      return { name: 'Codex', initials: 'Cx' };
+    case 'gemini':
+      return { name: 'Gemini', initials: 'G' };
+    default:
+      return { name: titleCase(base), initials: base.slice(0, 2).toUpperCase() };
+  }
+}
+
+// Coarse "x ago" / absolute fallback for the synced-time line. Keeps it
+// dependency-free (no date lib in this surface).
+function formatRelativeTime(ts: number | undefined): string | undefined {
+  if (typeof ts !== 'number') return undefined;
+  const diff = Date.now() - ts;
+  if (diff < 0) return undefined;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  return `${day}d ago`;
 }
 
 function entryToServerData(
@@ -131,7 +210,7 @@ export function DetailPage() {
 
   const [message, contextHolder] = Message.useMessage();
   const { mcpServers, saveMcpServers } = useMcpServers();
-  const { setAgentInstallStatus, checkSingleServerInstallStatus } = useMcpAgentStatus();
+  const { agentInstallStatus, setAgentInstallStatus, checkSingleServerInstallStatus } = useMcpAgentStatus();
   const { syncMcpToAgents, removeMcpFromAgents } = useMcpOperations(mcpServers, message);
   const { login, loggingIn, oauthStatus, setByoCredentials } = useMcpOAuth();
   const crud = useMcpServerCRUD(
@@ -142,6 +221,7 @@ export function DetailPage() {
     checkSingleServerInstallStatus,
     setAgentInstallStatus,
   );
+  const conn = useMcpConnection(mcpServers, saveMcpServers, message);
 
   const entry = useMemo(() => library.getEntry(id), [library, id]);
   const guide = useMemo(
@@ -154,7 +234,7 @@ export function DetailPage() {
     [mcpServers, id],
   );
 
-  const [tab, setTab] = useState<Tab>('setup-guide');
+  const [tab, setTab] = useState<Tab>('overview');
   const [env, setEnv] = useState<Record<string, string>>({});
   const [installing, setInstalling] = useState(false);
   const [byoModal, setByoModal] = useState<{
@@ -183,7 +263,7 @@ export function DetailPage() {
     return done;
   }, [guide, installedServer, oauthStatus]);
 
-  if (!entry) return <div className="mcp-detail-page">Unknown entry: {id}</div>;
+  if (!entry) return <div className={styles.unknown}>Unknown entry: {id}</div>;
 
   const w = entry['x-wayland'];
 
@@ -370,156 +450,481 @@ export function DetailPage() {
         ? installedServer?.enabled === true
         : true);
 
-  const installLabel = installing
-    ? t('mcpLibrary.install.installing', 'Installing…')
-    : isReady
-      ? t('mcpLibrary.install.connected', 'Connected')
-      : installed
-        ? t('mcpLibrary.install.installed', 'Installed')
-        : t('mcpLibrary.install.button', 'Install');
-
   const oauthInFlight = installedServer ? !!loggingIn[installedServer.id] : false;
+  const reconnecting = installedServer ? !!conn.testingServers[installedServer.id] : false;
+
+  // Live UI status (running / warn / error / stopped) drives the 3 action-card
+  // states. "stopped" splits further: a disabled server reads as "Off".
+  const uiStatus: UIStatus | null = installedServer
+    ? deriveStatus(installedServer, oauthStatus[installedServer.id])
+    : null;
+  const disabled = installedServer?.enabled === false;
+
+  // Reconnect re-runs the real connection engine (handleTestMcpConnection),
+  // which probes the server, lists tools, and persists the result.
+  const reconnect = () => {
+    if (installedServer) void conn.handleTestMcpConnection(installedServer);
+  };
+
+  // Remove deletes the server entirely (and removes it from every synced agent)
+  // after an explicit confirm, then returns to Browse.
+  const confirmRemove = () => {
+    if (!installedServer) return;
+    Modal.confirm({
+      title: t('mcpLibrary.detail.removeTitle', 'Remove {{name}}?', { name: entry.title }),
+      content: t(
+        'mcpLibrary.detail.removeBody',
+        'This deletes the connector and its sign-in. You can reinstall it any time.',
+      ),
+      okText: t('mcpLibrary.detail.removeConfirm', 'Remove'),
+      cancelText: t('mcpLibrary.detail.cancel', 'Cancel'),
+      okButtonProps: { status: 'danger' },
+      onOk: async () => {
+        await crud.handleDeleteMcpServer(installedServer.id);
+        navigate('/settings/mcp-library/browse');
+      },
+    });
+  };
+
+  const openUrl = (u: string | undefined) => {
+    const safe = safeUrl(u);
+    if (safe) void openExternalUrl(safe);
+  };
+
+  // Hero tag row facts (text chips only - no tier rainbow).
+  const maintainerLabel =
+    w.maintainerType === 'official' ? 'Official' : w.maintainerType === 'wayland' ? 'Wayland' : 'Community';
+  const primaryCategory = w.categories?.[0] ? titleCase(w.categories[0]) : undefined;
+  const transportType =
+    entry.packages[0]?.transport.type ?? entry.remotes?.[0]?.type ?? 'hosted';
+
+  const toolCount = installedServer?.tools?.length ?? 0;
+  const syncedAt = formatRelativeTime(installedServer?.lastConnected);
+  const account = w.auth.providerName ?? '—';
+  const syncedAgents = installedServer ? (agentInstallStatus[installedServer.name] ?? []) : [];
+
+  const estMinutes = guide?.estimatedMinutes ?? w.setupGuide?.estimatedMinutes;
+
+  const tabs: { key: Tab; label: string; count?: number }[] = [
+    { key: 'overview', label: t('mcpLibrary.detail.tabOverview', 'Overview') },
+    {
+      key: 'tools',
+      label: t('mcpLibrary.detail.tabTools', 'Tools'),
+      count: toolCount > 0 ? toolCount : undefined,
+    },
+    { key: 'setup-guide', label: t('mcpLibrary.detail.tabSetup', 'Setup') },
+    { key: 'permissions', label: t('mcpLibrary.detail.tabPermissions', 'Permissions') },
+  ];
+
+  // ----- state-aware action card -----
+  const renderAction = () => {
+    // STATE 1: Not installed.
+    if (!installed || !installedServer || !uiStatus) {
+      return (
+        <div className={styles.action}>
+          <div className={styles.statusLine}>
+            <span className={`${styles.dot} ${styles.dotOff}`} />
+            {t('mcpLibrary.detail.notInstalled', 'Not installed')}
+          </div>
+          <div className={styles.statusMeta}>
+            {w.auth.method === 'none'
+              ? t('mcpLibrary.detail.notInstalledKeyless', 'No account needed. Install and it works.')
+              : t(
+                  'mcpLibrary.detail.notInstalledAuth',
+                  'Install, then sign in or add a token to connect.',
+                )}
+          </div>
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            onClick={() =>
+              w.auth.method === 'none'
+                ? void install()
+                : void onPrimary(isApiKey ? 'api-key-save' : 'oauth-flow')
+            }
+            disabled={installing || oauthInFlight}
+          >
+            <Plus size={16} />
+            {installing
+              ? t('mcpLibrary.install.installing', 'Installing…')
+              : t('mcpLibrary.install.button', 'Install')}
+          </button>
+          {w.auth.method !== 'none' && (
+            <div className={styles.note}>
+              <ShieldCheck size={13} />
+              {t('mcpLibrary.detail.installAuthNote', 'Sign-in or a token is required after install.')}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // STATE 3: Needs sign-in (warn) - amber CTA running the existing OAuth path.
+    if (uiStatus === 'warn') {
+      return (
+        <div className={styles.action}>
+          <div className={`${styles.statusLine} ${styles.cWarn}`}>
+            <span className={`${styles.dot} ${styles.dotWarn}`} />
+            {t('mcpLibrary.detail.needsSignIn', 'Needs sign-in')}
+          </div>
+          <div className={styles.statusMeta}>
+            {t('mcpLibrary.detail.needsSignInMeta', 'Installed, but not connected yet.')}
+          </div>
+          <button
+            type="button"
+            className={`${styles.btnPrimary} ${styles.btnWarn}`}
+            onClick={() => void onPrimary('oauth-flow')}
+            disabled={oauthInFlight}
+          >
+            <LogIn size={16} />
+            {oauthInFlight
+              ? t('mcpLibrary.detail.signingIn', 'Signing in…')
+              : t('mcpLibrary.detail.signIn', 'Sign in')}
+          </button>
+          <div className={styles.lifecycle}>
+            <button type="button" className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
+              <Trash2 size={14} />
+              {t('mcpLibrary.detail.remove', 'Remove connector')}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // STATE 3b: Error - reconnect CTA (the connection engine, not OAuth).
+    if (uiStatus === 'error') {
+      return (
+        <div className={styles.action}>
+          <div className={`${styles.statusLine} ${styles.cErr}`}>
+            <span className={`${styles.dot} ${styles.dotErr}`} />
+            {t('mcpLibrary.detail.needsAttention', 'Needs attention')}
+          </div>
+          <div className={styles.statusMeta}>
+            {installedServer.lastError ??
+              t('mcpLibrary.detail.errorMeta', 'The last connection attempt failed.')}
+          </div>
+          <button type="button" className={styles.btnPrimary} onClick={reconnect} disabled={reconnecting}>
+            <RefreshCw size={16} />
+            {reconnecting
+              ? t('mcpLibrary.detail.reconnecting', 'Reconnecting…')
+              : t('mcpLibrary.detail.reconnect', 'Reconnect')}
+          </button>
+          <div className={styles.lifecycle}>
+            <button type="button" className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
+              <Trash2 size={14} />
+              {t('mcpLibrary.detail.remove', 'Remove connector')}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // STATE 2: Connected / healthy (running or disabled-but-installed).
+    return (
+      <div className={`${styles.action} ${disabled ? '' : styles.actionConnected}`}>
+        {disabled ? (
+          <div className={styles.statusLine}>
+            <span className={`${styles.dot} ${styles.dotOff}`} />
+            {t('mcpLibrary.detail.off', 'Off')}
+          </div>
+        ) : (
+          <StatusChip status="running" />
+        )}
+        <div className={styles.statusMeta} style={{ marginTop: 8 }}>
+          {t('mcpLibrary.detail.connectedMeta', '{{count}} tools', { count: toolCount })}
+          {syncedAt ? ` · ${t('mcpLibrary.detail.lastSynced', 'synced {{time}}', { time: syncedAt })}` : ''}
+        </div>
+        <div className={styles.ctrlRow}>
+          <span className={styles.ctrlKey}>{t('mcpLibrary.detail.enabled', 'Enabled')}</span>
+          <Switch
+            checked={installedServer.enabled === true}
+            onChange={(v) => void crud.handleToggleMcpServer(installedServer.id, v)}
+          />
+        </div>
+        <div className={styles.lifecycle}>
+          <button type="button" className={styles.btn2} onClick={reconnect} disabled={reconnecting}>
+            <RefreshCw size={14} />
+            {reconnecting
+              ? t('mcpLibrary.detail.reconnecting', 'Reconnecting…')
+              : t('mcpLibrary.detail.reconnect', 'Reconnect')}
+          </button>
+        </div>
+        <div className={styles.lifecycle}>
+          <button type="button" className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
+            <Trash2 size={14} />
+            {t('mcpLibrary.detail.remove', 'Remove connector')}
+          </button>
+        </div>
+        <div className={styles.note}>
+          <Info size={13} />
+          {t('mcpLibrary.detail.lifecycleNote', 'Disable keeps your sign-in. Remove deletes it.')}
+        </div>
+      </div>
+    );
+  };
+
+  // ----- Connection side panel facts -----
+  const connRows: { icon: React.ReactNode; key: string; value: React.ReactNode }[] = [
+    {
+      icon: <Plug size={13} />,
+      key: t('mcpLibrary.detail.status', 'Status'),
+      value: uiStatus ? <StatusChip status={uiStatus} /> : t('mcpLibrary.detail.notInstalled', 'Not installed'),
+    },
+    {
+      icon: <User size={13} />,
+      key: t('mcpLibrary.detail.account', 'Account'),
+      value: account,
+    },
+    {
+      icon: <Shield size={13} />,
+      key: t('mcpLibrary.detail.auth', 'Auth'),
+      value: authLabel(w.auth.method),
+    },
+    {
+      icon: <Radio size={13} />,
+      key: t('mcpLibrary.detail.transport', 'Transport'),
+      value: transportLabel(transportType),
+    },
+    {
+      icon: <Wrench size={13} />,
+      key: t('mcpLibrary.detail.tools', 'Tools'),
+      value: String(toolCount),
+    },
+    {
+      icon: <Clock size={13} />,
+      key: t('mcpLibrary.detail.lastConnected', 'Last connected'),
+      value: syncedAt ?? '—',
+    },
+  ];
 
   return (
-    <div className="mcp-detail-page">
+    <div className={styles.page}>
       {contextHolder}
-      <button
-        className="mcp-back"
-        onClick={() => navigate('/settings/mcp-library/browse')}
-      >
-        ← MCP Library
+      <button type="button" className={styles.back} onClick={() => navigate('/settings/mcp-library/browse')}>
+        <ArrowLeft size={15} /> {t('mcpLibrary.detail.back', 'MCP Library')}
       </button>
 
-      <header className="mcp-detail-head">
-        {safeUrl(w.iconUrl) && (
-          <img className="mcp-detail-logo" src={safeUrl(w.iconUrl)} alt="" />
-        )}
-        <div>
-          <h1>{entry.title}</h1>
-          {w.verifiedAt && (
-            <span className="mcp-verified-pill">
-              <Check size={12} /> Wayland verified
-            </span>
-          )}
-          <div className="mcp-detail-pub">
-            {safeUrl(entry.websiteUrl) ? (
-              <button
-                type="button"
-                className="mcp-link-button"
-                onClick={() => {
-                  const u = safeUrl(entry.websiteUrl);
-                  if (u) void openExternalUrl(u);
-                }}
-              >
-                {entry.name}
-              </button>
-            ) : (
-              <span>{entry.name}</span>
-            )}{' '}
-            · v{entry.version} · {w.license ?? '-'}
-          </div>
-          <p className="mcp-detail-tagline">{entry.description}</p>
-        </div>
-        <div className="mcp-detail-actions">
-          <button
-            className={`mcp-btn-primary${isReady ? ' is-connected' : ''}`}
-            onClick={() => void install()}
-            disabled={installed || installing || oauthInFlight}
-          >
-            {installLabel}
-          </button>
-          {safeUrl(entry.websiteUrl) && (
-            <button
-              type="button"
-              className="mcp-btn"
-              onClick={() => {
-                const u = safeUrl(entry.websiteUrl);
-                if (u) void openExternalUrl(u);
+      {/* HERO */}
+      <div className={styles.hero}>
+        <div className={styles.logo}>
+          {safeUrl(w.iconUrl) ? (
+            <img
+              src={safeUrl(w.iconUrl)}
+              alt=""
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+                const parent = e.currentTarget.parentElement;
+                if (parent && !parent.querySelector(`.${styles.logoFallback}`)) {
+                  const span = document.createElement('span');
+                  span.className = styles.logoFallback;
+                  span.textContent = entry.title.charAt(0).toUpperCase();
+                  parent.appendChild(span);
+                }
               }}
-            >
-              <ExternalLink size={12} /> View source
-            </button>
+            />
+          ) : (
+            <span className={styles.logoFallback}>{entry.title.charAt(0).toUpperCase()}</span>
           )}
         </div>
-      </header>
-
-      <div className="mcp-tabs">
-        {(['overview', 'setup-guide', 'tools', 'permissions', 'changelog'] as Tab[]).map(
-          (tabKey) => (
-            <button
-              key={tabKey}
-              className={`mcp-tab ${tab === tabKey ? 'is-active' : ''}`}
-              onClick={() => setTab(tabKey)}
-            >
-              {tabKey.replace('-', ' ').replace(/^./, (c) => c.toUpperCase())}
-            </button>
-          ),
-        )}
+        <div className={styles.heroMeta}>
+          <h1 className={styles.heroTitle}>
+            {entry.title}
+            {w.verifiedAt && <BadgeCheck size={18} className={styles.verifiedTick} />}
+          </h1>
+          <div className={styles.heroTags}>
+            <span className={styles.tag}>{maintainerLabel}</span>
+            {primaryCategory && <span className={`${styles.tag} ${styles.tagOutline}`}>{primaryCategory}</span>}
+            <span className={styles.tag}>{transportLabel(transportType)}</span>
+            <span className={styles.tag}>{authLabel(w.auth.method)}</span>
+          </div>
+          <p className={styles.heroTagline}>{entry.description}</p>
+        </div>
+        {renderAction()}
       </div>
 
-      <div className="mcp-detail-body">
-        {tab === 'setup-guide' && guide && (
-          <>
-            {isReady && (
-              <div className="mcp-setup-success" role="status">
-                <Check size={16} />
-                <span>
-                  {t(
-                    'mcpLibrary.install.setupComplete',
-                    "{{name}} is connected and ready. Ask any chat to use it.",
-                    { name: entry.title },
-                  )}
-                </span>
+      {/* TABS */}
+      <div className={styles.tabs}>
+        {tabs.map((tb) => (
+          <button
+            key={tb.key}
+            type="button"
+            className={`${styles.tab} ${tab === tb.key ? styles.tabActive : ''}`}
+            onClick={() => setTab(tb.key)}
+          >
+            {tb.label}
+            {tb.count !== undefined && <span className={styles.tabCount}>{tb.count}</span>}
+          </button>
+        ))}
+      </div>
+
+      <div className={styles.cols}>
+        <div className={styles.colMain}>
+          {tab === 'overview' && (
+            <>
+              <h2 className={styles.hSec}>{t('mcpLibrary.detail.whatItDoes', 'What it does')}</h2>
+              <div className={styles.prose}>
+                <p>{entry.description}</p>
+                {estMinutes ? (
+                  <p>
+                    {t('mcpLibrary.detail.setupIntro', 'Setup takes about {{minutes}} minutes.', {
+                      minutes: estMinutes,
+                    })}
+                  </p>
+                ) : null}
               </div>
-            )}
-            <SetupGuide
-              guide={guide}
-              envValues={env}
-              onEnvChange={(name, value) =>
-                setEnv((prev) => ({ ...prev, [name]: value }))
-              }
-              onPrimary={(action) => void onPrimary(action)}
-              completedStepIds={completedStepIds}
-            />
-          </>
-        )}
-        {tab === 'tools' && (
-          <ul className="mcp-tool-groups">
-            {w.toolGroups?.map((g) => (
-              <li key={g.label}>
-                <b>{g.label}</b> · {g.count} tools
-              </li>
-            ))}
-          </ul>
-        )}
-        {tab === 'permissions' && w.auth.scopes && (
-          <ul className="mcp-scope-list">
-            {w.auth.scopes.map((s) => (
-              <li key={s.name}>
-                <code>{s.name}</code> - {s.plainLanguage}
-              </li>
-            ))}
-          </ul>
-        )}
-        {tab === 'overview' && (
-          <div className="mcp-overview">
-            <div>
-              <TierBadge tier={w.tier} /> <MaintainerBadge type={w.maintainerType} />
+            </>
+          )}
+
+          {tab === 'tools' && (
+            <>
+              <h2 className={styles.hSec}>{t('mcpLibrary.detail.toolsHeading', 'Tools')}</h2>
+              {installedServer?.tools && installedServer.tools.length > 0 ? (
+                installedServer.tools.map((tool) => (
+                  <div key={tool.name} className={styles.tool}>
+                    <div>
+                      <div className={styles.toolName}>{tool.name}</div>
+                      {tool.description && <div className={styles.toolDesc}>{tool.description}</div>}
+                    </div>
+                  </div>
+                ))
+              ) : w.toolGroups && w.toolGroups.length > 0 ? (
+                w.toolGroups.map((g) => (
+                  <div key={g.label} className={styles.tool}>
+                    <div>
+                      <div className={styles.toolName}>{g.label}</div>
+                      <div className={styles.toolDesc}>
+                        {t('mcpLibrary.detail.toolGroupCount', '{{count}} tools', { count: g.count })}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className={styles.locked}>{t('mcpLibrary.detail.toolsLocked', 'Install to see its tools.')}</p>
+              )}
+            </>
+          )}
+
+          {tab === 'setup-guide' && (
+            <>
+              <h2 className={styles.hSec}>{t('mcpLibrary.detail.setupHeading', 'Setup guide')}</h2>
+              {isReady && (
+                <div className={styles.setupSuccess} role="status">
+                  <Check size={16} />
+                  <span>
+                    {t(
+                      'mcpLibrary.install.setupComplete',
+                      '{{name}} is connected and ready. Ask any chat to use it.',
+                      { name: entry.title },
+                    )}
+                  </span>
+                </div>
+              )}
+              {guide ? (
+                <SetupGuide
+                  guide={guide}
+                  envValues={env}
+                  onEnvChange={(name, value) => setEnv((prev) => ({ ...prev, [name]: value }))}
+                  onPrimary={(action) => void onPrimary(action)}
+                  completedStepIds={completedStepIds}
+                />
+              ) : (
+                <p className={styles.locked}>
+                  {t('mcpLibrary.detail.noGuide', 'This connector installs in one click — no setup steps.')}
+                </p>
+              )}
+            </>
+          )}
+
+          {tab === 'permissions' && (
+            <>
+              <h2 className={styles.hSec}>{t('mcpLibrary.detail.permissionsHeading', 'What it can access')}</h2>
+              {w.auth.scopes && w.auth.scopes.length > 0 ? (
+                w.auth.scopes.map((s) => (
+                  <div key={s.name} className={styles.tool}>
+                    <div>
+                      <div className={styles.toolName}>{s.name}</div>
+                      <div className={styles.toolDesc}>{s.plainLanguage}</div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className={styles.locked}>
+                  {t('mcpLibrary.detail.noPermissions', 'No special permissions requested.')}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+        <aside className={styles.colSide}>
+          {installed && installedServer && (
+            <div className={styles.panel}>
+              <h3>{t('mcpLibrary.detail.connectionPanel', 'Connection')}</h3>
+              {connRows.map((row) => (
+                <div key={row.key} className={styles.kv}>
+                  <span className={styles.kvKey}>
+                    {row.icon}
+                    {row.key}
+                  </span>
+                  <span className={styles.kvVal}>{row.value}</span>
+                </div>
+              ))}
             </div>
-            <dl>
-              <dt>Transport</dt>
-              <dd>
-                {entry.packages[0]?.transport.type ??
-                  entry.remotes?.[0]?.type ??
-                  '-'}
-              </dd>
-              <dt>Runtime</dt>
-              <dd>{entry.packages[0]?.runtimeHint ?? 'hosted'}</dd>
-              <dt>Platforms</dt>
-              <dd>{(w.platforms ?? ['all']).join(', ')}</dd>
-            </dl>
-          </div>
-        )}
+          )}
+
+          {installed && (
+            <div className={styles.panel}>
+              <h3>{t('mcpLibrary.detail.availableTo', 'Available to')}</h3>
+              {syncedAgents.length > 0 ? (
+                <div className={styles.agentBadges}>
+                  {syncedAgents.map((source) => {
+                    const ag = agentDisplay(source);
+                    return (
+                      <span key={source} className={styles.agentBadge}>
+                        <span className={styles.agentAvatar}>{ag.initials}</span>
+                        {ag.name}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className={styles.availableEmpty}>
+                  {t('mcpLibrary.detail.availableEmpty', 'Not synced to any agent yet.')}
+                </p>
+              )}
+              <p className={styles.availableNote}>
+                {t(
+                  'mcpLibrary.detail.availableNote',
+                  'Connectors are available to all your agents while enabled.',
+                )}
+              </p>
+            </div>
+          )}
+
+          {(safeUrl(entry.websiteUrl) || safeUrl(entry.repository?.url) || safeUrl(w.auth.providerSignupUrl)) && (
+            <div className={styles.panel}>
+              <h3>{t('mcpLibrary.detail.links', 'Links')}</h3>
+              {safeUrl(entry.websiteUrl) && (
+                <button type="button" className={styles.link} onClick={() => openUrl(entry.websiteUrl)}>
+                  <ExternalLink size={14} />
+                  {t('mcpLibrary.detail.linkWebsite', 'Website')}
+                </button>
+              )}
+              {safeUrl(entry.repository?.url) && (
+                <button type="button" className={styles.link} onClick={() => openUrl(entry.repository?.url)}>
+                  <ExternalLink size={14} />
+                  {t('mcpLibrary.detail.linkSource', 'Source repository')}
+                </button>
+              )}
+              {safeUrl(w.auth.providerSignupUrl) && (
+                <button type="button" className={styles.link} onClick={() => openUrl(w.auth.providerSignupUrl)}>
+                  <Shield size={14} />
+                  {t('mcpLibrary.detail.linkSignup', 'Create an account')}
+                </button>
+              )}
+            </div>
+          )}
+        </aside>
       </div>
 
       <ByoCredentialsModal
