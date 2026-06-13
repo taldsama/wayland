@@ -375,15 +375,13 @@ function buildCatalogRow(d, file) {
 // ---- run ------------------------------------------------------------------
 const catalog = JSON.parse(fs.readFileSync(CATALOG, 'utf8'));
 const existing = new Set(catalog.entries.map((e) => e.id));
-// Held back: these need CLI subcommands / flag-args / positional creds that a
-// single-command stdio entry can't express yet (would spawn and fail). Re-add
-// once the catalog package model supports runtime arguments.
+// Twilio / Upstash / DigitalOcean were re-added via gen-mcp-held-connectors.mjs
+// once PackageRef.runtimeArguments landed. Still held here:
+//  - Convex: MCP runs against a local Convex PROJECT dir, not a global install.
+//  - Daytona: needs an interactive `daytona login` before `mcp start`.
 const EXCLUDE = new Set([
   'dev.convex/convex-mcp',
   'io.daytona/daytona-mcp',
-  'com.twilio/twilio-mcp',
-  'com.upstash/upstash-mcp',
-  'com.digitalocean/digitalocean-mcp',
 ]);
 let rank = 100;
 let added = 0;

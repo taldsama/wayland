@@ -1775,6 +1775,73 @@
       "installRate": 0,
       "entryUrl": "entries/io.coda-coda-mcp.json",
       "guideUrl": "guides/io.coda-coda-mcp.md"
+    },
+    {
+      "id": "com.digitalocean/digitalocean-mcp",
+      "name": "DigitalOcean",
+      "shortDescription": "Manage App Platform, droplets, managed databases, Kubernetes, and the container registry - DigitalOcean's official MCP.",
+      "iconUrl": "icons/com.digitalocean-digitalocean-mcp.svg",
+      "tier": "builder",
+      "categories": [
+        "infrastructure",
+        "devops"
+      ],
+      "maintainerType": "official",
+      "verifiedByWayland": "2026-06-13",
+      "popularityRank": 200,
+      "installRate": 0,
+      "entryUrl": "entries/com.digitalocean-digitalocean-mcp.json",
+      "guideUrl": "guides/com.digitalocean-digitalocean-mcp.md"
+    },
+    {
+      "id": "com.upstash/upstash-mcp",
+      "name": "Upstash",
+      "shortDescription": "Manage Upstash Redis, QStash, and Workflow resources in natural language - Upstash's official MCP.",
+      "iconUrl": "icons/com.upstash-upstash-mcp.svg",
+      "tier": "builder",
+      "categories": [
+        "database",
+        "infrastructure"
+      ],
+      "maintainerType": "official",
+      "verifiedByWayland": "2026-06-13",
+      "popularityRank": 201,
+      "installRate": 0,
+      "entryUrl": "entries/com.upstash-upstash-mcp.json",
+      "guideUrl": "guides/com.upstash-upstash-mcp.md"
+    },
+    {
+      "id": "com.twilio/twilio-mcp",
+      "name": "Twilio",
+      "shortDescription": "Send SMS, place calls, and reach the full Twilio API surface - Twilio Alpha's official MCP.",
+      "iconUrl": "icons/com.twilio-twilio-mcp.svg",
+      "tier": "worker",
+      "categories": [
+        "communication"
+      ],
+      "maintainerType": "official",
+      "verifiedByWayland": "2026-06-13",
+      "popularityRank": 202,
+      "installRate": 0,
+      "entryUrl": "entries/com.twilio-twilio-mcp.json",
+      "guideUrl": "guides/com.twilio-twilio-mcp.md"
+    },
+    {
+      "id": "com.xero/xero-mcp",
+      "name": "Xero",
+      "shortDescription": "Accounting in natural language - invoices, contacts, P&L and balance-sheet reports, bank transactions - Xero's official MCP.",
+      "iconUrl": "icons/com.xero-xero-mcp.svg",
+      "tier": "worker",
+      "categories": [
+        "payments",
+        "productivity"
+      ],
+      "maintainerType": "official",
+      "verifiedByWayland": "2026-06-13",
+      "popularityRank": 203,
+      "installRate": 0,
+      "entryUrl": "entries/com.xero-xero-mcp.json",
+      "guideUrl": "guides/com.xero-xero-mcp.md"
     }
   ]
 }

@@ -30,6 +30,14 @@ export interface PackageRef {
   runtimeHint: 'npx' | 'uvx' | 'docker' | 'native';
   transport: { type: 'stdio' | 'streamable-http' | 'sse' };
   environmentVariables?: EnvVar[];
+  /**
+   * Extra CLI arguments appended after the package identifier when spawning a
+   * stdio server, for packages that need a subcommand (`convex mcp start`),
+   * a toolset flag (`--services apps,databases`), or credentials passed as
+   * flags/positional args rather than env. `{{VAR}}` tokens are substituted
+   * from the user's setup-guide input values (same names as environmentVariables).
+   */
+  runtimeArguments?: string[];
 }
 
 export interface RemoteRef {

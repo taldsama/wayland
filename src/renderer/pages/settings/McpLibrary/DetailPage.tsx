@@ -74,6 +74,12 @@ function entryToServerData(
       remoteHeaders[headerName] = headerName === 'Authorization' ? `Bearer ${token.trim()}` : token.trim();
     }
   }
+  // Extra CLI args after the package id (subcommand / toolset flag / cred flag),
+  // with `{{VAR}}` substituted from the user's setup-guide inputs. Empty args
+  // (an unfilled optional `{{VAR}}`) are dropped so we never pass a bare flag value.
+  const runtimeArgs = (pkg?.runtimeArguments ?? [])
+    .map((a) => a.replace(/\{\{(\w+)\}\}/g, (_m, k) => envValues[k] ?? ''))
+    .filter((a) => a.length > 0);
   const transport: IMcpServerTransport = remote
     ? {
         type: normalizeRemoteType(remote.type),
@@ -88,13 +94,13 @@ function entryToServerData(
           // path under out/main (dev) or app.asar.unpacked/out/main (prod).
           type: 'stdio',
           command: 'node',
-          args: [pkg!.identifier],
+          args: [pkg!.identifier, ...runtimeArgs],
           env: envValues,
         }
       : {
           type: 'stdio',
           command: pkg!.runtimeHint,
-          args: pkg!.identifier ? [pkg!.identifier] : [],
+          args: [...(pkg!.identifier ? [pkg!.identifier] : []), ...runtimeArgs],
           env: envValues,
         };
 
