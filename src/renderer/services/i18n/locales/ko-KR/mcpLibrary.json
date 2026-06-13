@@ -110,7 +110,11 @@
     "notConnected": "Not connected",
     "notConnectedOauth": "Installed. Sign in to connect it.",
     "notConnectedKey": "Installed. Add your token to connect it.",
-    "addToken": "Add token"
+    "addToken": "Add token",
+    "connecting": "Connecting…",
+    "saveConnect": "Save & connect",
+    "signInWith": "Sign in with {{provider}}",
+    "saveConnectHint": "Paste your key above, then connect."
   },
   "install": {
     "button": "설치",

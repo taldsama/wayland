@@ -323,7 +323,11 @@ export function DetailPage() {
    */
   const saveAndConnectApiKey = async () => {
     const hasToken = Object.values(env).some((v) => typeof v === 'string' && v.trim().length > 0);
-    if (!hasToken) {
+    // Some api-key connectors take an OPTIONAL key (Context7's free tier works
+    // without one) - their guide has no token input. Only block on a missing
+    // token when the guide actually asks for one; otherwise connect keyless.
+    const requiresToken = !!guide?.steps?.some((s) => s.inputs && s.inputs.length > 0);
+    if (!hasToken && requiresToken) {
       message.warning(t('mcpLibrary.install.tokenRequired', 'Enter your token first.'));
       return;
     }
@@ -464,6 +468,17 @@ export function DetailPage() {
   // buried behind Overview. Once connected, default to Overview. A manual tab
   // click (setTab) always wins.
   const activeTab: Tab = tab ?? (!isReady && guide ? 'setup-guide' : 'overview');
+
+  // The connect action(s) the guide already exposes via a step button. Many
+  // catalog guides forgot it (18 api-key entries lack 'api-key-save'; HubSpot /
+  // Xero lack 'oauth-flow'), which would leave a token box with no way to
+  // connect. When it's missing, the Setup tab renders a fallback connect bar so
+  // every connector has a working connect button regardless of guide quality.
+  const guideActions = guide?.steps.flatMap((s) => (s.primaryAction ? [s.primaryAction.action] : [])) ?? [];
+  const showFallbackConnect =
+    !isReady &&
+    ((isOauth && !guideActions.includes('oauth-flow')) ||
+      (isApiKey && !guideActions.includes('api-key-save')));
 
   // Live UI status (running / warn / error / stopped) drives the 3 action-card
   // states. "stopped" splits further: a disabled server reads as "Off".
@@ -799,7 +814,7 @@ export function DetailPage() {
           <button
             key={tb.key}
             type="button"
-            className={`${styles.tab} ${activeTab ===tb.key ? styles.tabActive : ''}`}
+            className={`${styles.tab} ${activeTab === tb.key ? styles.tabActive : ''}`}
             onClick={() => setTab(tb.key)}
           >
             {tb.label}
@@ -810,7 +825,7 @@ export function DetailPage() {
 
       <div className={styles.cols}>
         <div className={styles.colMain}>
-          {activeTab ==='overview' && (
+          {activeTab === 'overview' && (
             <>
               <h2 className={styles.hSec}>{t('mcpLibrary.detail.whatItDoes', 'What it does')}</h2>
               <div className={styles.prose}>
@@ -826,7 +841,7 @@ export function DetailPage() {
             </>
           )}
 
-          {activeTab ==='tools' && (
+          {activeTab === 'tools' && (
             <>
               <h2 className={styles.hSec}>{t('mcpLibrary.detail.toolsHeading', 'Tools')}</h2>
               {installedServer?.tools && installedServer.tools.length > 0 ? (
@@ -855,7 +870,7 @@ export function DetailPage() {
             </>
           )}
 
-          {activeTab ==='setup-guide' && (
+          {activeTab === 'setup-guide' && (
             <>
               <h2 className={styles.hSec}>{t('mcpLibrary.detail.setupHeading', 'Setup guide')}</h2>
               {isReady && (
@@ -883,10 +898,36 @@ export function DetailPage() {
                   {t('mcpLibrary.detail.noGuide', 'This connector installs in one click — no setup steps.')}
                 </p>
               )}
+              {showFallbackConnect && (
+                <div className={styles.connectBar}>
+                  <button
+                    type="button"
+                    className={styles.btnPrimary}
+                    onClick={() => void onPrimary(isApiKey ? 'api-key-save' : 'oauth-flow')}
+                    disabled={installing || oauthInFlight}
+                  >
+                    {isApiKey ? <Plug size={16} /> : <LogIn size={16} />}
+                    {isApiKey
+                      ? installing
+                        ? t('mcpLibrary.detail.connecting', 'Connecting…')
+                        : t('mcpLibrary.detail.saveConnect', 'Save & connect')
+                      : oauthInFlight
+                        ? t('mcpLibrary.detail.signingIn', 'Signing in…')
+                        : t('mcpLibrary.detail.signInWith', 'Sign in with {{provider}}', {
+                            provider: w.auth.providerName ?? entry.title,
+                          })}
+                  </button>
+                  {isApiKey && (
+                    <span className={styles.connectHint}>
+                      {t('mcpLibrary.detail.saveConnectHint', 'Paste your key above, then connect.')}
+                    </span>
+                  )}
+                </div>
+              )}
             </>
           )}
 
-          {activeTab ==='permissions' && (
+          {activeTab === 'permissions' && (
             <>
               <h2 className={styles.hSec}>{t('mcpLibrary.detail.permissionsHeading', 'What it can access')}</h2>
               {w.auth.scopes && w.auth.scopes.length > 0 ? (
