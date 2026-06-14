@@ -365,5 +365,29 @@
     },
     "dismiss": "Dispensar",
     "recommended": "(recomendado)"
+  },
+  "composerMenu": {
+    "skills": "Skills",
+    "connectors": "Connectors",
+    "countOn": "{{count}} on",
+    "skillsTitle": "Skills on this chat",
+    "skillsSub": "Only these load by default. Everything else stays one search away.",
+    "onThisChat": "On this chat",
+    "searchPlaceholder": "Search skills…",
+    "suggestedFor": "Suggested for “{{draft}}”",
+    "resultsOne": "1 result",
+    "resultsN": "{{count}} results",
+    "noResults": "No skills match “{{query}}”.",
+    "manageAllSkills": "Manage all skills",
+    "tagBuiltin": "builtin",
+    "tagAdded": "added",
+    "toggleAria": "Toggle {{name}}",
+    "connectorsTitle": "Connectors",
+    "connectorsSub": "Turn a connected MCP server on or off.",
+    "connectorsConnected": "Connected",
+    "toolCount": "{{count}} tools",
+    "noConnectors": "No connectors installed yet.",
+    "addConnector": "Add a connector",
+    "manageConnectors": "Manage connectors"
   }
 }
