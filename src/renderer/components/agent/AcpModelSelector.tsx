@@ -15,10 +15,15 @@ import { useFluxConnected } from '@/renderer/hooks/useFluxConnected';
 import { getModelDisplayLabel } from '@/renderer/utils/model/agentLogo';
 import { formatAcpModelDisplayLabel, getAcpModelSourceLabel } from '@/renderer/utils/model/modelSource';
 import { Button, Dropdown, Menu, Tooltip } from '@arco-design/web-react';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import MarqueePillLabel from './MarqueePillLabel';
+import ModelSelectorFlyout from '@renderer/components/model/modelSelector/ModelSelectorFlyout';
+import { useModelSelectorViewModel } from '@renderer/components/model/modelSelector/useModelSelectorViewModel';
+import { usePinnedModels } from '@renderer/hooks/usage/usePinnedModels';
+import { useModelEffort } from '@renderer/components/model/modelSelector/useModelEffort';
 
 /**
  * The four Flux virtual models, in canonical picker order (auto first).
@@ -81,8 +86,18 @@ const AcpModelSelector: React.FC<{
   initialModelId?: string;
 }> = ({ conversationId, backend, initialModelId }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [modelInfo, setModelInfo] = useState<AcpModelInfo | null>(null);
   const fluxConnected = useFluxConnected();
+  // Unified flyout: view model is driven off `curatedForAgent(backend)` (claude
+  // ->anthropic, codex->openai, vendor CLIs->[]). `activeKey` is resolved below
+  // from the agent's reported current model against the curated rows, so no
+  // process-layer provider map is imported here.
+  const vm = useModelSelectorViewModel(backend ?? '');
+  const { toggle: togglePin } = usePinnedModels(true);
+  // Per-conversation effort (codex/claude only — the flyout's EffortSubRow is
+  // gated by `vm.effortSupported`, so this is inert for non-effort backends).
+  const { effort, setEffort } = useModelEffort(conversationId);
   // Flux models appear at the top of the picker only for Flux-capable backends
   // and only while the flux-router provider is actually connected.
   const showFlux = isFluxCapableBackend(backend) && fluxConnected;
@@ -329,6 +344,43 @@ const AcpModelSelector: React.FC<{
     return <div className={`w-6px h-6px rounded-full shrink-0 ${healthColor}`} />;
   };
 
+  // Resolve the active row key from the agent's reported current model. Flux ids
+  // map to the canonical `flux-router:<id>` (the hero key); native ids match a
+  // curated row by bare id, whatever underlying provider it resolved to.
+  const resolvedVm = useMemo(() => {
+    const currentId = modelInfo?.currentModelId;
+    if (!currentId) return { ...vm, activeKey: null };
+    if (isFluxModelId(currentId)) return { ...vm, activeKey: `flux-router:${currentId}` };
+    const match = [...vm.zones.flatMap((z) => z.rows), ...vm.moreZones.flatMap((z) => z.rows)].find(
+      (r) => r.id === currentId
+    );
+    return { ...vm, activeKey: match ? match.key : null };
+  }, [vm, modelInfo?.currentModelId]);
+
+  // The flyout emits `(modelId, providerId)`; route it through the existing
+  // `handleSelectModel` path so the #66 flux-pin guard (`selectedFluxModelRef`)
+  // still holds for a Flux selection.
+  const onSelect = useCallback((modelId: string) => handleSelectModel(modelId), [handleSelectModel]);
+  const onManage = useCallback(() => navigate('/settings/models'), [navigate]);
+  const flyoutDroplist = (
+    <ModelSelectorFlyout
+      vm={resolvedVm}
+      onSelect={onSelect}
+      onTogglePin={togglePin}
+      onManage={onManage}
+      effort={effort}
+      onSetEffort={setEffort}
+      draftSearch
+    />
+  );
+
+  // `curatedForAgent` only returns real models for CLIs mapped to a connected
+  // provider (claude->anthropic, codex->openai). Vendor CLIs (qwen, goose, ...)
+  // return [], and their switchable models live only in `modelInfo.availableModels`.
+  // Drive the unified flyout where curated rows exist; otherwise fall back to the
+  // native Arco menu (which still surfaces the agent's own models + Flux tiers).
+  const hasCuratedModels = resolvedVm.zones.some((z) => z.rows.length > 0) || resolvedVm.moreZones.some((z) => z.rows.length > 0);
+
   // Flux-capable backend + connected Flux provider: render a switchable dropdown
   // with the Flux tiers at the top (selecting one routes the chat through Flux)
   // and the agent's own native models below, unchanged. This wraps all native
@@ -339,37 +391,41 @@ const AcpModelSelector: React.FC<{
       <Dropdown
         trigger='click'
         droplist={
-          <Menu>
-            <Menu.ItemGroup title={t('conversation.welcome.fluxGroupLabel')}>
-              {FLUX_PICKER_MODELS.map((model) => (
-                <Menu.Item
-                  key={model.id}
-                  className={model.id === modelInfo?.currentModelId ? 'bg-2!' : ''}
-                  onClick={() => handleSelectModel(model.id)}
-                >
-                  <div className='flex items-center gap-8px w-full'>
-                    <span>{model.label}</span>
-                  </div>
-                </Menu.Item>
-              ))}
-            </Menu.ItemGroup>
-            {nativeModels.length > 0 && (
-              <Menu.ItemGroup title={t('conversation.welcome.nativeModelsGroupLabel')}>
-                {nativeModels.map((model) => (
+          hasCuratedModels ? (
+            flyoutDroplist
+          ) : (
+            <Menu>
+              <Menu.ItemGroup title={t('conversation.welcome.fluxGroupLabel')}>
+                {FLUX_PICKER_MODELS.map((model) => (
                   <Menu.Item
                     key={model.id}
                     className={model.id === modelInfo?.currentModelId ? 'bg-2!' : ''}
                     onClick={() => handleSelectModel(model.id)}
                   >
                     <div className='flex items-center gap-8px w-full'>
-                      {healthDot(model.id)}
                       <span>{model.label}</span>
                     </div>
                   </Menu.Item>
                 ))}
               </Menu.ItemGroup>
-            )}
-          </Menu>
+              {nativeModels.length > 0 && (
+                <Menu.ItemGroup title={t('conversation.welcome.nativeModelsGroupLabel')}>
+                  {nativeModels.map((model) => (
+                    <Menu.Item
+                      key={model.id}
+                      className={model.id === modelInfo?.currentModelId ? 'bg-2!' : ''}
+                      onClick={() => handleSelectModel(model.id)}
+                    >
+                      <div className='flex items-center gap-8px w-full'>
+                        {healthDot(model.id)}
+                        <span>{model.label}</span>
+                      </div>
+                    </Menu.Item>
+                  ))}
+                </Menu.ItemGroup>
+              )}
+            </Menu>
+          )
         }
       >
         <Button className='sendbox-model-btn header-model-btn agent-mode-compact-pill' shape='round' size='small'>
@@ -428,28 +484,38 @@ const AcpModelSelector: React.FC<{
     <Dropdown
       trigger='click'
       droplist={
-        <Menu>
-          {modelInfo.availableModels.map((model) => {
-            // Get model health status
-            const providerConfig = modelConfig?.find((p) => p.platform?.includes(backend || ''));
-            const healthStatus = providerConfig?.modelHealth?.[model.id]?.status || 'unknown';
-            const healthColor =
-              healthStatus === 'healthy' ? 'bg-green-500' : healthStatus === 'unhealthy' ? 'bg-red-500' : 'bg-gray-400';
+        hasCuratedModels ? (
+          flyoutDroplist
+        ) : (
+          <Menu>
+            {modelInfo.availableModels.map((model) => {
+              // Get model health status
+              const providerConfig = modelConfig?.find((p) => p.platform?.includes(backend || ''));
+              const healthStatus = providerConfig?.modelHealth?.[model.id]?.status || 'unknown';
+              const healthColor =
+                healthStatus === 'healthy'
+                  ? 'bg-green-500'
+                  : healthStatus === 'unhealthy'
+                    ? 'bg-red-500'
+                    : 'bg-gray-400';
 
-            return (
-              <Menu.Item
-                key={model.id}
-                className={model.id === modelInfo.currentModelId ? 'bg-2!' : ''}
-                onClick={() => handleSelectModel(model.id)}
-              >
-                <div className='flex items-center gap-8px w-full'>
-                  {healthStatus !== 'unknown' && <div className={`w-6px h-6px rounded-full shrink-0 ${healthColor}`} />}
-                  <span>{model.label}</span>
-                </div>
-              </Menu.Item>
-            );
-          })}
-        </Menu>
+              return (
+                <Menu.Item
+                  key={model.id}
+                  className={model.id === modelInfo.currentModelId ? 'bg-2!' : ''}
+                  onClick={() => handleSelectModel(model.id)}
+                >
+                  <div className='flex items-center gap-8px w-full'>
+                    {healthStatus !== 'unknown' && (
+                      <div className={`w-6px h-6px rounded-full shrink-0 ${healthColor}`} />
+                    )}
+                    <span>{model.label}</span>
+                  </div>
+                </Menu.Item>
+              );
+            })}
+          </Menu>
+        )
       }
     >
       <Button className='sendbox-model-btn header-model-btn agent-mode-compact-pill' shape='round' size='small'>

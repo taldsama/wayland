@@ -58,7 +58,7 @@ const WCoreHeaderModelSelector: React.FC<{ conversationId: string; initialModel?
     [conversationId]
   );
   const modelSelection = useWCoreModelSelection({ initialModel, onSelectModel });
-  return <WCoreModelSelector selection={modelSelection} />;
+  return <WCoreModelSelector selection={modelSelection} conversationId={conversationId} />;
 };
 
 /** Fetches conversation for a single agent and renders TeamChatView */

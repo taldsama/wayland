@@ -5,7 +5,7 @@
  */
 
 import { Button, Input } from '@arco-design/web-react';
-import { Check, ChevronRight, Plus, Search, Settings, Sparkles } from 'lucide-react';
+import { Check, ChevronRight, Pin, Plus, Search, Settings, Sparkles } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { iconColors } from '@/renderer/styles/colors';
@@ -128,21 +128,22 @@ const ModelSelectorFlyout: React.FC<ModelSelectorProps> = ({
             <Check size={16} strokeWidth={2.6} />
           </span>
         )}
-        <button
-          type='button'
+        <Button
+          type='text'
+          shape='circle'
+          size='mini'
           className={`${styles.pin} ${row.pinned ? styles.pinned : ''}`}
           aria-label={
             row.pinned
               ? t('conversation.modelSelector.unpinAria', { defaultValue: 'Unpin {{name}}', name: row.label })
               : t('conversation.modelSelector.pinAria', { defaultValue: 'Pin {{name}}', name: row.label })
           }
+          icon={<Pin size={13} strokeWidth={1.8} fill={row.pinned ? 'currentColor' : 'none'} />}
           onClick={(e) => {
             e.stopPropagation();
             onTogglePin(row.key);
           }}
-        >
-          <Sparkles size={13} strokeWidth={1.8} fill={row.pinned ? 'currentColor' : 'none'} />
-        </button>
+        />
       </div>
     );
   };

@@ -238,7 +238,7 @@ const WCoreConversationPanel: React.FC<{ conversation: WCoreConversation; slider
     title: conversation.name,
     siderTitle: sliderTitle,
     sider: <ChatSider conversation={conversation} />,
-    headerLeft: <WCoreModelSelector selection={modelSelection} />,
+    headerLeft: <WCoreModelSelector selection={modelSelection} conversationId={conversation.id} />,
     headerExtra: (
       <div className='flex items-center gap-8px'>
         <ConversationSkillsIndicator conversation={conversation} />
