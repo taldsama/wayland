@@ -181,7 +181,7 @@ const ModelSelectorFlyout: React.FC<ModelSelectorProps> = ({
             </div>
             <div className={styles.emptySub}>
               {t('conversation.modelSelector.emptyBody', {
-                defaultValue: 'No models yet — connect a provider or sign in to a CLI.',
+                defaultValue: 'No models yet. Connect a provider or sign in to a CLI.',
               })}
             </div>
             <Button type='primary' onClick={onManage}>
