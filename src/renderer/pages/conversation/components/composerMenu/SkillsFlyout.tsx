@@ -73,10 +73,39 @@ const SkillsFlyout: React.FC<Props> = ({ composer, draftText = '', suggestions, 
 
   const onChatNames = useMemo(() => new Set(composer.onChatList.map((s) => s.name)), [composer.onChatList]);
 
-  const derivedSuggestions = useMemo(
-    () => suggestions ?? deriveSuggestions(library, draftText, onChatNames),
-    [suggestions, library, draftText, onChatNames]
-  );
+  // Proactive suggestions from the agent's own BM25 retrieval (skills.suggest),
+  // debounced on the draft. Falls back to a client-side filter if the IPC yields
+  // nothing yet. An explicit `suggestions` prop (tests) overrides both.
+  const [ipcSuggestions, setIpcSuggestions] = useState<SkillIndexEntry[]>([]);
+  useEffect(() => {
+    if (suggestions) return;
+    const q = draftText.trim();
+    if (q.length < 3) {
+      setIpcSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const handle = setTimeout(() => {
+      ipcBridge.skills.suggest
+        .invoke({ query: q, limit: SUGGESTION_LIMIT })
+        .then((res) => {
+          if (!cancelled) setIpcSuggestions(res ?? []);
+        })
+        .catch(() => {
+          if (!cancelled) setIpcSuggestions([]);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [suggestions, draftText]);
+
+  const derivedSuggestions = useMemo(() => {
+    if (suggestions) return suggestions;
+    const ranked = ipcSuggestions.length > 0 ? ipcSuggestions : deriveSuggestions(library, draftText, onChatNames);
+    return ranked.filter((s) => !onChatNames.has(s.name)).slice(0, SUGGESTION_LIMIT);
+  }, [suggestions, ipcSuggestions, library, draftText, onChatNames]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();

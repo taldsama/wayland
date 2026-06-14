@@ -70,6 +70,11 @@ export function initSkillsBridge(): void {
     return lib.list({ type: req?.type ?? 'skill' });
   });
 
+  ipcBridge.skills.suggest.provider(async ({ query, limit }) => {
+    const { retrieveSkillSuggestions } = await import('@process/task/agentUtils');
+    return retrieveSkillSuggestions(query, limit ?? 2);
+  });
+
   ipcBridge.skills.stats.provider(async () => {
     // Stats must mirror the list filter so the four health cards count the
     // same set the user is browsing. Otherwise the page shows e.g.

@@ -417,6 +417,12 @@ export const skills = {
    * caller ever needs them.
    */
   list: buildProvider<SkillIndexEntry[], { type?: SkillIndexEntry['type'] } | undefined>('skills.list'),
+  /**
+   * Rank library skills for a composer draft (BM25), mirroring the per-turn
+   * retrieval the agent uses. Powers the composer "+" "Suggested for '<draft>'"
+   * list. Returns [] for greetings or when nothing clearly matches.
+   */
+  suggest: buildProvider<SkillIndexEntry[], { query: string; limit?: number }>('skills.suggest'),
   /** Return aggregate library statistics. */
   stats: buildProvider<SkillStats, void>('skills.stats'),
   /**
