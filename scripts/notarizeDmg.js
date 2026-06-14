@@ -51,27 +51,13 @@ exports.default = async function notarizeDmg(buildResult) {
       console.log(`notarizeDmg: code-signing ${name} with Developer ID (no timestamp)…`);
       signDmgNoTimestamp(identity, dmg);
 
-      console.log(`notarizeDmg: submitting ${name} to Apple notary service…`);
-      const submitCmd = [
-        'xcrun notarytool submit',
-        `"${dmg}"`,
-        `--apple-id "${appleId}"`,
-        `--team-id "${teamId}"`,
-        '--password "$NOTARYTOOL_PWD"',
-        '--wait',
-        '--timeout 20m',
-      ].join(' ');
-      execSync(submitCmd, {
-        stdio: 'inherit',
-        env: { ...process.env, NOTARYTOOL_PWD: appleIdPassword },
-      });
-
-      // Staple the ticket so Gatekeeper validates the dmg offline. `stapler`
-      // contacts Apple's ticket servers with no client timeout, so bound it too.
-      if (!runBounded('xcrun', ['stapler', 'staple', dmg], { timeoutMs: 300000, label: `notarizeDmg: stapling ${name}` })) {
-        throw new Error(`stapler staple failed or timed out for ${name}`);
-      }
-      console.log(`notarizeDmg: stapled ${name}`);
+      // The notary submit + staple both contact Apple over the network and can
+      // hit transient stalls — e.g. NSURLErrorDomain Code=-1001 "request timed
+      // out" — that have nothing to do with the artifact or our credentials.
+      // Without a retry a single Apple hiccup ships the dmg signed-but-unstapled
+      // and the smoke gate blocks the entire release (v0.9.8 arm64 hit exactly
+      // this). Retry the network-bound steps with backoff before degrading.
+      await notarizeAndStapleWithRetry({ dmg, name, appleId, appleIdPassword, teamId });
 
       // Stapling rewrites the dmg bytes, so the updater metadata that referenced
       // the pre-staple dmg is now stale. Repair the sha512/size in latest-mac.yml.
@@ -85,6 +71,63 @@ exports.default = async function notarizeDmg(buildResult) {
     }
   }
 };
+
+/** Sleep without blocking the event loop (the hook is async). */
+function delay(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/**
+ * Submit the dmg to the Apple notary service and staple the ticket, retrying
+ * the network-bound pair on transient failure. Apple's notary endpoint
+ * intermittently returns connection timeouts (-1001); a one-off blip should not
+ * block a release. Throws only after every attempt fails, so the caller still
+ * degrades to "signed-but-unstapled" and the smoke gate makes the final call.
+ */
+async function notarizeAndStapleWithRetry({ dmg, name, appleId, appleIdPassword, teamId }) {
+  const maxAttempts = 3;
+  const backoffMs = 60000;
+  const submitCmd = [
+    'xcrun notarytool submit',
+    `"${dmg}"`,
+    `--apple-id "${appleId}"`,
+    `--team-id "${teamId}"`,
+    '--password "$NOTARYTOOL_PWD"',
+    '--wait',
+    '--timeout 20m',
+  ].join(' ');
+
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`notarizeDmg: submitting ${name} to Apple notary service (attempt ${attempt}/${maxAttempts})…`);
+      execSync(submitCmd, {
+        stdio: 'inherit',
+        env: { ...process.env, NOTARYTOOL_PWD: appleIdPassword },
+      });
+
+      // Staple the ticket so Gatekeeper validates the dmg offline. `stapler`
+      // contacts Apple's ticket servers with no client timeout, so bound it too.
+      if (!runBounded('xcrun', ['stapler', 'staple', dmg], { timeoutMs: 300000, label: `notarizeDmg: stapling ${name}` })) {
+        throw new Error(`stapler staple failed or timed out for ${name}`);
+      }
+      console.log(`notarizeDmg: stapled ${name}`);
+      return;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      if (attempt < maxAttempts) {
+        console.warn(
+          `notarizeDmg: ${name} attempt ${attempt}/${maxAttempts} failed (${message}); retrying in ${backoffMs / 1000}s…`
+        );
+        await delay(backoffMs);
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
 
 /**
  * Code-sign the dmg with Developer ID but WITHOUT a secure timestamp.
