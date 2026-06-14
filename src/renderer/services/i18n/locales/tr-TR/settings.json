@@ -1955,7 +1955,8 @@
     },
     "headless": {
       "title": "Saglayicilar sunucuda yapilandirilir",
-      "body": "Bu uzak bir oturumdur, bu nedenle anahtarlar buraya girilemez. Saglayicilar ortam degiskenleri veya sunucudaki `wayland setup` ile yapilandirilir. Yapilandirilmis saglayicilariniz ve modelleri yenileme sonrasinda asagida gorunur."
+      "body": "Bu uzak bir oturumdur, bu nedenle anahtarlar buraya girilemez. Saglayicilar ortam degiskenleri veya sunucudaki `wayland setup` ile yapilandirilir. Yapilandirilmis saglayicilariniz ve modelleri yenileme sonrasinda asagida gorunur.",
+      "localEndpoint": "To add a local OpenAI-compatible endpoint (Ollama, vLLM, LM Studio), set OPENAI_API_KEY and OPENAI_BASE_URL in the server environment, then restart. The endpoint's models appear in the list below once refreshed."
     }
   },
   "mcpPage": {

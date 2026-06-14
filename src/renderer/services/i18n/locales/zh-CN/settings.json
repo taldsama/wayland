@@ -1956,7 +1956,8 @@
     },
     "headless": {
       "title": "提供商在服务器上配置",
-      "body": "这是一个远程会话，因此无法在此输入密钥。提供商通过环境变量或服务器上的 `wayland setup` 进行配置。刷新后，您已配置的提供商及其模型将显示在下方。"
+      "body": "这是一个远程会话，因此无法在此输入密钥。提供商通过环境变量或服务器上的 `wayland setup` 进行配置。刷新后，您已配置的提供商及其模型将显示在下方。",
+      "localEndpoint": "To add a local OpenAI-compatible endpoint (Ollama, vLLM, LM Studio), set OPENAI_API_KEY and OPENAI_BASE_URL in the server environment, then restart. The endpoint's models appear in the list below once refreshed."
     }
   },
   "mcpPage": {

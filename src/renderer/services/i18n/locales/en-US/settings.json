@@ -1997,7 +1997,8 @@
     },
     "headless": {
       "title": "Providers are configured on the server",
-      "body": "This is a remote session, so keys cannot be entered here. Providers are configured via environment variables or `wayland setup` on the server. Your configured providers and their models appear below once refreshed."
+      "body": "This is a remote session, so keys cannot be entered here. Providers are configured via environment variables or `wayland setup` on the server. Your configured providers and their models appear below once refreshed.",
+      "localEndpoint": "To add a local OpenAI-compatible endpoint (Ollama, vLLM, LM Studio), set OPENAI_API_KEY and OPENAI_BASE_URL in the server environment, then restart. The endpoint's models appear in the list below once refreshed."
     }
   },
   "mcpPage": {

@@ -1957,7 +1957,8 @@
     },
     "headless": {
       "title": "プロバイダーはサーバー上で設定されます",
-      "body": "これはリモートセッションのため、ここでキーを入力することはできません。プロバイダーは環境変数またはサーバー上の `wayland setup` で設定します。更新すると、設定済みのプロバイダーとそのモデルが下に表示されます。"
+      "body": "これはリモートセッションのため、ここでキーを入力することはできません。プロバイダーは環境変数またはサーバー上の `wayland setup` で設定します。更新すると、設定済みのプロバイダーとそのモデルが下に表示されます。",
+      "localEndpoint": "To add a local OpenAI-compatible endpoint (Ollama, vLLM, LM Studio), set OPENAI_API_KEY and OPENAI_BASE_URL in the server environment, then restart. The endpoint's models appear in the list below once refreshed."
     }
   },
   "mcpPage": {

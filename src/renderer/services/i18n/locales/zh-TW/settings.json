@@ -1957,7 +1957,8 @@
     },
     "headless": {
       "title": "供應商在伺服器上設定",
-      "body": "這是一個遠端工作階段，因此無法在此輸入金鑰。供應商透過環境變數或伺服器上的 `wayland setup` 進行設定。重新整理後，您已設定的供應商及其模型將顯示在下方。"
+      "body": "這是一個遠端工作階段，因此無法在此輸入金鑰。供應商透過環境變數或伺服器上的 `wayland setup` 進行設定。重新整理後，您已設定的供應商及其模型將顯示在下方。",
+      "localEndpoint": "To add a local OpenAI-compatible endpoint (Ollama, vLLM, LM Studio), set OPENAI_API_KEY and OPENAI_BASE_URL in the server environment, then restart. The endpoint's models appear in the list below once refreshed."
     }
   },
   "mcpPage": {

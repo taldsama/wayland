@@ -392,6 +392,10 @@ const ModelsSettingsInner: React.FC = () => {
         <div className={styles.headlessNotice}>
           <p className={styles.headlessNoticeTitle}>{t('settings.modelsPage.headless.title')}</p>
           <p className={styles.headlessNoticeBody}>{t('settings.modelsPage.headless.body')}</p>
+          <p className={styles.headlessNoticeBody}>{t('settings.modelsPage.headless.localEndpoint')}</p>
+          <p className={styles.headlessNoticeBody}>
+            <code>OPENAI_API_KEY=local OPENAI_BASE_URL=http://127.0.0.1:8000/v1</code>
+          </p>
         </div>
       ) : (
         <>

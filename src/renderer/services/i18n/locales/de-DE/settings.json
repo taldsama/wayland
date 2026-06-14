@@ -1978,7 +1978,8 @@
     },
     "headless": {
       "title": "Anbieter werden auf dem Server konfiguriert",
-      "body": "Dies ist eine Remote-Sitzung, daher koennen hier keine Schluessel eingegeben werden. Anbieter werden ueber Umgebungsvariablen oder `wayland setup` auf dem Server konfiguriert. Ihre konfigurierten Anbieter und deren Modelle erscheinen nach der Aktualisierung unten."
+      "body": "Dies ist eine Remote-Sitzung, daher koennen hier keine Schluessel eingegeben werden. Anbieter werden ueber Umgebungsvariablen oder `wayland setup` auf dem Server konfiguriert. Ihre konfigurierten Anbieter und deren Modelle erscheinen nach der Aktualisierung unten.",
+      "localEndpoint": "To add a local OpenAI-compatible endpoint (Ollama, vLLM, LM Studio), set OPENAI_API_KEY and OPENAI_BASE_URL in the server environment, then restart. The endpoint's models appear in the list below once refreshed."
     }
   },
   "mcpPage": {

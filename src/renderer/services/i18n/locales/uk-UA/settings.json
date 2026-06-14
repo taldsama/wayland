@@ -1922,7 +1922,8 @@
     },
     "headless": {
       "title": "Провайдери налаштовуються на сервері",
-      "body": "Це віддалений сеанс, тому ключі не можна ввести тут. Провайдери налаштовуються через змінні середовища або `wayland setup` на сервері. Ваші налаштовані провайдери та їхні моделі з’являться нижче після оновлення."
+      "body": "Це віддалений сеанс, тому ключі не можна ввести тут. Провайдери налаштовуються через змінні середовища або `wayland setup` на сервері. Ваші налаштовані провайдери та їхні моделі з’являться нижче після оновлення.",
+      "localEndpoint": "To add a local OpenAI-compatible endpoint (Ollama, vLLM, LM Studio), set OPENAI_API_KEY and OPENAI_BASE_URL in the server environment, then restart. The endpoint's models appear in the list below once refreshed."
     }
   },
   "mcpPage": {

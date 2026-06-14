@@ -1978,7 +1978,8 @@
     },
     "headless": {
       "title": "Los proveedores se configuran en el servidor",
-      "body": "Esta es una sesion remota, por lo que las claves no se pueden introducir aqui. Los proveedores se configuran mediante variables de entorno o `wayland setup` en el servidor. Tus proveedores configurados y sus modelos apareceran abajo tras actualizar."
+      "body": "Esta es una sesion remota, por lo que las claves no se pueden introducir aqui. Los proveedores se configuran mediante variables de entorno o `wayland setup` en el servidor. Tus proveedores configurados y sus modelos apareceran abajo tras actualizar.",
+      "localEndpoint": "To add a local OpenAI-compatible endpoint (Ollama, vLLM, LM Studio), set OPENAI_API_KEY and OPENAI_BASE_URL in the server environment, then restart. The endpoint's models appear in the list below once refreshed."
     }
   },
   "mcpPage": {
