@@ -29,6 +29,12 @@ import { registerWecomChannelRoutes } from './wecomChannelRoutes';
 import { registerStorageRoutes } from './storageRoutes';
 import { registerProviderKeyRoutes } from './providerKeyRoutes';
 import { registerToolKeyRoutes } from './toolKeyRoutes';
+import { registerMcpConfigRoutes } from './mcpConfigRoutes';
+import { registerChannelConfigRoutes } from './channelConfigRoutes';
+import { registerConstitutionRoutes } from './constitutionRoutes';
+import { registerUsernameRoutes } from './usernameRoutes';
+import { registerFluxConnectRoutes } from './fluxConnectRoutes';
+import { registerMcpOAuthRoutes } from './mcpOAuthRoutes';
 
 /** Temp directory used by multer disk storage - validated at runtime to prevent path traversal */
 const MULTER_TEMP_DIR = os.tmpdir();
@@ -739,6 +745,21 @@ export function registerApiRoutes(app: Express): void {
   // (remote-secure-config W1.B): write-only CONFIG-WRITE routes, return
   // { hasKey } only (Brave, Tavily, Exa, ElevenLabs, FAL, Hugging Face, ...).
   registerToolKeyRoutes(app, validateApiAccess);
+
+  // The rest of the CONFIG-WRITE surface from a remote WebUI client
+  // (remote-secure-config W3 + W4a). All write-only, requireSecureConfigWrite,
+  // return status only; each reuses the existing in-process handler.
+  // W3.D MCP sync/remove/byo-oauth, W3.E channels enable/disable/sync/rotate-
+  // webhook(shown-once)/approve-pairing, W3.G constitution writes (+ a read GET:
+  // the constitution is prose, not a secret), W3.H WebUI change-username
+  // (enforces current password). W4a Flux + MCP-DCR OAuth connect from the
+  // device, redirect_uri pinned to the validated origin (never a raw Host).
+  registerMcpConfigRoutes(app, validateApiAccess);
+  registerChannelConfigRoutes(app, validateApiAccess);
+  registerConstitutionRoutes(app, validateApiAccess);
+  registerUsernameRoutes(app, validateApiAccess);
+  registerFluxConnectRoutes(app, validateApiAccess);
+  registerMcpOAuthRoutes(app, validateApiAccess);
 
   /**
    * Generic API endpoint

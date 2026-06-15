@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { acpConversation, mcpService } from '@/common/adapter/ipcBridge';
 import { ConfigStorage } from '@/common/config/storage';
 import type { IMcpServer } from '@/common/config/storage';
+import { isElectronDesktop } from '@/renderer/utils/platform';
+import { removeMcpFromAgentsHttp, syncMcpToAgentsHttp } from '@/renderer/services/McpConfigService';
 import { globalMessageQueue } from './messageQueue';
 
 /**
@@ -112,10 +114,14 @@ export const useMcpOperations = (
           message.info(t('settings.mcpRemoveStarted', { count: compatibleCount }));
         });
 
-        const removeResponse = await mcpService.removeMcpFromAgents.invoke({
-          mcpServerName: serverName,
-          agents: agentsResponse.data,
-        });
+        // Desktop -> Electron IPC; hosted WebUI -> token-authed + CSRF'd write-only
+        // HTTP route (the mcpService.* IPC channels stay denied to remote callers).
+        const removeResponse = isElectronDesktop()
+          ? await mcpService.removeMcpFromAgents.invoke({
+              mcpServerName: serverName,
+              agents: agentsResponse.data,
+            })
+          : await removeMcpFromAgentsHttp(serverName);
         await handleMcpOperationResult(removeResponse, 'remove', successMessage, true); // Skip re-detection
       }
     },
@@ -137,10 +143,14 @@ export const useMcpOperations = (
           message.info(t('settings.mcpSyncStarted', { count: compatibleCount }));
         });
 
-        const syncResponse = await mcpService.syncMcpToAgents.invoke({
-          mcpServers: [server],
-          agents: agentsResponse.data,
-        });
+        // Desktop -> Electron IPC; hosted WebUI -> token-authed + CSRF'd write-only
+        // HTTP route (the server is resolved server-side by id over HTTP).
+        const syncResponse = isElectronDesktop()
+          ? await mcpService.syncMcpToAgents.invoke({
+              mcpServers: [server],
+              agents: agentsResponse.data,
+            })
+          : await syncMcpToAgentsHttp(server.id);
 
         await handleMcpOperationResult(syncResponse, 'sync', undefined, skipRecheck);
       } else {

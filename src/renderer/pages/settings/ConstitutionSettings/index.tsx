@@ -9,6 +9,12 @@ import { RotateCcw } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
+import { isElectronDesktop } from '@renderer/utils/platform';
+import {
+  readConstitutionHttp,
+  resetConstitutionHttp,
+  writeConstitutionHttp,
+} from '@renderer/services/ConstitutionService';
 import type { SaveState } from '@renderer/components/settings/shared/feedback/SavedIndicator';
 import SettingsPageShell from '@renderer/pages/settings/components/SettingsPageShell';
 import TipTapMarkdownEditor from '@renderer/pages/conversation/Preview/components/editors/TipTapMarkdownEditor';
@@ -75,17 +81,22 @@ const ConstitutionSettings: React.FC = () => {
     let cancelled = false;
     void (async () => {
       const api = window.electronAPI;
-      if (!api?.readConstitution || !api?.resetConstitution) {
-        // Non-Electron / preload not ready - leave the editor empty with a
-        // neutral state. The Reset action below is also gated.
-        if (!cancelled) setLoading(false);
-        return;
-      }
-      let text = await api.readConstitution();
-      if (!text) {
-        // First-install seed: materialize the default Constitution to disk
-        // so the editor isn't blank on a brand-new install.
-        text = await api.resetConstitution();
+      let text: string;
+      if (isElectronDesktop() && api?.readConstitution && api?.resetConstitution) {
+        text = await api.readConstitution();
+        if (!text) {
+          // First-install seed: materialize the default Constitution to disk
+          // so the editor isn't blank on a brand-new install.
+          text = await api.resetConstitution();
+        }
+      } else {
+        // Headless WebUI: the constitution is not a secret, so read it over the
+        // token-authed GET. Seed the default on first install via reset, then
+        // re-read since reset returns status only (never the body).
+        text = await readConstitutionHttp();
+        if (!text && (await resetConstitutionHttp())) {
+          text = await readConstitutionHttp();
+        }
       }
       if (cancelled) return;
       setValue(text);
@@ -109,7 +120,9 @@ const ConstitutionSettings: React.FC = () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setSaveState('saving');
     saveTimer.current = setTimeout(async () => {
-      const ok = (await window.electronAPI?.writeConstitution?.(md)) ?? false;
+      const ok = isElectronDesktop()
+        ? ((await window.electronAPI?.writeConstitution?.(md)) ?? false)
+        : await writeConstitutionHttp(md);
       setSaveState(ok ? 'saved' : 'error');
       if (ok) {
         if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
@@ -119,7 +132,13 @@ const ConstitutionSettings: React.FC = () => {
   }, []);
 
   const handleReset = useCallback(async (): Promise<void> => {
-    const next = await window.electronAPI?.resetConstitution?.();
+    let next: string | undefined;
+    if (isElectronDesktop()) {
+      next = await window.electronAPI?.resetConstitution?.();
+    } else if (await resetConstitutionHttp()) {
+      // Reset returns status only; re-read the restored prose over the GET.
+      next = await readConstitutionHttp();
+    }
     if (typeof next !== 'string') return;
     hydrating.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);

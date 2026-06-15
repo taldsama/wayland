@@ -1,6 +1,10 @@
 import { useState, useCallback } from 'react';
 import { mcpService } from '@/common/adapter/ipcBridge';
+import { ConfigStorage } from '@/common/config/storage';
 import type { IMcpServer } from '@/common/config/storage';
+import { isElectronDesktop } from '@renderer/utils/platform';
+import { startMcpOAuthHttp } from '@renderer/services/McpOAuthService';
+import { setMcpByoOAuthCredentialsHttp } from '@renderer/services/McpConfigService';
 
 export interface McpOAuthStatus {
   isAuthenticated: boolean;
@@ -95,6 +99,29 @@ export const useMcpOAuth = () => {
   const login = useCallback(async (server: IMcpServer): Promise<McpOAuthLoginResult> => {
     setLoggingIn((prev) => ({ ...prev, [server.id]: true }));
 
+    // Headless WebUI: the loginMcpOAuth IPC is denied to remote callers (it
+    // mutates credential material). Start the flow over the write-only HTTP route
+    // instead, which derives an origin-aware DCR redirect and persists the token
+    // server-side. The route returns the vendor authorization URL; we navigate
+    // this tab there so the vendor can redirect back to /api/mcp/oauth/callback.
+    if (!isElectronDesktop()) {
+      try {
+        const result = await startMcpOAuthHttp(server.id);
+        if (result.ok === true) {
+          // Navigate to the vendor auth page. The vendor redirect lands on the
+          // server callback, which completes + persists the token; the user
+          // returns and re-checks status. Success is NOT asserted here.
+          window.location.assign(result.authUrl);
+          return { success: true };
+        }
+        return { success: false, code: 'unknown', error: result.error || 'Login failed' };
+      } catch (error) {
+        return { success: false, code: 'unknown', error: error instanceof Error ? error.message : 'Unknown error' };
+      } finally {
+        setLoggingIn((prev) => ({ ...prev, [server.id]: false }));
+      }
+    }
+
     try {
       const response = await mcpService.loginMcpOAuth.invoke({
         server,
@@ -154,6 +181,24 @@ export const useMcpOAuth = () => {
       clientSecret?: string,
     ): Promise<{ success: boolean; server?: IMcpServer; error?: string }> => {
       try {
+        // Headless WebUI: the setMcpByoOAuthCredentials IPC is denied to remote
+        // callers (it mutates credential material). Post through the write-only
+        // HTTP route instead, which returns STATUS ONLY ({ ok }) - it never echoes
+        // the credentials back. Reconstruct the updated record locally from the
+        // (non-secret) mcp.config so the caller can retry login immediately.
+        if (!isElectronDesktop()) {
+          const ok = await setMcpByoOAuthCredentialsHttp(serverId, clientId, clientSecret);
+          if (!ok) {
+            return { success: false, error: 'Failed to save credentials' };
+          }
+          const servers = (await ConfigStorage.get('mcp.config').catch(() => [] as IMcpServer[])) ?? [];
+          const server = servers.find((s) => s.id === serverId);
+          if (!server) {
+            return { success: false, error: 'MCP server not found after save' };
+          }
+          return { success: true, server };
+        }
+
         const response = await mcpService.setMcpByoOAuthCredentials.invoke({
           serverId,
           clientId,
