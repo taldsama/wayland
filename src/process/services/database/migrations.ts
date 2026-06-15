@@ -2298,6 +2298,46 @@ const migration_v51: IMigration = {
 };
 
 /**
+ * Migration v51 -> v52: Heal orphaned team-child rows.
+ *
+ * Earlier migrations recreate the `teams` table inside the migration
+ * transaction, where runMigrations() runs with `PRAGMA foreign_keys = OFF`
+ * (required for SQLite table recreation). With FK enforcement off, ON DELETE
+ * CASCADE does NOT fire - so any team row that disappears during a rebuild
+ * silently orphans its mailbox / team_tasks / team_event_log children. The
+ * global `foreign_key_check` at the end of runMigrations then fails for the
+ * ENTIRE upgrade (every migration rolls back), the database falls back to file
+ * storage, and every DB-backed page (Models, Scheduled Tasks, Teams, usage)
+ * spins forever. Observed in the wild: 455 orphaned mailbox rows blocking the
+ * v51 upgrade.
+ *
+ * Delete the orphaned children so the FK check passes. Idempotent and safe -
+ * these rows reference teams that no longer exist and are already unreachable.
+ */
+const migration_v52: IMigration = {
+  version: 52,
+  name: 'Heal orphaned team-child rows (mailbox/team_tasks/team_event_log)',
+  up: (db) => {
+    // Hardcoded allowlist - never interpolate untrusted identifiers into SQL.
+    const childTables = ['mailbox', 'team_tasks', 'team_event_log'];
+    for (const table of childTables) {
+      const exists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(table);
+      if (!exists) continue;
+      const result = db
+        .prepare(`DELETE FROM ${table} WHERE team_id IS NOT NULL AND team_id NOT IN (SELECT id FROM teams)`)
+        .run();
+      if (result.changes > 0) {
+        console.log(`[Migration v52] Deleted ${result.changes} orphaned row(s) from ${table}`);
+      }
+    }
+  },
+  down: () => {
+    // Irreversible: the deleted rows referenced non-existent teams and cannot
+    // be meaningfully restored. No-op.
+  },
+};
+
+/**
  * All migrations in order
  */
 // prettier-ignore
@@ -2310,7 +2350,7 @@ export const ALL_MIGRATIONS: IMigration[] = [
   migration_v31, migration_v32, migration_v33, migration_v34, migration_v35, migration_v36,
   migration_v37, migration_v38, migration_v39, migration_v40, migration_v41, migration_v42,
   migration_v43, migration_v44, migration_v45, migration_v46, migration_v47,
-  migration_v48, migration_v49, migration_v50, migration_v51,
+  migration_v48, migration_v49, migration_v50, migration_v51, migration_v52,
 ];
 
 /**
