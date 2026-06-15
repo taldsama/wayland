@@ -32,6 +32,72 @@ import { detectNetworkContext } from '../middleware/detectNetworkContext';
 import { classifyClientTrust } from '../middleware/networkTrust';
 
 /**
+ * Step-up failure lockout (R7). The route's own `authRateLimiter` throttles
+ * request VOLUME, but it counts every request and resets on success - it is not
+ * a failure-counting password oracle defence. This gate-internal counter is the
+ * real lockout: it increments ONLY on a wrong step-up password and locks the
+ * caller out for the window once the threshold is hit, regardless of which
+ * limiter a future config-write route happens to wire up. A correct password
+ * clears the counter immediately so a legitimate operator is never penalised.
+ *
+ * Keyed by user-id + direct socket peer so one device's fat-fingering cannot
+ * lock another, and so the lockout cannot be reset by rotating the auth token.
+ */
+const STEP_UP_MAX_FAILURES = 5;
+const STEP_UP_WINDOW_MS = 15 * 60 * 1000;
+
+type StepUpEntry = { failures: number; lockedUntil: number; resetAt: number };
+
+const stepUpFailures = new Map<string, StepUpEntry>();
+
+function stepUpKey(req: Request, password: string): string {
+  const peer = socketPeer(req) ?? 'unknown';
+  const userId = req.user?.id ?? 'anon';
+  // Password is never stored; it only participates so the key is stable per
+  // caller, not per attempt. (userId + peer is the real identity.)
+  void password;
+  return `${userId}|${peer}`;
+}
+
+/**
+ * Returns the milliseconds remaining on an active lockout for this caller, or 0
+ * when they are free to attempt a step-up. Expired windows are pruned lazily.
+ */
+function stepUpLockoutRemaining(key: string, now: number): number {
+  const entry = stepUpFailures.get(key);
+  if (!entry) return 0;
+  if (now >= entry.resetAt) {
+    stepUpFailures.delete(key);
+    return 0;
+  }
+  if (entry.lockedUntil > now) return entry.lockedUntil - now;
+  return 0;
+}
+
+/** Record a failed step-up; locks the caller out once the threshold is hit. */
+function recordStepUpFailure(key: string, now: number): void {
+  const existing = stepUpFailures.get(key);
+  const entry: StepUpEntry =
+    existing && now < existing.resetAt ? existing : { failures: 0, lockedUntil: 0, resetAt: now + STEP_UP_WINDOW_MS };
+  entry.failures += 1;
+  if (entry.failures >= STEP_UP_MAX_FAILURES) {
+    entry.lockedUntil = now + STEP_UP_WINDOW_MS;
+    entry.resetAt = entry.lockedUntil;
+  }
+  stepUpFailures.set(key, entry);
+}
+
+/** Clear the failure counter for a caller after a correct password. */
+function clearStepUpFailures(key: string): void {
+  stepUpFailures.delete(key);
+}
+
+/** Test-only: drop all lockout state between cases. */
+export function _resetStepUpLockoutForTests(): void {
+  stepUpFailures.clear();
+}
+
+/**
  * Verify the step-up password for the authenticated user. Destructive actions
  * require re-entering the WebUI password even for an operator session, so a
  * session left open on an unlocked device cannot perform an irreversible action.
@@ -119,11 +185,28 @@ export async function requireDestructive(req: Request, res: Response, password: 
     return false;
   }
 
-  // Step-up password re-verify.
+  // Step-up password re-verify, behind a failure-counting lockout (R7). The
+  // lockout is enforced HERE, in the shared gate, so it protects every
+  // config-write consumer regardless of the route's own rate-limiter wiring -
+  // the foundation no longer bakes in a 60/min password oracle.
+  const now = Date.now();
+  const key = stepUpKey(req, password);
+  const lockedFor = stepUpLockoutRemaining(key, now);
+  if (lockedFor > 0) {
+    res.setHeader('Retry-After', Math.ceil(lockedFor / 1000).toString());
+    res.status(429).json({
+      success: false,
+      msg: 'Too many failed password attempts. Try again later.',
+    });
+    return false;
+  }
+
   if (!(await verifyStepUp(req, password))) {
+    recordStepUpFailure(key, now);
     res.status(401).json({ success: false, msg: 'Password confirmation failed.' });
     return false;
   }
 
+  clearStepUpFailures(key);
   return true;
 }

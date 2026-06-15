@@ -9,9 +9,8 @@ import fsPromises from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import multer from 'multer';
-import { apiRateLimiter } from '../middleware/security';
-import { classifyClientTrust } from '../middleware/networkTrust';
-import { verifyStepUp } from './configWriteGuards';
+import { apiRateLimiter, authRateLimiter } from '../middleware/security';
+import { requireDestructive } from './configWriteGuards';
 import { computeUsage, invalidateUsageCache } from '@process/storage/computeUsage';
 import { clearStorageDir, getLogsDir, getStorageDirs } from '@process/storage/storageLocations';
 import { backupExport } from '@process/storage/backupExport';
@@ -68,32 +67,22 @@ export function registerStorageRoutes(app: Express, validateApiAccess: RequestHa
 
   // POST /api/storage/export { includeKeys?, passphrase?, password? } - generate a backup zip and download it.
   // POST (not GET) so the passphrase never lands in a URL or access log.
-  app.post('/api/storage/export', apiRateLimiter, validateApiAccess, async (req: Request, res: Response) => {
+  // authRateLimiter (5 / 15min, failures counted) - NOT apiRateLimiter - because
+  // the keys-included branch re-verifies the WebUI password (step-up); behind the
+  // 60/min apiRateLimiter that re-verify was a password oracle (R7).
+  app.post('/api/storage/export', authRateLimiter, validateApiAccess, async (req: Request, res: Response) => {
     const passphrase = bodyString(req.body?.passphrase) || undefined;
     const includeKeys = req.body?.includeKeys === true || req.body?.includeKeys === 'true';
 
     // A keys-included export is the single most sensitive read-back the app
     // exposes - it bundles credential material for offline decryption - so it is
-    // gated exactly like the destructive restore: (a) operator provenance (the
-    // request must arrive from a trusted private network) AND (b) a step-up
-    // password re-auth, so an authenticated token left open on an unlocked device
-    // can never exfiltrate every provider key (#83 + cross-audit 2026-06-15). A
-    // keyless backup (conversations / attachments / config) stays available to any
-    // authenticated session. Trust is read from the raw socket peer (W0), so the
-    // narrow trust-proxy setting cannot let a forged XFF flip the classification.
+    // gated as DESTRUCTIVE via the shared `requireDestructive`: the CONFIG-WRITE
+    // floor (HTTPS-when-public) + operator provenance (raw socket peer, never the
+    // spoofable req.ip) + a step-up password re-auth carrying the gate-internal
+    // failure-counting lockout (R7). A keyless backup (conversations / attachments
+    // / config) stays available to any authenticated session.
     if (includeKeys) {
-      // Trust is judged from the DIRECT socket peer, never req.ip: with trust
-      // proxy set, req.ip can be rewritten from a spoofable X-Forwarded-For.
-      const clientIp = req.socket.remoteAddress || '';
-      if (classifyClientTrust(clientIp) !== 'operator') {
-        res.status(403).json({
-          success: false,
-          msg: 'Exporting keys is only available from a trusted local network (loopback or Tailscale).',
-        });
-        return;
-      }
-      if (!(await verifyStepUp(req, bodyString(req.body?.password)))) {
-        res.status(401).json({ success: false, msg: 'Password confirmation failed.' });
+      if (!(await requireDestructive(req, res, bodyString(req.body?.password)))) {
         return;
       }
     }
@@ -114,10 +103,13 @@ export function registerStorageRoutes(app: Express, validateApiAccess: RequestHa
   });
 
   // POST /api/storage/restore (multipart 'file' zip) + body { password, passphrase? }
-  // Operator-only (private network) + step-up password + pre-restore safety backup.
+  // DESTRUCTIVE: CONFIG-WRITE floor + operator-only (private network) + step-up
+  // password (with failure-counting lockout) + pre-restore safety backup.
+  // authRateLimiter (not apiRateLimiter) so the step-up re-verify is not a
+  // 60/min password oracle (R7).
   app.post(
     '/api/storage/restore',
-    apiRateLimiter,
+    authRateLimiter,
     validateApiAccess,
     (req: Request, res: Response, next: NextFunction) => {
       uploadRestore.single('file')(req, res, (err: unknown) => {
@@ -138,21 +130,11 @@ export function registerStorageRoutes(app: Express, validateApiAccess: RequestHa
         if (uploadedPath) void fsPromises.rm(uploadedPath, { force: true }).catch(() => {});
       };
       try {
-        // (a) operator provenance: restore only from a trusted private network.
-        // Trust is judged from the DIRECT socket peer, never req.ip (XFF-spoofable).
-        const clientIp = req.socket.remoteAddress || '';
-        if (classifyClientTrust(clientIp) !== 'operator') {
+        // CONFIG-WRITE floor + operator provenance (raw socket peer, never the
+        // spoofable req.ip) + step-up password re-auth with failure lockout (R7),
+        // all enforced by the shared DESTRUCTIVE gate.
+        if (!(await requireDestructive(req, res, bodyString(req.body?.password)))) {
           cleanup();
-          res.status(403).json({
-            success: false,
-            msg: 'Restore is only available from a trusted local network (loopback or Tailscale).',
-          });
-          return;
-        }
-        // (b) step-up password re-auth.
-        if (!(await verifyStepUp(req, bodyString(req.body?.password)))) {
-          cleanup();
-          res.status(401).json({ success: false, msg: 'Password confirmation failed.' });
           return;
         }
         if (!uploadedPath) {
