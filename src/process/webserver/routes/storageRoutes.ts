@@ -79,15 +79,40 @@ export function registerStorageRoutes(app: Express, validateApiAccess: RequestHa
     }
   });
 
-  // POST /api/storage/export { includeKeys?, passphrase? } - generate a backup zip and download it.
+  // POST /api/storage/export { includeKeys?, passphrase?, password? } - generate a backup zip and download it.
   // POST (not GET) so the passphrase never lands in a URL or access log.
   app.post('/api/storage/export', apiRateLimiter, validateApiAccess, async (req: Request, res: Response) => {
+    const passphrase = bodyString(req.body?.passphrase) || undefined;
+    const includeKeys = req.body?.includeKeys === true || req.body?.includeKeys === 'true';
+
+    // A keys-included export is the single most sensitive read-back the app
+    // exposes - it bundles credential material for offline decryption - so it is
+    // gated exactly like the destructive restore: (a) operator provenance (the
+    // request must arrive from a trusted private network) AND (b) a step-up
+    // password re-auth, so an authenticated token left open on an unlocked device
+    // can never exfiltrate every provider key (#83 + cross-audit 2026-06-15). A
+    // keyless backup (conversations / attachments / config) stays available to any
+    // authenticated session. (trust proxy is OFF, so req.ip is the real peer;
+    // the W0 hardening narrows the classifier to the raw socket once it is set.)
+    if (includeKeys) {
+      const clientIp = req.ip || req.socket.remoteAddress || '';
+      if (classifyClientTrust(clientIp) !== 'operator') {
+        res.status(403).json({
+          success: false,
+          msg: 'Exporting keys is only available from a trusted local network (loopback, LAN, or Tailscale).',
+        });
+        return;
+      }
+      if (!(await verifyStepUp(req, bodyString(req.body?.password)))) {
+        res.status(401).json({ success: false, msg: 'Password confirmation failed.' });
+        return;
+      }
+    }
+
     const tmpDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'wl-export-'));
     const fileName = `wayland-backup-${new Date().toISOString().slice(0, 10)}.zip`;
     const destPath = path.join(tmpDir, fileName);
     try {
-      const passphrase = bodyString(req.body?.passphrase) || undefined;
-      const includeKeys = req.body?.includeKeys === true || req.body?.includeKeys === 'true';
       await backupExport({ userData: getStorageDirs().workspace, destPath, includeKeys, passphrase });
       res.download(destPath, fileName, () => {
         void fsPromises.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
