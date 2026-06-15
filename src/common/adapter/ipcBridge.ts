@@ -1740,6 +1740,12 @@ export type IjfwDropIngestResult =
 export type IModelRegistryConnectResult = {
   ok: boolean;
   error?: ConnectError;
+  /**
+   * Non-fatal advisory on an otherwise successful connect. `'no-credit'` means
+   * the key authenticated but has no usable credit yet, so the provider was
+   * added connected-but-switched-off (#100); the panel surfaces a soft notice.
+   */
+  warning?: ConnectError;
 };
 
 /** Result of a connectivity test against an already-connected provider. */

@@ -524,6 +524,11 @@ export function createModelRegistryHandlers(deps: ModelRegistryDeps): ModelRegis
 
     const isCloud = CLOUD_PROVIDERS.has(providerId);
     const isGoogleAuth = 'useGoogleAuth' in resolved;
+    // #100: a key that authenticates but has no usable credit yet (e.g. a brand
+    // new OpenRouter key) should still be addable. When set, the fresh-connect
+    // path persists the provider connected-but-switched-off with a warning
+    // instead of rejecting it.
+    let noCredit = false;
 
     if (isGoogleAuth) {
       // Google-auth Gemini - no HTTP probe (OAuth is verified by the auth
@@ -542,7 +547,15 @@ export function createModelRegistryHandlers(deps: ModelRegistryDeps): ModelRegis
       // but build an empty catalog).
       if ('fields' in resolved) return { ok: false, error: 'unrecognized' };
       const result = await connectionTester.test(providerId, resolved as { key: string }, resolved.baseUrl);
-      if (!result.ok) return { ok: false, error: result.error ?? 'unknown' };
+      if (!result.ok) {
+        // A no-credit key still authenticates, and providers with a public model
+        // listing (OpenRouter) still build a full catalog. On a FRESH connect,
+        // accept it as connected-but-off with a warning (#100) instead of
+        // rejecting. A rekey keeps the strict behavior - never silently swap a
+        // working key for an unusable one. Every other failure is a hard reject.
+        if (isRekey || result.error !== 'no-credit') return { ok: false, error: result.error ?? 'unknown' };
+        noCredit = true;
+      }
     }
 
     // Ship-gate Fix B2: persist an explicit `baseUrl` alongside the api key
@@ -600,6 +613,18 @@ export function createModelRegistryHandlers(deps: ModelRegistryDeps): ModelRegis
     if (!built.ok || (built.models === 0 && built.sourceErrors > 0)) {
       repo.updateRegistryProviderState(providerId, 'error', 'unknown');
       return { ok: false, error: 'unknown' };
+    }
+
+    if (noCredit) {
+      // Connected, but the key has no usable credit yet. Land the provider
+      // switched off - disable every catalogued model so the row reads Connected
+      // + off - and return a warning so the panel can say "add credit, then turn
+      // it on" (#100). Flipping the provider switch on later re-enables the
+      // curated defaults; the disable overrides survive catalog refreshes.
+      for (const model of repo.getRegistryCatalog(providerId)) {
+        repo.setRegistryOverride(providerId, model.id, false);
+      }
+      return { ok: true, warning: 'no-credit' };
     }
 
     return { ok: true };
@@ -662,8 +687,10 @@ export function createModelRegistryHandlers(deps: ModelRegistryDeps): ModelRegis
           creds as { key: string } | { fields: Record<string, string> },
           typeof stored.creds.baseUrl === 'string' ? stored.creds.baseUrl : undefined
         );
-        const state: ProviderConnState = result.ok ? 'connected' : 'error';
-        repo.updateRegistryProviderState(providerId, state, result.ok ? undefined : result.error);
+        // A no-credit key is still authenticated - keep the provider Connected
+        // (it sits switched-off via disabled models), consistent with connect (#100).
+        const established = result.ok || result.error === 'no-credit';
+        repo.updateRegistryProviderState(providerId, established ? 'connected' : 'error', established ? undefined : result.error);
         return result.ok ? { ok: true } : { ok: false, error: result.error ?? 'unknown' };
       } catch {
         return { ok: false, error: 'unknown' };

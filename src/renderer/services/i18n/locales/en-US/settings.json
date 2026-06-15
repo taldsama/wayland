@@ -1759,6 +1759,7 @@
       "thatProvider": "that provider",
       "errorUnauthorized": "That {{provider}} key was rejected, unauthorized. Check the key and try again.",
       "errorNoCredit": "Connected, but that {{provider}} key has no usable credit. Add billing to run models.",
+      "noticeNoCredit": "Connected {{provider}}, but the key has no usable credit yet, so it's switched off. Add credit, then turn it on to run models.",
       "errorOffline": "Couldn't reach {{provider}}, you appear to be offline. Check your connection and retry.",
       "errorUnrecognized": "That key was not recognized. Open Browse and pick your provider.",
       "errorCloud": "Recognized {{provider}}, this provider needs more than one field. Open Browse to enter the full credentials.",

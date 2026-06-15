@@ -3246,6 +3246,7 @@ export type I18nKey =
   | 'settings.modelsPage.connect.hintDefault'
   | 'settings.modelsPage.connect.keyLabel'
   | 'settings.modelsPage.connect.keyPlaceholder'
+  | 'settings.modelsPage.connect.noticeNoCredit'
   | 'settings.modelsPage.connect.or'
   | 'settings.modelsPage.connect.recognized'
   | 'settings.modelsPage.connect.thatProvider'
