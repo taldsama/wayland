@@ -14,7 +14,7 @@ import { AuthService } from '@process/webserver/auth/service/AuthService';
 import { UserRepository } from '@process/webserver/auth/repository/UserRepository';
 import { AUTH_CONFIG, SERVER_CONFIG } from './config/constants';
 import { initWebAdapter } from './adapter';
-import { setupBasicMiddleware, setupCors, setupErrorHandler } from './setup';
+import { setupBasicMiddleware, setupCors, setupErrorHandler, setupTrustProxy } from './setup';
 import { registerAuthRoutes } from './routes/authRoutes';
 import { registerApiRoutes } from './routes/apiRoutes';
 import { registerStaticRoutes, resolveRendererPath, VITE_DEV_PORT } from './routes/staticRoutes';
@@ -316,6 +316,9 @@ export async function startWebServerWithInstance(port: number, allowRemote = fal
   // can install its own `express.raw()` body parser (signature verification
   // requires the unparsed body) and so inbound webhooks bypass CSRF - they
   // are authenticated by per-platform signatures, not by browser cookies.
+  // Trust proxy must be set BEFORE any middleware reads req.ip / req.secure, and
+  // narrowly (loopback + WAYLAND_OPERATOR_CIDRS only) so XFF stays non-spoofable.
+  setupTrustProxy(app);
   setupCors(app, port, allowRemote);
   mountWebhookRoutes(app, {
     getSecretForToken: async (token: string): Promise<string | null> => {

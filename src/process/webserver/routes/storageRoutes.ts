@@ -11,8 +11,7 @@ import path from 'path';
 import multer from 'multer';
 import { apiRateLimiter } from '../middleware/security';
 import { classifyClientTrust } from '../middleware/networkTrust';
-import { AuthService } from '@process/webserver/auth/service/AuthService';
-import { UserRepository } from '@process/webserver/auth/repository/UserRepository';
+import { verifyStepUp } from './configWriteGuards';
 import { computeUsage, invalidateUsageCache } from '@process/storage/computeUsage';
 import { clearStorageDir, getLogsDir, getStorageDirs } from '@process/storage/storageLocations';
 import { backupExport } from '@process/storage/backupExport';
@@ -29,18 +28,6 @@ const uploadRestore = multer({
 
 function bodyString(value: unknown): string {
   return typeof value === 'string' ? value : '';
-}
-
-/**
- * Verify the step-up password for the authenticated user. Destructive storage
- * actions (restore) require re-entering the WebUI password even for an operator
- * session, so a session left open on an unlocked device cannot wipe-and-restore.
- */
-async function verifyStepUp(req: Request, password: string): Promise<boolean> {
-  if (!password || !req.user?.id) return false;
-  const user = await UserRepository.findById(req.user.id);
-  if (!user) return false;
-  return AuthService.verifyPassword(password, user.password_hash);
 }
 
 /**
@@ -92,14 +79,16 @@ export function registerStorageRoutes(app: Express, validateApiAccess: RequestHa
     // password re-auth, so an authenticated token left open on an unlocked device
     // can never exfiltrate every provider key (#83 + cross-audit 2026-06-15). A
     // keyless backup (conversations / attachments / config) stays available to any
-    // authenticated session. (trust proxy is OFF, so req.ip is the real peer;
-    // the W0 hardening narrows the classifier to the raw socket once it is set.)
+    // authenticated session. Trust is read from the raw socket peer (W0), so the
+    // narrow trust-proxy setting cannot let a forged XFF flip the classification.
     if (includeKeys) {
-      const clientIp = req.ip || req.socket.remoteAddress || '';
+      // Trust is judged from the DIRECT socket peer, never req.ip: with trust
+      // proxy set, req.ip can be rewritten from a spoofable X-Forwarded-For.
+      const clientIp = req.socket.remoteAddress || '';
       if (classifyClientTrust(clientIp) !== 'operator') {
         res.status(403).json({
           success: false,
-          msg: 'Exporting keys is only available from a trusted local network (loopback, LAN, or Tailscale).',
+          msg: 'Exporting keys is only available from a trusted local network (loopback or Tailscale).',
         });
         return;
       }
@@ -150,12 +139,13 @@ export function registerStorageRoutes(app: Express, validateApiAccess: RequestHa
       };
       try {
         // (a) operator provenance: restore only from a trusted private network.
-        const clientIp = req.ip || req.socket.remoteAddress || '';
+        // Trust is judged from the DIRECT socket peer, never req.ip (XFF-spoofable).
+        const clientIp = req.socket.remoteAddress || '';
         if (classifyClientTrust(clientIp) !== 'operator') {
           cleanup();
           res.status(403).json({
             success: false,
-            msg: 'Restore is only available from a trusted local network (loopback, LAN, or Tailscale).',
+            msg: 'Restore is only available from a trusted local network (loopback or Tailscale).',
           });
           return;
         }

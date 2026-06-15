@@ -2258,6 +2258,46 @@ const migration_v50: IMigration = {
 };
 
 /**
+ * Migration v50 -> v51: Append-only audit log for config-write / destructive ops.
+ *
+ * Records WHO did WHAT from WHERE for every remote configuration mutation
+ * (remote-secure-config W5; the helper + table land in W0, consumers wire up
+ * later). One row per action:
+ *  - `user_id`     - the authenticated user that performed the action.
+ *  - `action`      - a stable verb id (e.g. 'provider.connect', 'storage.restore').
+ *  - `target`      - the object acted on (provider id, channel id, ...), nullable.
+ *  - `ip`          - the DIRECT socket peer (never req.ip / XFF), for forensics.
+ *  - `reached_via` - detectNetworkContext provenance at action time.
+ *  - `created_at`  - epoch ms.
+ *
+ * No foreign keys by design (matches cost_events / budgets): user_id is a soft
+ * reference so the log survives a user-row delete and PRAGMA foreign_key_check
+ * stays clean. Append-only - no UPDATE/DELETE path is provided.
+ */
+const migration_v51: IMigration = {
+  version: 51,
+  name: 'Add audit_log table for config-write/destructive actions',
+  up: (db) => {
+    db.exec(`CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT,
+      action TEXT NOT NULL,
+      target TEXT,
+      ip TEXT,
+      reached_via TEXT,
+      created_at INTEGER NOT NULL
+    )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at DESC)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id, created_at DESC)');
+    console.log('[Migration v51] Created audit_log table');
+  },
+  down: (db) => {
+    db.exec('DROP TABLE IF EXISTS audit_log');
+    console.log('[Migration v51] Dropped audit_log table');
+  },
+};
+
+/**
  * All migrations in order
  */
 // prettier-ignore
@@ -2270,7 +2310,7 @@ export const ALL_MIGRATIONS: IMigration[] = [
   migration_v31, migration_v32, migration_v33, migration_v34, migration_v35, migration_v36,
   migration_v37, migration_v38, migration_v39, migration_v40, migration_v41, migration_v42,
   migration_v43, migration_v44, migration_v45, migration_v46, migration_v47,
-  migration_v48, migration_v49, migration_v50,
+  migration_v48, migration_v49, migration_v50, migration_v51,
 ];
 
 /**
