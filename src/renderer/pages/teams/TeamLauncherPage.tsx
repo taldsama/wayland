@@ -373,6 +373,18 @@ const TeamLauncherPage: React.FC = () => {
         return;
       }
 
+      // Auto-start the team with the user's brief. Without this the team lands
+      // on an empty "Describe your goal" screen and never begins. Post the brief
+      // to the leader via the same path the in-team composer uses
+      // (getOrStartSession lazily spawns the leader). Fire-and-forget so the
+      // user reaches the team page immediately while the leader boots.
+      const kickoff = state.goalText.trim();
+      if (kickoff) {
+        void ipcBridge.team.sendMessage
+          .invoke({ teamId: team.id, content: kickoff })
+          .catch((error) => console.error('Team kickoff send failed:', error));
+      }
+
       void Promise.resolve(navigate(`/team/${team.id}`)).catch((error) => {
         console.error('Navigation to team page failed:', error);
       });
