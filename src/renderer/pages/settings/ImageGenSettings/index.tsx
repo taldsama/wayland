@@ -5,9 +5,10 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Divider, Form, Switch, Tooltip, Message } from '@arco-design/web-react';
-import { HelpCircle } from 'lucide-react';
+import { Divider, Form, Switch, Tooltip, Message, Button } from '@arco-design/web-react';
+import { HelpCircle, Wand2, Plug, RefreshCw, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { ConfigStorage, BUILTIN_IMAGE_GEN_ID, type IConfigStorageRefer, type IMcpServer } from '@/common/config/storage';
 import { isImageModelName } from '@/common/config/imageModels';
 import useConfigModelListWithImage from '@renderer/hooks/agent/useConfigModelListWithImage';
@@ -25,6 +26,7 @@ const isBuiltinImageGenServer = (server: IMcpServer) =>
 
 const ImageGenSettings: React.FC = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [messageApi, messageContext] = Message.useMessage({ maxCount: 5 });
 
   const { modelListWithImage } = useConfigModelListWithImage();
@@ -269,6 +271,46 @@ const ImageGenSettings: React.FC = () => {
             )}
           </Form.Item>
         </Form>
+
+        {imageModelList.length > 0 && (
+          <div className='flex items-start gap-6px mt-12px text-12px text-t-tertiary'>
+            <RefreshCw size={12} className='mt-2px shrink-0 text-[rgb(var(--primary-6))]' />
+            <span>{t('settings.imageGenPage.autoUpdateHint')}</span>
+          </div>
+        )}
+      </div>
+
+      {/* How it works */}
+      <div className='px-[12px] md:px-[32px] py-[24px] bg-[var(--color-bg-2)] rd-12px border border-solid border-[var(--color-border-2)]'>
+        <div className='flex items-center gap-8px mb-16px'>
+          <Wand2 size={16} className='text-[rgb(var(--primary-6))]' />
+          <span className='text-14px text-t-primary'>{t('settings.imageGenPage.howItWorksTitle')}</span>
+        </div>
+        <div className='flex flex-col gap-12px'>
+          <div className='flex items-start gap-10px'>
+            <Wand2 size={14} className='mt-2px shrink-0 text-t-tertiary' />
+            <span className='text-13px text-t-secondary'>{t('settings.imageGenPage.howItWorksUsage')}</span>
+          </div>
+          <div className='flex items-start gap-10px'>
+            <Plug size={14} className='mt-2px shrink-0 text-t-tertiary' />
+            <span className='text-13px text-t-secondary'>{t('settings.imageGenPage.howItWorksProviders')}</span>
+          </div>
+          <div className='flex items-start gap-10px'>
+            <RefreshCw size={14} className='mt-2px shrink-0 text-t-tertiary' />
+            <span className='text-13px text-t-secondary'>{t('settings.imageGenPage.howItWorksAuto')}</span>
+          </div>
+        </div>
+        <Divider className='my-16px' />
+        <Button
+          type='text'
+          className='px-0px text-[rgb(var(--primary-6))]'
+          onClick={() => navigate('/settings/models')}
+        >
+          <span className='inline-flex items-center gap-6px'>
+            {t('settings.imageGenPage.manageProvidersCta')}
+            <ArrowRight size={14} />
+          </span>
+        </Button>
       </div>
     </SettingsPageShell>
   );

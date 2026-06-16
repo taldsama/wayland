@@ -12,9 +12,20 @@ function model(id: string, kind: CatalogModel['kind'], releaseDate?: string): Ca
 }
 
 describe('selectImageModelIds', () => {
-  it('keeps only kind:image models', () => {
+  it('keeps kind:image models and drops unrelated text/audio', () => {
     const catalog = [model('gpt-5', 'text'), model('gpt-image-1.5', 'image'), model('whisper-1', 'audio')];
     expect(selectImageModelIds(catalog)).toEqual(['gpt-image-1.5']);
+  });
+
+  it('includes unenriched image models that models.dev has not tagged yet (e.g. gpt-image-2)', () => {
+    // gpt-image-2 is too new for models.dev: unenriched, defaulted to kind:text,
+    // no image tag. It must still surface because its id looks like an image model.
+    const catalog = [
+      model('gpt-5', 'text', '2025-08-01'),
+      { ...model('gpt-image-2', 'text', '2026-04-21'), enriched: false },
+      model('gpt-image-1.5', 'image', '2025-11-25'),
+    ];
+    expect(selectImageModelIds(catalog)).toEqual(['gpt-image-2', 'gpt-image-1.5']);
   });
 
   it('sorts newest releaseDate first so the best current model leads', () => {
