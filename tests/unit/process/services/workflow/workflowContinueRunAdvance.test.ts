@@ -228,6 +228,25 @@ describe('continueRun - driver auto-completion (Stage 1)', () => {
     );
   });
 
+  it('#123: AUTO + active now + pending confirmation: parks (await_input), does NOT auto-advance', async () => {
+    const { parts, sessionId } = await startDemo('auto');
+    // Boot edge flips step 1 todo->now.
+    await parts.service.continueRun(sessionId, { turnState: 'ai_waiting_input' });
+    let s = await parts.service.findById(sessionId);
+    expect(s?.steps[0].status).toBe('now');
+
+    // The turn finished while the agent was blocked on a tool/permission
+    // confirmation (default `ai_waiting_input` state, non-zero count). The brain
+    // must park instead of marking the step done and cascading forward.
+    const res = await parts.service.continueRun(sessionId, { turnState: 'ai_waiting_input', pendingConfirmations: 1 });
+    expect(res.decision).toBe('await_input');
+    expect(res.directive).toBeNull();
+    s = await parts.service.findById(sessionId);
+    expect(s?.steps[0].status).toBe('now'); // not done
+    expect(s?.steps[1].status).toBe('todo'); // not advanced
+    expect(s?.run_mode).toBe('awaiting_input');
+  });
+
   it('AUTO + last step now + others done + normal turn: all terminal -> complete + run_mode done', async () => {
     const { parts, sessionId } = await startDemo('auto');
     // Mark step 1 done, step 2 now (the agent is finishing the last step).

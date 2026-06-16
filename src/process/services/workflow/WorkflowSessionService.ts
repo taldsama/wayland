@@ -623,7 +623,7 @@ export class WorkflowSessionService {
    */
   async continueRun(
     sessionId: string,
-    opts: { repokeActiveStep?: boolean; turnState?: TurnState } = {}
+    opts: { repokeActiveStep?: boolean; turnState?: TurnState; pendingConfirmations?: number } = {}
   ): Promise<{ decision: ReturnType<typeof decideAfterTurn>; directive: string | null; session: WorkflowSession }> {
     const current = this.repo.findById(sessionId);
     if (current === null) {
@@ -681,9 +681,17 @@ export class WorkflowSessionService {
           const session = await this.setRunMode(sessionId, 'awaiting_input');
           return { decision: 'await_input', directive: null, session };
         }
-        if (hasOpenAsk) {
-          // Rule 2: the agent needs the user (an unanswered ask on the active
-          // step). Leave the step `now` and park - the AskCard surfaces it.
+        // The agent finishes a turn that is blocked on a tool/permission
+        // confirmation with the default `ai_waiting_input` state but a non-zero
+        // pending-confirmation count (AcpAgentManager.handleFinishSignal). Treat
+        // that exactly like an open ask: the step is NOT complete.
+        const hasPendingConfirmation = (opts.pendingConfirmations ?? 0) > 0;
+        if (hasOpenAsk || hasPendingConfirmation) {
+          // Rule 2: the agent needs the user - an unanswered ask OR an unresolved
+          // confirmation. Leave the step `now` and park. Without this, AUTO mode
+          // force-marked the step done and advanced, cascading the agent through
+          // every step without doing the work (#123). The AskCard / confirmation
+          // prompt surfaces the block so the user can answer.
           const session = await this.setRunMode(sessionId, 'awaiting_input');
           return { decision: 'await_input', directive: null, session };
         }

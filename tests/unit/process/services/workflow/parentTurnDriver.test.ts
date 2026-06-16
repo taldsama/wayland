@@ -107,7 +107,7 @@ describe('handleParentWorkflowTurn', () => {
     expect(deps.service.findByConversationId).toHaveBeenCalledWith('conv-1');
     // The completed turn's terminal state is threaded into the brain so the
     // driver-owned completion block (Stage 1) can mark the active step terminal.
-    expect(continueRun).toHaveBeenCalledWith('wf-1', { turnState: 'ai_waiting_input' });
+    expect(continueRun).toHaveBeenCalledWith('wf-1', { turnState: 'ai_waiting_input', pendingConfirmations: 0 });
     expect(sendDirective).toHaveBeenCalledWith('conv-1', 'Proceed to step 1: Audit');
   });
 
@@ -115,7 +115,30 @@ describe('handleParentWorkflowTurn', () => {
     const { deps, continueRun } = makeDeps({ findSession: session() });
     deps.service.continueRun = continueRun;
     await handleParentWorkflowTurn(turn({ sessionId: 'conv-1', state: 'error' }), deps);
-    expect(continueRun).toHaveBeenCalledWith('wf-1', { turnState: 'error' });
+    expect(continueRun).toHaveBeenCalledWith('wf-1', { turnState: 'error', pendingConfirmations: 0 });
+  });
+
+  it('#123: threads a non-zero pending-confirmation count so the brain can park instead of advancing', async () => {
+    const { deps, sendDirective } = makeDeps({ findSession: session() });
+    // The agent finished blocked on a tool/permission confirmation: the finish
+    // reports the default `ai_waiting_input` state but a non-zero count. The
+    // brain parks (await_input, no directive) so nothing is force-advanced.
+    const continueRun = vi.fn(async () => ({
+      decision: 'await_input' as const,
+      directive: null,
+      session: session({ run_mode: 'awaiting_input' }),
+    }));
+    deps.service.continueRun = continueRun;
+    await handleParentWorkflowTurn(
+      turn({
+        sessionId: 'conv-1',
+        state: 'ai_waiting_input',
+        runtime: { hasTask: false, isProcessing: false, pendingConfirmations: 2 },
+      }),
+      deps
+    );
+    expect(continueRun).toHaveBeenCalledWith('wf-1', { turnState: 'ai_waiting_input', pendingConfirmations: 2 });
+    expect(sendDirective).not.toHaveBeenCalled();
   });
 
   it('does not send when the decision is await_input (step mode halt)', async () => {

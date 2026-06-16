@@ -38,7 +38,7 @@ export type ParentTurnService = {
   findByConversationId(conversationId: string): WorkflowSession | null;
   continueRun(
     sessionId: string,
-    opts?: { repokeActiveStep?: boolean; turnState?: TurnState }
+    opts?: { repokeActiveStep?: boolean; turnState?: TurnState; pendingConfirmations?: number }
   ): Promise<{
     decision: AfterTurnDecision;
     directive: string | null;
@@ -90,8 +90,13 @@ export async function handleParentWorkflowTurn(
     // Thread the completed turn's terminal state into the brain. Only the three
     // states in TERMINAL_TURN_STATES reach here (guarded above), and they map
     // 1:1 onto the narrowed TurnState union the completion block keys off.
+    // Also thread the pending-confirmation count: a turn that finishes while the
+    // agent is blocked on a tool/permission confirmation reports `ai_waiting_input`
+    // (the finish default) with a non-zero count, and must NOT be auto-advanced
+    // past the unanswered prompt (#123).
     const turnState = event.state as TurnState;
-    const { decision, directive } = await deps.service.continueRun(session.id, { turnState });
+    const pendingConfirmations = event.runtime?.pendingConfirmations ?? 0;
+    const { decision, directive } = await deps.service.continueRun(session.id, { turnState, pendingConfirmations });
     if (decision === 'advance' && directive) {
       try {
         await deps.sendDirective(conversationId, directive);
