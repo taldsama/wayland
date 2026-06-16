@@ -352,6 +352,16 @@ class IjfwArchiveService {
       registryEntries = await fallbackScanForProjects();
     }
 
+    // GitHub #137: the global "home brain" at ~/.ijfw/memory is where the in-app
+    // importers (Obsidian, claude-mem, drag-drop) and quickAdd('global') write
+    // (see importBridge.resolveMemoryDir and quickAdd above). The registry /
+    // dev-scan only enumerate per-project memory dirs, so without injecting the
+    // home dir the imported memories were never scanned and the memory tab
+    // rendered empty. It is added as an ordinary candidate: the access-check
+    // below drops it when ~/.ijfw/memory does not exist, so installs that never
+    // imported are unaffected.
+    registryEntries = [...registryEntries, { path: os.homedir(), lastSeen: 0 }];
+
     // Deduplicate by normalized path.
     const seen = new Set<string>();
     const projectPaths: RegistryEntry[] = [];

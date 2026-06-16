@@ -152,6 +152,41 @@ describe('IjfwArchiveService', () => {
     }
   });
 
+  it('renders global home-brain memories (~/.ijfw/memory) with no registry and no ~/dev (GitHub #137)', async () => {
+    // Reproduces #137: UI importers (Obsidian, claude-mem, drag-drop) and
+    // quickAdd('global') write to ~/.ijfw/memory, but buildIndex only scanned
+    // per-project dirs from registry.md / ~/dev. On a fresh install (no registry,
+    // no ~/dev) the memory tab rendered empty despite files on disk.
+    const fakeHome = path.join(tmpRoot, 'fresh-home');
+    // NOTE: deliberately NO registry.md and NO <fakeHome>/dev — mirrors a
+    // non-developer Windows/macOS user who only ran the in-app importer.
+    const homeMemDir = path.join(fakeHome, '.ijfw', 'memory');
+    writeMemoryFile(homeMemDir, 'obsidian-deadbeef.md', [
+      makeEntry({
+        type: 'observation',
+        summary: 'Imported note from my Obsidian vault',
+        stored: '2026-06-10T09:00:00.000Z',
+        tags: '[obsidian]',
+        body: 'This came from an Obsidian import and must appear in the memory tab.',
+      }),
+    ]);
+
+    const origHome = process.env.HOME;
+    const origUserProfile = process.env.USERPROFILE;
+    process.env.HOME = fakeHome;
+    process.env.USERPROFILE = fakeHome;
+
+    try {
+      service = new IjfwArchiveService(noopWatcherFactory);
+      const result = await service.listEntries({});
+      expect(result.total).toBeGreaterThan(0);
+      expect(result.entries.some((e) => e.summary === 'Imported note from my Obsidian vault')).toBe(true);
+    } finally {
+      restoreEnv('HOME', origHome);
+      restoreEnv('USERPROFILE', origUserProfile);
+    }
+  });
+
   it('getEntry returns null for unknown id', async () => {
     const fakeHome = path.join(tmpRoot, 'fake-home');
     const ijfwHomeDir = path.join(fakeHome, '.ijfw');
