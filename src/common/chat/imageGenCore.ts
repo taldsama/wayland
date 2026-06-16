@@ -491,14 +491,14 @@ export async function executeFluxImageGen(
   const baseUrl = (provider.baseUrl || `https://${FLUX_IMAGE_HOST}/v1`).replace(/\/+$/, '');
   const endpoint = `${baseUrl}/images/generations`;
 
-  // "Flux Image" (the recommended default) is not a literal arm: omit the model
-  // and pass a quality category so Flux picks a strong arm per request (contract
-  // §3.2/§3.3 - category 'Pro' resolves to nano-banana-pro-2k class: high
-  // quality, SynthID, no org-verify requirement). A concrete arm id is sent
-  // verbatim. Either way: n=1, never response_format (gpt-image rejects it).
-  const isRecommendedAuto = provider.useModel === FLUX_RECOMMENDED_IMAGE_ID;
-  const requestBody = isRecommendedAuto
-    ? { prompt: params.prompt, n: 1, category: 'Pro' }
+  // "Flux Image" (the recommended default) is not a literal arm - it means
+  // "use whatever the user set as their default in the Flux members area". So
+  // omit the model entirely and let Flux resolve the account default. A pinned
+  // concrete arm id is sent verbatim instead. Either way: n=1, never
+  // response_format (gpt-image arms reject it).
+  const isAccountDefault = provider.useModel === FLUX_RECOMMENDED_IMAGE_ID;
+  const requestBody = isAccountDefault
+    ? { prompt: params.prompt, n: 1 }
     : { model: provider.useModel, prompt: params.prompt, n: 1 };
 
   let response: Response;
