@@ -1,8 +1,10 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Button, Message } from '@arco-design/web-react';
+import { Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ipcBridge } from '@/common';
 import type { ChatGptOAuthResult } from '@/common/types/onboarding';
+import { useModelRegistry } from '@renderer/hooks/useModelRegistry';
 
 /** Inline OpenAI wordmark. The monochrome glyph adapts to theme. */
 const OpenAiMark: React.FC = () => (
@@ -36,6 +38,14 @@ const ERROR_KEY: Record<Exclude<ChatGptOAuthResult, { ok: true }>['error'], stri
  */
 const ChatGptButton: React.FC = () => {
   const { t } = useTranslation();
+  // The Models tree wraps this in a `ModelRegistryProvider`, so `providers` is
+  // the shared snapshot that re-renders live on every `modelRegistry.listChanged`
+  // event - the connected-state row flips the moment ChatGPT connects.
+  const { providers } = useModelRegistry();
+  const isChatGptConnected = useMemo(
+    () => providers.some((p) => p.providerId === 'chatgpt-subscription' && p.state === 'connected'),
+    [providers]
+  );
   const [loading, setLoading] = useState(false);
 
   const handleClick = useCallback(async () => {
@@ -55,6 +65,23 @@ const ChatGptButton: React.FC = () => {
       setLoading(false);
     }
   }, [t]);
+
+  // When ChatGPT is already connected, show a quiet "Signed in with ChatGPT" row
+  // instead of the plain CTA so users stop re-clicking it. A small text Reconnect
+  // re-runs the same OAuth flow (refreshes the token).
+  if (isChatGptConnected && !loading) {
+    return (
+      <div className='w-full box-border flex items-center gap-8px min-h-40px px-14px py-6px rd-2px bg-[var(--color-fill-2)] border border-[var(--color-border-2)] text-14px text-[var(--color-text-2)]'>
+        <OpenAiMark />
+        <span className='whitespace-nowrap'>{t('settings.modelsPage.connect.chatgptConnected')}</span>
+        <Check size={15} className='shrink-0 text-[var(--color-success-6,#00b42a)]' aria-hidden='true' />
+        <div className='flex-1' />
+        <Button type='text' size='mini' onClick={() => void handleClick()}>
+          {t('settings.modelsPage.connect.chatgptReconnect')}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <>

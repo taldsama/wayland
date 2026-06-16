@@ -1752,6 +1752,8 @@
       "xaiConnected": "Signed in with X",
       "xaiReconnect": "Reconnect",
       "chatgpt": "Sign in with ChatGPT",
+      "chatgptConnected": "Signed in with ChatGPT",
+      "chatgptReconnect": "Reconnect",
       "chatgptNote": "Signs in with your ChatGPT subscription via the same path the Codex CLI uses. OpenAI may change or restrict this.",
       "chatgptSuccess": "Signed in with your ChatGPT subscription.",
       "chatgptUnauthorized": "ChatGPT sign-in was rejected. An active ChatGPT subscription is required.",
@@ -1823,6 +1825,7 @@
       "toggleFailed": "Could not change that provider. Please try again.",
       "providerToggleAria": "Turn {{provider}} models on or off",
       "providerToggleOnHint": "Turn on this provider's recommended models",
+      "providerToggleNoModelsHint": "No models loaded yet. Open Manage and refresh to load this provider\u0027s models first.",
       "providerToggleOffHint": "Turn off all of this provider's models",
       "via": {
         "apiKey": "API key",

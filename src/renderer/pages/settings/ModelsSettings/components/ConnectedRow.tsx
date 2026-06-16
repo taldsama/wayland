@@ -212,7 +212,15 @@ const ConnectedRow: React.FC<Props> = ({ provider, onManage, onFix }) => {
       )}
 
       {canToggle && (
-        <Tooltip content={t(providerOn ? 'settings.modelsPage.row.providerToggleOffHint' : 'settings.modelsPage.row.providerToggleOnHint')}>
+        <Tooltip
+          content={t(
+            rows !== null && rows.length === 0
+              ? 'settings.modelsPage.row.providerToggleNoModelsHint'
+              : providerOn
+                ? 'settings.modelsPage.row.providerToggleOffHint'
+                : 'settings.modelsPage.row.providerToggleOnHint'
+          )}
+        >
           <Switch
             className={styles.providerToggle}
             size='small'
