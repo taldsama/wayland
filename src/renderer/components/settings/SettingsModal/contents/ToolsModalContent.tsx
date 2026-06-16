@@ -909,6 +909,7 @@ const ToolsModalContent: React.FC = () => {
               <Form.Item label={t('settings.imageGenerationModel')}>
                 {imageGenerationModelList.length > 0 ? (
                   <WaylandSelect
+                    triggerProps={{ className: 'wl-image-model-popup' }}
                     value={
                       imageGenerationModel?.id && imageGenerationModel?.useModel
                         ? `${imageGenerationModel.id}|${imageGenerationModel.useModel}`

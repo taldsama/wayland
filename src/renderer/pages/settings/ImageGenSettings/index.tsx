@@ -238,6 +238,7 @@ const ImageGenSettings: React.FC = () => {
                 value={selectedValue}
                 onChange={handleModelChange}
                 className='max-w-[420px]'
+                triggerProps={{ className: 'wl-image-model-popup' }}
               >
                 {imageModelList.map(({ model, ...platform }) => (
                   <WaylandSelect.OptGroup label={platform.name} key={platform.id}>
