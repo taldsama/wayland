@@ -11,10 +11,11 @@ import classNames from 'classnames';
 import useSWR from 'swr';
 import { ipcBridge } from '@/common';
 import type { IProvider } from '@/common/config/storage';
-import { FLUX_PROVIDER_ID, isFluxModelId } from '@/common/config/flux';
 import ModelSelectorFlyout from '@renderer/components/model/modelSelector/ModelSelectorFlyout';
-import { modelKey } from '@renderer/components/model/modelSelector/modelRowHelpers';
-import { resolveSelectedProvider } from '@renderer/components/model/modelSelector/resolveSelectedProvider';
+import {
+  resolveActiveModelKey,
+  resolveSelectedProvider,
+} from '@renderer/components/model/modelSelector/resolveSelectedProvider';
 import { useModelSelectorViewModel } from '@renderer/components/model/modelSelector/useModelSelectorViewModel';
 import { usePinnedModels } from '@renderer/hooks/usage/usePinnedModels';
 
@@ -51,11 +52,12 @@ const GeminiModelSelector: React.FC<{
   // off the canonical `flux-router:<id>` so the Flux Auto hero shows its active
   // check even though the live Flux provider carries an opaque id. Hooks run
   // unconditionally to keep the hook count stable across early returns.
-  const activeModelKey = useMemo(() => {
-    if (!currentModel?.useModel) return null;
-    if (isFluxModelId(currentModel.useModel)) return `${FLUX_PROVIDER_ID}:${currentModel.useModel}`;
-    return modelKey({ providerId: currentModel.id, id: currentModel.useModel });
-  }, [currentModel?.id, currentModel?.useModel]);
+  // Key the active flyout row by the registry ProviderId recovered from the
+  // selection's owning bridge row, not the legacy storage id (#124).
+  const activeModelKey = useMemo(
+    () => resolveActiveModelKey(modelConfig, currentModel),
+    [modelConfig, currentModel?.id, currentModel?.useModel]
+  );
   const vm = useModelSelectorViewModel('gemini', activeModelKey);
   const { toggle } = usePinnedModels(true);
 

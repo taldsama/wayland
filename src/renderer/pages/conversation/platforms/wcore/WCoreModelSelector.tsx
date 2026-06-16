@@ -16,10 +16,12 @@ import classNames from 'classnames';
 import useSWR from 'swr';
 import { ipcBridge } from '@/common';
 import type { IProvider } from '@/common/config/storage';
-import { FLUX_MODEL_DISPLAY, FLUX_PROVIDER_ID, isFluxModelId, type FluxModelId } from '@/common/config/flux';
+import { FLUX_MODEL_DISPLAY, isFluxModelId, type FluxModelId } from '@/common/config/flux';
 import ModelSelectorFlyout from '@renderer/components/model/modelSelector/ModelSelectorFlyout';
-import { modelKey } from '@renderer/components/model/modelSelector/modelRowHelpers';
-import { resolveSelectedProvider } from '@renderer/components/model/modelSelector/resolveSelectedProvider';
+import {
+  resolveActiveModelKey,
+  resolveSelectedProvider,
+} from '@renderer/components/model/modelSelector/resolveSelectedProvider';
 import { useModelSelectorViewModel } from '@renderer/components/model/modelSelector/useModelSelectorViewModel';
 import { useModelEffort } from '@renderer/components/model/modelSelector/useModelEffort';
 import { usePinnedModels } from '@renderer/hooks/usage/usePinnedModels';
@@ -50,11 +52,12 @@ const WCoreModelSelector: React.FC<{
   // canonical `flux-router:<id>` so the Flux Auto hero shows its active check
   // even though the live Flux provider in model.config carries an opaque id.
   const currentSelection = selection?.currentModel;
-  const activeModelKey = useMemo(() => {
-    if (!currentSelection?.useModel) return null;
-    if (isFluxModelId(currentSelection.useModel)) return `${FLUX_PROVIDER_ID}:${currentSelection.useModel}`;
-    return modelKey({ providerId: currentSelection.id, id: currentSelection.useModel });
-  }, [currentSelection?.id, currentSelection?.useModel]);
+  // Key the active flyout row by the registry ProviderId recovered from the
+  // selection's owning bridge row, not the legacy storage id (#124).
+  const activeModelKey = useMemo(
+    () => resolveActiveModelKey(modelConfig, currentSelection),
+    [modelConfig, currentSelection?.id, currentSelection?.useModel]
+  );
   const vm = useModelSelectorViewModel('wcore', activeModelKey);
   const { toggle } = usePinnedModels(true);
   const { effort, setEffort } = useModelEffort(conversationId ?? '');

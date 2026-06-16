@@ -4,8 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { IProvider } from '@/common/config/storage';
-import { isFluxModelId } from '@/common/config/flux';
+import type { IProvider, TProviderWithModel } from '@/common/config/storage';
+import { FLUX_PROVIDER_ID, isFluxModelId } from '@/common/config/flux';
+import { modelKey } from './modelRowHelpers';
+
+/** The tag the registry bridge stamps on each mirrored row: `v2:<registryProviderId>`. */
+const BRIDGE_TAG_KEY = '__waylandModelRegistryBridge';
+const V2_TAG_PREFIX = 'v2:';
 
 /**
  * Resolve the legacy `IProvider` that owns a model the unified flyout emitted.
@@ -41,4 +46,28 @@ export const resolveSelectedProvider = (
     providers.find((p) => p.id === providerId) ??
     providers.find((p) => getAvailableModels(p).includes(modelId))
   );
+};
+
+/**
+ * The flyout's active-row key for the current selection.
+ *
+ * The flyout keys its rows by the registry `ProviderId`, but a selection carries
+ * the legacy storage `provider.id`, so keying the active row off `selection.id`
+ * never matched and the selected model showed no check - and at chat start the
+ * mismatch blanked the picker entirely (#124). Recover the registry `ProviderId`
+ * from the owning legacy provider's bridge tag (`v2:<registryProviderId>`),
+ * falling back to the legacy id when the row is untagged (a non-bridge provider,
+ * whose models are not in the registry flyout anyway).
+ */
+export const resolveActiveModelKey = (
+  modelConfig: IProvider[] | undefined,
+  selection: Pick<TProviderWithModel, 'id' | 'useModel'> | undefined
+): string | null => {
+  if (!selection?.useModel) return null;
+  if (isFluxModelId(selection.useModel)) return modelKey({ providerId: FLUX_PROVIDER_ID, id: selection.useModel });
+  const owner = modelConfig?.find((p) => p.id === selection.id);
+  const tag = owner ? (owner as unknown as Record<string, unknown>)[BRIDGE_TAG_KEY] : undefined;
+  const registryProviderId =
+    typeof tag === 'string' && tag.startsWith(V2_TAG_PREFIX) ? tag.slice(V2_TAG_PREFIX.length) : undefined;
+  return modelKey({ providerId: registryProviderId ?? selection.id ?? '', id: selection.useModel });
 };

@@ -6,7 +6,12 @@
 
 import { describe, it, expect } from 'vitest';
 import type { IProvider } from '@/common/config/storage';
-import { resolveSelectedProvider } from '@renderer/components/model/modelSelector/resolveSelectedProvider';
+import {
+  resolveActiveModelKey,
+  resolveSelectedProvider,
+} from '@renderer/components/model/modelSelector/resolveSelectedProvider';
+
+const BRIDGE_TAG_KEY = '__waylandModelRegistryBridge';
 
 /** Minimal provider fixture; only the fields the resolver reads matter. */
 const provider = (over: Partial<IProvider>): IProvider =>
@@ -72,5 +77,38 @@ describe('resolveSelectedProvider', () => {
     const resolved = resolveSelectedProvider([openai], getAvailableModels, 'grok-4', 'xai');
 
     expect(resolved).toBeUndefined();
+  });
+});
+
+describe('resolveActiveModelKey (#124)', () => {
+  it('recovers the registry ProviderId from the owning bridge row tag', () => {
+    // The flyout keys rows by the registry ProviderId. The selection carries the
+    // opaque legacy storage id, but the bridge row tags itself with the registry
+    // id - so the active key must be `<registryProviderId>:<model>`, not
+    // `<storageId>:<model>`.
+    const gemini = provider({ id: 'prov_x', platform: 'gemini', [BRIDGE_TAG_KEY]: 'v2:google-gemini' } as Partial<IProvider>);
+    const key = resolveActiveModelKey([gemini], { id: 'prov_x', useModel: 'gemini-3-pro-preview' });
+    expect(key).toBe('google-gemini:gemini-3-pro-preview');
+  });
+
+  it('falls back to the legacy id when the owning row is untagged (non-bridge provider)', () => {
+    const custom = provider({ id: 'prov_y', platform: 'openai-compatible', model: ['my-model'] });
+    const key = resolveActiveModelKey([custom], { id: 'prov_y', useModel: 'my-model' });
+    expect(key).toBe('prov_y:my-model');
+  });
+
+  it('keys a Flux routing alias off the canonical flux-router id, ignoring the selection id', () => {
+    const key = resolveActiveModelKey([], { id: 'flux_opaque', useModel: 'flux-auto' });
+    expect(key).toBe('flux-router:flux-auto');
+  });
+
+  it('returns null when nothing is selected', () => {
+    expect(resolveActiveModelKey([], undefined)).toBeNull();
+    expect(resolveActiveModelKey([], { id: 'x', useModel: undefined })).toBeNull();
+  });
+
+  it('falls back to the legacy id when the owner is not in model.config yet', () => {
+    const key = resolveActiveModelKey(undefined, { id: 'prov_z', useModel: 'gpt-5.4' });
+    expect(key).toBe('prov_z:gpt-5.4');
   });
 });

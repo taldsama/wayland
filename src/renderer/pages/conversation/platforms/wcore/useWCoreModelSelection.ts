@@ -44,14 +44,27 @@ export const useWCoreModelSelection = ({
   // composer otherwise keeps showing a dead model like "gpt-5.5" that fails on
   // send). flux-auto is exempt: the Flux Router provider is intentionally
   // filtered out of `providers` (no function_calling models) yet is always a
-  // valid route, so never treat a flux id as stale. Clearing surfaces the
-  // no-model empty state so the user re-picks a connected model.
+  // valid route, so never treat a flux id as stale.
+  //
+  // #124: validate by MODEL MEMBERSHIP across all connected providers, not by
+  // `provider.id`. A freshly-spawned chat carries the model registry's
+  // ProviderId (e.g. 'openai'), which never equals the opaque legacy storage
+  // `provider.id`, so an id-only match wrongly cleared a perfectly valid model -
+  // blanking the picker and blocking sends until a manual reselect. When the
+  // model is still offered but under a different (registry) id, re-bind to the
+  // owning legacy provider so send resolves real credentials.
   useEffect(() => {
     if (!currentModel) return;
     if (currentModel.useModel && isFluxModelId(currentModel.useModel)) return;
-    const provider = providers.find((p) => p.id === currentModel.id);
-    const stillValid = !!provider && getAvailableModels(provider).includes(currentModel.useModel ?? '');
-    if (!stillValid) setCurrentModel(undefined);
+    const useModel = currentModel.useModel ?? '';
+    const owner =
+      providers.find((p) => p.id === currentModel.id && getAvailableModels(p).includes(useModel)) ??
+      providers.find((p) => getAvailableModels(p).includes(useModel));
+    if (!owner) {
+      setCurrentModel(undefined);
+    } else if (owner.id !== currentModel.id) {
+      setCurrentModel({ ...(owner as unknown as TProviderWithModel), useModel });
+    }
   }, [providers, currentModel, getAvailableModels]);
 
   const handleSelectModel = useCallback(

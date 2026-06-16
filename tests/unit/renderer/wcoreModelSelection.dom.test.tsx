@@ -61,4 +61,17 @@ describe('useWCoreModelSelection revalidation (#64)', () => {
     await new Promise((r) => setTimeout(r, 30));
     expect(result.current.currentModel?.useModel).toBe('flux-auto');
   });
+
+  it('rebinds a model spawned with a registry ProviderId to the owning legacy provider (#124)', async () => {
+    // A fresh WCore chat carries the registry ProviderId ('openai'); the legacy
+    // storage provider has an opaque id ('prov_a1b2'). The old id-only check
+    // cleared it (blank picker, cannot send). It must instead keep the model and
+    // re-bind to the legacy provider so send resolves real credentials.
+    const legacy = { id: 'prov_a1b2', platform: 'openai', model: ['gpt-5.5'] } as unknown as IProvider;
+    setList([legacy], { prov_a1b2: ['gpt-5.5'] });
+    const initial = { id: 'openai', useModel: 'gpt-5.5' } as unknown as TProviderWithModel;
+    const { result } = renderHook(() => useWCoreModelSelection({ initialModel: initial, onSelectModel }));
+    await waitFor(() => expect(result.current.currentModel?.id).toBe('prov_a1b2'));
+    expect(result.current.currentModel?.useModel).toBe('gpt-5.5');
+  });
 });
