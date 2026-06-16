@@ -60,12 +60,14 @@ import {
   CHATGPT_TOKEN_URL,
   createPkce,
   isPinnedOpenAiAuthHttps,
+  isTokenExpired,
   parseTokenResponse,
   resolveClientId,
   type ChatGptTokens,
   type Pkce,
 } from './chatgptOAuthCore';
 import { loadChatGptTokens, saveChatGptTokens } from './chatgptTokenStore';
+import { readCodexAuthFile, writeCodexAuthFile } from './codexAuthFile';
 
 /** Overall flow timeout - how long the user has to complete the browser sign-in. */
 const FLOW_TIMEOUT_MS = 3 * 60 * 1000;
@@ -86,6 +88,12 @@ type CallbackOutcome = { kind: 'code'; code: string } | { kind: 'error'; error: 
  */
 export async function chatgptOAuthLogin(): Promise<ChatGptOAuthResult> {
   try {
+    // If the user already signed in via the Codex CLI (`~/.codex/auth.json`),
+    // reuse that credential instead of opening the browser - the ChatGPT analog
+    // of xAI's `~/.grok/auth.json` reuse.
+    const reused = await tryReuseCodexCli();
+    if (reused) return reused;
+
     const pkce = createPkce();
     const clientId = resolveClientId();
 
@@ -130,6 +138,21 @@ export async function chatgptRefreshToken(): Promise<ChatGptOAuthResult> {
   } catch {
     return { ok: false, error: 'unknown' };
   }
+}
+
+/**
+ * Reuse an existing Codex CLI login (`~/.codex/auth.json`) when it holds a
+ * usable, non-expired ChatGPT subscription token. Registers it (no browser) and
+ * returns the result, or `null` to fall through to the full PKCE flow. Mirrors
+ * the xAI `tryReuseGrokCli()` path.
+ */
+async function tryReuseCodexCli(): Promise<ChatGptOAuthResult | null> {
+  const bundle = await readCodexAuthFile();
+  if (!bundle || !bundle.accountId) return null;
+  // An expired access token falls through to a fresh sign-in (the browser flow
+  // also covers the no-refresh case cleanly).
+  if (isTokenExpired(bundle)) return null;
+  return registerChatGptSubscription(bundle);
 }
 
 // ─── Loopback authorize ───────────────────────────────────────────────────────
@@ -384,6 +407,11 @@ async function registerChatGptSubscription(tokens: ChatGptTokens): Promise<ChatG
     baseUrl: CHATGPT_BACKEND_BASE,
   });
   if (!connected.ok) return { ok: false, error: narrowConnectError(connected.error) };
+
+  // Bridge the credential to Wayland Core / the Codex CLI, which read it from
+  // `~/.codex/auth.json` to drive ChatGPT inference. Best-effort - a failed
+  // write never fails the sign-in (the app registry copy still works).
+  await writeCodexAuthFile(tokens);
 
   return { ok: true, planType: (tokens.planType ?? 'unknown') as ChatGptPlanLabel };
 }

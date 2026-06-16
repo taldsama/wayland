@@ -10,6 +10,7 @@ import FluxRouterMark from '@renderer/components/icons/FluxRouterMark';
 import { providerMeta } from './providerCatalog';
 import { allVisibleEnabled, mergeCatalogRows, rowsToFlip } from './components/bulkToggle';
 import XGrokButton from './components/XGrokButton';
+import ChatGptButton from './components/ChatGptButton';
 import styles from './ManageProvider.module.css';
 
 type Props = {
@@ -291,6 +292,7 @@ const ManageProvider: React.FC<Props> = ({ provider, onBack, onDisconnected }) =
   // where a revoked / expired token needs re-auth). `XGrokButton` shows its own
   // connected / reconnect affordance and the OAuth waiting + paste-fallback UI.
   const isXai = provider.providerId === 'xai';
+  const isChatGpt = provider.providerId === 'chatgpt-subscription';
   // Flux is a router (tiers across many models), not a vendor catalog, so its
   // models-section explainer is Flux-specific rather than the shared copy.
   const isFlux = isFluxRouter;
@@ -425,6 +427,12 @@ const ManageProvider: React.FC<Props> = ({ provider, onBack, onDisconnected }) =
       {isXai && (
         <div className='mt-12px'>
           <XGrokButton />
+        </div>
+      )}
+
+      {isChatGpt && (
+        <div className='mt-12px'>
+          <ChatGptButton />
         </div>
       )}
 
