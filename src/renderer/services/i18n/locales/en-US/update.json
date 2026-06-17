@@ -46,7 +46,8 @@
     "hostNotAllowed": "The update download host \"{{host}}\" is not trusted. Please download from the Releases page.",
     "redirectNoLocation": "The update download was redirected without a destination. Please download from the Releases page.",
     "tooManyRedirects": "The update download followed too many redirects. Please download from the Releases page.",
-    "missingUrl": "No download is available for this update. Please download from the Releases page."
+    "missingUrl": "No download is available for this update. Please download from the Releases page.",
+    "checkReturnedNull": "Couldn't check for updates right now. Please try again later."
   },
   "pill": {
     "available": "Update",
