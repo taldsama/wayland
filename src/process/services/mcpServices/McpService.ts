@@ -16,7 +16,6 @@ import { OpencodeMcpAgent } from './agents/OpencodeMcpAgent';
 import { WCoreMcpAgent } from './agents/WCoreMcpAgent';
 import type { IMcpProtocol, DetectedMcpServer, McpConnectionTestResult, McpSyncResult, McpSource } from './McpProtocol';
 import { validateMcpServer, sanitizeMcpServerName } from './validateMcpServer';
-import { mcpOAuthService } from './McpOAuthService';
 
 /**
  * MCP service - coordinates the MCP operation protocol across agents
@@ -379,6 +378,14 @@ export class McpService {
     // getValidToken refreshes an expired token, this keeps the bearer current. Only
     // when there is NO stored OAuth token do we respect a user-supplied (BYO)
     // Authorization header as-is. The original server object is never mutated.
+    //
+    // Import McpOAuthService dynamically (not at module top level): it pulls the
+    // aioncli-core OAuth chain whose OAuthCredentialStorage static initializer
+    // references HybridTokenStorage, and a top-level import triggers a
+    // module-init TDZ ("Cannot access 'HybridTokenStorage' before initialization")
+    // in any module that imports McpService. Deferring the import past the
+    // non-http early return keeps the chain out of module load.
+    const { mcpOAuthService } = await import('./McpOAuthService');
     const token = await mcpOAuthService.getValidToken(server).catch((): string | null => null);
     if (!token) {
       return server;
