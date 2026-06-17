@@ -270,15 +270,46 @@ export class TeamSessionService {
    */
   private async isStandingFlaggedLauncher(sourceLauncherId: string): Promise<boolean> {
     try {
+      // A launcher id may arrive bare, `builtin-` prefixed (native catalog
+      // records), or `ext-` prefixed (extension/custom). Build candidate ids
+      // covering every shape so the lookup matches regardless of source.
+      const bare = sourceLauncherId.startsWith('ext-')
+        ? sourceLauncherId.slice(4)
+        : sourceLauncherId.startsWith('builtin-')
+          ? sourceLauncherId.slice(8)
+          : sourceLauncherId;
+      const candidates = new Set([
+        sourceLauncherId,
+        bare,
+        `ext-${bare}`,
+        `builtin-${bare}`,
+      ]);
+      const matches = (record: { id?: string; standing?: boolean } | undefined): boolean => {
+        const id = record?.id;
+        return typeof id === 'string' && candidates.has(id) && record?.standing === true;
+      };
+
+      // 1) Extension registry (custom/extension teams).
       const { ExtensionRegistry } = await import('@process/extensions/ExtensionRegistry');
-      const assistants = ExtensionRegistry.getInstance().getAssistants();
-      const stripped = sourceLauncherId.startsWith('ext-') ? sourceLauncherId.slice(4) : sourceLauncherId;
-      const record = assistants.find((a) => {
-        const id = (a as { id?: string }).id;
-        if (typeof id !== 'string') return false;
-        return id === sourceLauncherId || id === `ext-${sourceLauncherId}` || id === stripped || id === `ext-${stripped}`;
-      });
-      return (record as { standing?: boolean } | undefined)?.standing === true;
+      const registryAssistants = ExtensionRegistry.getInstance().getAssistants() as Array<{
+        id?: string;
+        standing?: boolean;
+      }>;
+      if (registryAssistants.some(matches)) return true;
+
+      // 2) Native built-in catalog (waylandteams). ExtensionLoader skips the
+      // native bundle, so native standing teams (`builtin-<slug>`) are absent
+      // from the registry above and must be resolved from the catalog.
+      const { getBuiltinCatalogAssistants } = await import('@process/utils/builtinCatalog');
+      const catalogAssistants = getBuiltinCatalogAssistants() as Array<{ id?: string; standing?: boolean }>;
+      if (catalogAssistants.some(matches)) return true;
+
+      // 3) Merged config.assistants (covers any record not in the two above).
+      const storedAssistants = ((await ProcessConfig.get('assistants')) ?? []) as Array<{
+        id?: string;
+        standing?: boolean;
+      }>;
+      return storedAssistants.some(matches);
     } catch {
       return false;
     }

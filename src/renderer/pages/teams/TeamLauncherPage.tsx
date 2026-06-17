@@ -88,11 +88,19 @@ const TeamLauncherPage: React.FC = () => {
   // not only the native/vendored ones tagged `_kind === 'specialist'`.
   const specialists = useMemo(() => assistants.filter(isSelectableSpecialist), [assistants]);
 
+  // Identity-resolution map over the FULL assistant list (not just selectable
+  // specialists). Some native team rosters (e.g. Book Publishing House) list
+  // teammates that are generic ASSISTANT_PRESETS stored as `builtin-<slug>`
+  // with no `kind` - `isSelectableSpecialist` filters those out, so they were
+  // absent from this map and the roster + launched team fell back to showing
+  // their raw id (#A1). Building the lookup from the full list resolves their
+  // friendly name without making the 31 generic presets selectable in the
+  // picker (which reads the separate `specialists` array below).
   const specialistsById = useMemo(() => {
     const map = new Map<string, AssistantListItem>();
-    for (const s of specialists) map.set(s.id, s);
+    for (const a of assistants) map.set(a.id, a);
     return map;
-  }, [specialists]);
+  }, [assistants]);
 
   const launcher = useMemo<AssistantListItem | null>(() => {
     if (!teamId) return null;
