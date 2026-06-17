@@ -32,6 +32,39 @@ import WeixinConfigForm from './chat/WeixinConfigForm';
 import WecomConfigForm from './chat/WecomConfigForm';
 
 /**
+ * The full registered channel roster, mirroring the `/settings/channels`
+ * ChannelsIndex page so the modal surface shows the SAME wired channels rather
+ * than a stale hardcoded pair. Each id is the plugin type; the 5 channels that
+ * the modal renders with a full inline config form (telegram/lark/dingtalk/
+ * weixin/wecom) and any extension-contributed type are filtered out at build
+ * time, so the remainder are surfaced as real, set-up-able channels (NOT falsely
+ * "coming soon"). `displayName` is the en-US fallback; `titleKey` localizes it.
+ */
+const REGISTERED_CHANNELS: ReadonlyArray<{ id: string; titleKey: string; displayName: string }> = [
+  { id: 'slack', titleKey: 'settings.channels.slackTitle', displayName: 'Slack' },
+  { id: 'discord', titleKey: 'settings.channels.discordTitle', displayName: 'Discord' },
+  { id: 'whatsapp', titleKey: 'settings.channels.whatsappTitle', displayName: 'WhatsApp' },
+  { id: 'sms-twilio', titleKey: 'settings.channels.smsTwilioTitle', displayName: 'SMS (Twilio)' },
+  { id: 'webhook', titleKey: 'settings.channels.webhookTitle', displayName: 'Webhook' },
+  { id: 'signal', titleKey: 'settings.channels.signalTitle', displayName: 'Signal' },
+  { id: 'email-agentmail', titleKey: 'settings.channels.emailAgentMailTitle', displayName: 'Email (AgentMail)' },
+  { id: 'email-imap', titleKey: 'settings.channels.emailImapTitle', displayName: 'Email (IMAP/SMTP)' },
+  { id: 'matrix', titleKey: 'settings.channels.matrixTitle', displayName: 'Matrix' },
+  { id: 'ms-teams', titleKey: 'settings.channels.msteamsTitle', displayName: 'MS Teams' },
+  { id: 'line', titleKey: 'settings.channels.lineTitle', displayName: 'LINE' },
+  { id: 'imessage', titleKey: 'settings.channels.imessageTitle', displayName: 'iMessage' },
+  { id: 'wechat', titleKey: 'settings.channels.wechatTitle', displayName: 'WeChat' },
+  { id: 'mattermost', titleKey: 'settings.channels.mattermostTitle', displayName: 'Mattermost' },
+  { id: 'google-chat', titleKey: 'settings.channels.googleChatTitle', displayName: 'Google Chat' },
+  { id: 'nextcloud-talk', titleKey: 'settings.channels.nextcloudTalkTitle', displayName: 'Nextcloud Talk' },
+  { id: 'irc', titleKey: 'settings.channels.ircTitle', displayName: 'IRC' },
+  { id: 'nostr', titleKey: 'settings.channels.nostrTitle', displayName: 'Nostr' },
+  { id: 'twitch', titleKey: 'settings.channels.twitchTitle', displayName: 'Twitch' },
+  { id: 'synology-chat', titleKey: 'settings.channels.synologyChatTitle', displayName: 'Synology Chat' },
+  { id: 'bluebubbles', titleKey: 'settings.channels.bluebubblesTitle', displayName: 'BlueBubbles' },
+];
+
+/**
  * Channel config writes fork desktop vs hosted WebUI (remote-secure-config
  * W3.E). On desktop they go through Electron IPC; in a hosted WebUI those IPC
  * channels are denied to remote callers (R2), so they post through the
@@ -834,38 +867,40 @@ const ChannelModalContent: React.FC = () => {
       }));
 
     const extensionTypeSet = new Set(extensionChannels.map((channel) => String(channel.id).toLowerCase()));
-    const comingSoonChannels: ChannelConfig[] = [
-      {
-        id: 'slack',
-        title: t('settings.channels.slackTitle', 'Slack'),
-        description: t('settings.channels.slackDesc', 'Chat with Wayland assistant via Slack'),
-        status: 'coming_soon' as const,
+    // The 5 channels above are rendered with a full inline config form; never
+    // re-list them as a generic entry.
+    const builtinTypeSet = new Set(['telegram', 'lark', 'dingtalk', 'weixin', 'wecom']);
+
+    // Surface the rest of the REAL registered channel roster (Slack, Discord,
+    // WhatsApp, Signal, Matrix, ...) - the same set the /settings/channels page
+    // shows. These are wired and auto-started, so they are honest `active`
+    // set-up entries pointing at the full Channels settings, NOT a hardcoded
+    // Slack/Discord pair falsely marked "coming soon". Anything already covered
+    // by a built-in form or an installed extension is filtered out.
+    const otherChannels: ChannelConfig[] = REGISTERED_CHANNELS.filter(
+      (c) => !builtinTypeSet.has(c.id) && !extensionTypeSet.has(c.id.toLowerCase())
+    ).map((c) => {
+      const name = t(c.titleKey, c.displayName);
+      return {
+        id: c.id,
+        title: name,
+        description: t('settings.channels.genericDesc', {
+          defaultValue: 'Chat with your Wayland assistant via {{channel}}',
+          channel: name,
+        }),
+        status: 'active' as const,
         enabled: false,
-        disabled: true,
+        isConnected: false,
         content: (
           <div className='text-14px text-t-secondary py-12px'>
-            {t('settings.channels.comingSoonDesc', 'Support for {{channel}} is coming soon', {
-              channel: t('settings.channels.slackTitle', 'Slack'),
+            {t('settings.channels.openFullSettingsDesc', {
+              defaultValue: 'Open Settings -> Channels to connect {{channel}}.',
+              channel: name,
             })}
           </div>
         ),
-      },
-      {
-        id: 'discord',
-        title: t('settings.channels.discordTitle', 'Discord'),
-        description: t('settings.channels.discordDesc', 'Chat with Wayland assistant via Discord'),
-        status: 'coming_soon' as const,
-        enabled: false,
-        disabled: true,
-        content: (
-          <div className='text-14px text-t-secondary py-12px'>
-            {t('settings.channels.comingSoonDesc', 'Support for {{channel}} is coming soon', {
-              channel: t('settings.channels.discordTitle', 'Discord'),
-            })}
-          </div>
-        ),
-      },
-    ].filter((channel) => !extensionTypeSet.has(String(channel.id).toLowerCase()));
+      };
+    });
 
     return [
       telegramChannel,
@@ -874,7 +909,7 @@ const ChannelModalContent: React.FC = () => {
       weixinChannel,
       wecomChannel,
       ...extensionChannels,
-      ...comingSoonChannels,
+      ...otherChannels,
     ];
   }, [
     pluginStatus,
