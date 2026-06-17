@@ -37,6 +37,13 @@ export function getConversationTypeForBackend(backend: string): ICreateConversat
     case 'gemini':
       return 'gemini';
     case 'wcore':
+    // Teams emit the WCore engine under the literal `wayland-core` (the rest of
+    // the app uses `wcore`); vendored agent-profile specialists carry no real
+    // backend and leak their preset type `agent-profile`. Both are the WCore
+    // engine, not an ACP CLI, so route them to the wcore manager instead of
+    // letting them fall through to `acp` and die with "No CLI path for backend".
+    case 'wayland-core':
+    case 'agent-profile':
       return 'wcore';
     case 'openclaw-gateway':
     case 'openclaw':

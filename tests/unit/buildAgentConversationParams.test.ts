@@ -123,4 +123,34 @@ describe('buildAgentConversationParams', () => {
       }),
     });
   });
+
+  // #150: Teams emit the WCore engine as the literal `wayland-core` (vs the
+  // app-wide `wcore`). It must route to the wcore manager, not fall through to
+  // `acp` and die with "No CLI path for backend wayland-core".
+  it('routes the team `wayland-core` backend to wcore (not acp)', () => {
+    const params = buildAgentConversationParams({
+      backend: 'wayland-core',
+      name: 'Team Member',
+      workspace: '/workspace',
+      model: {} as any,
+    });
+    expect(params.type).toBe('wcore');
+    expect(params.extra).not.toHaveProperty('backend', 'wayland-core');
+  });
+
+  // #148: vendored agent-profile specialists carry no real backend and leak
+  // their preset type `agent-profile`. It must route to wcore, not acp.
+  it('routes an agent-profile specialist to wcore (not acp)', () => {
+    const params = buildAgentConversationParams({
+      backend: 'agent-profile',
+      name: 'Agent Profile Specialist',
+      workspace: '/workspace',
+      model: {} as any,
+      isPreset: true,
+      presetAgentType: 'agent-profile',
+      presetResources: { rules: 'PERSONA' },
+    });
+    expect(params.type).toBe('wcore');
+    expect(params.extra).not.toHaveProperty('backend', 'agent-profile');
+  });
 });
