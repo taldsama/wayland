@@ -91,4 +91,58 @@ describe('MessageTranslator', () => {
     });
     expect(msgs).toEqual([]);
   });
+
+  // Accumulate every emitted text delta the way the renderer does (append by
+  // msg_id), so the test asserts on the final on-screen text per message.
+  const renderText = (translator: MessageTranslator, chunks: Array<{ messageId?: string; text: string }>) => {
+    const byId = new Map<string, string>();
+    for (const c of chunks) {
+      const msgs = translator.translate({
+        sessionId: 's1',
+        update: { sessionUpdate: 'agent_message_chunk', messageId: c.messageId, content: { type: 'text', text: c.text } },
+      } as unknown as SessionNotification);
+      for (const m of msgs) {
+        if (m.type === 'text') {
+          byId.set(m.msg_id ?? '', (byId.get(m.msg_id ?? '') ?? '') + (m.content as { content: string }).content);
+        }
+      }
+    }
+    return byId;
+  };
+
+  it('does not double text when undefined-id deltas are followed by the full text under a real messageId (regression: PongPong)', () => {
+    const translator = new MessageTranslator();
+    // claude-code-acp emits: a thought claims the messageId, deltas stream under
+    // messageId=undefined, then the full text repeats under the real messageId.
+    translator.translate({
+      sessionId: 's1',
+      update: { sessionUpdate: 'agent_thought_chunk', messageId: 'msg_real', content: { type: 'text', text: '' } },
+    } as unknown as SessionNotification);
+    const byId = renderText(translator, [
+      { messageId: undefined, text: '' },
+      { messageId: undefined, text: 'A' },
+      { messageId: undefined, text: ' Notion server is now connecting.' },
+      { messageId: 'msg_real', text: 'A Notion server is now connecting.' },
+    ]);
+    expect(Array.from(byId.values())).toEqual(['A Notion server is now connecting.']);
+  });
+
+  it('does not double a single-chunk reply repeated under a real messageId (Pong -> not PongPong)', () => {
+    const translator = new MessageTranslator();
+    const byId = renderText(translator, [
+      { messageId: undefined, text: 'Pong' },
+      { messageId: 'msg_real', text: 'Pong' },
+    ]);
+    expect(Array.from(byId.values())).toEqual(['Pong']);
+  });
+
+  it('still accumulates normal incremental deltas without dropping text', () => {
+    const translator = new MessageTranslator();
+    const byId = renderText(translator, [
+      { messageId: 'm1', text: 'Hello ' },
+      { messageId: 'm1', text: 'wor' },
+      { messageId: 'm1', text: 'ld' },
+    ]);
+    expect(Array.from(byId.values())).toEqual(['Hello world']);
+  });
 });
