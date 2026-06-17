@@ -365,6 +365,24 @@ describe('hasBuiltinSkills', () => {
   it('returns false for an empty string', () => {
     expect(hasBuiltinSkills('')).toBe(false);
   });
+
+  // S3: native catalog specialists are stored as `builtin-<slug>` records that
+  // are NOT in ASSISTANT_PRESETS but carry their assigned skills inline on
+  // `enabledSkills`. Passing the record lets the Settings editor recognize them
+  // so it stops clearing their skills list.
+  it('returns true for a native catalog specialist (not a preset) that carries enabledSkills', () => {
+    // "research" is not in MOCK_PRESETS, so the preset lookup alone returns false.
+    expect(hasBuiltinSkills('builtin-research')).toBe(false);
+    expect(hasBuiltinSkills('builtin-research', { enabledSkills: ['deep-research'] })).toBe(true);
+  });
+
+  it('returns false when the native record carries an empty enabledSkills array', () => {
+    expect(hasBuiltinSkills('builtin-research', { enabledSkills: [] })).toBe(false);
+  });
+
+  it('still returns true for a preset even when the record carries no skills', () => {
+    expect(hasBuiltinSkills('builtin-alpha', { enabledSkills: [] })).toBe(true);
+  });
 });
 
 describe('isSelectableSpecialist (#115)', () => {

@@ -137,8 +137,12 @@ export const useAssistantEditor = ({
       setEditContext(context);
       setEditSkills(skills);
 
-      // Load skills list for builtin assistants with skillFiles and all custom assistants
-      if (hasBuiltinSkills(assistant.id) || !assistant.isBuiltin) {
+      // Load skills list for builtin assistants with skillFiles and all custom
+      // assistants. Native catalog specialists (builtin-<slug> records not in
+      // ASSISTANT_PRESETS) carry their skills inline on `enabledSkills`; pass
+      // the record so hasBuiltinSkills recognizes them and the editor stops
+      // clearing their skills list.
+      if (hasBuiltinSkills(assistant.id, assistant) || !assistant.isBuiltin) {
         const skillsList = await ipcBridge.fs.listAvailableSkills.invoke();
         setAvailableSkills(skillsList);
         setSelectedSkills(assistant.enabledSkills || []);

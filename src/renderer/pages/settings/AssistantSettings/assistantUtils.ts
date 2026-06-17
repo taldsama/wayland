@@ -7,9 +7,21 @@ export type AssistantSource = 'builtin' | 'custom' | 'extension';
 
 /**
  * Check if a builtin assistant has skills config (defaultEnabledSkills or skillFiles).
+ *
+ * The optional `record` lets callers also qualify native catalog specialists
+ * (waylandteams), which are stored as `builtin-<slug>` records that are NOT in
+ * ASSISTANT_PRESETS but carry their assigned skills inline on `enabledSkills`.
+ * Without this the Settings editor cleared their skills list (they failed the
+ * preset lookup), so native specialists could not view/edit their skills.
  */
-export const hasBuiltinSkills = (assistantId: string): boolean => {
+export const hasBuiltinSkills = (
+  assistantId: string,
+  record?: { enabledSkills?: string[] | null } | null
+): boolean => {
   if (!assistantId.startsWith('builtin-')) return false;
+  if (record && Array.isArray(record.enabledSkills) && record.enabledSkills.length > 0) {
+    return true;
+  }
   const presetId = assistantId.replace('builtin-', '');
   const preset = ASSISTANT_PRESETS.find((p) => p.id === presetId);
   if (!preset) return false;
