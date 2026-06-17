@@ -196,7 +196,7 @@ export function initSkillsBridge(): void {
     return { skillMd };
   });
 
-  ipcBridge.skills.save.provider(async ({ name, description, category, tags, body }) => {
+  ipcBridge.skills.save.provider(async ({ name, description, category, tags, body, type }) => {
     const kebab = name
       .trim()
       .toLowerCase()
@@ -225,7 +225,7 @@ export function initSkillsBridge(): void {
       {
         name: kebab,
         description,
-        type: 'skill',
+        type: type ?? 'skill',
         source: 'user',
         metadata: { tags, category: category || undefined },
         path: destFile,

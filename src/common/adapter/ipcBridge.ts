@@ -485,7 +485,7 @@ export const skills = {
    */
   save: buildProvider<
     { name: string; verdict: SkillVerdict; quarantinedAt?: string },
-    { name: string; description: string; category: string; tags: string[]; body: string }
+    { name: string; description: string; category: string; tags: string[]; body: string; type?: 'skill' | 'workflow' }
   >('skills.save'),
 };
 

@@ -8,8 +8,15 @@
  * WorkflowCompleteCard - replaces the step rail when a workflow session
  * reaches `status === 'complete'`. Surfaces the duration + step count
  * (and optional token/cost), up to 3 markdown-rendered "key outputs" the
- * W4 integration extracts from agent messages, the terminal `Run again`
- * CTA, and up to 3 suggested next workflows.
+ * W4 integration extracts from agent messages, and the terminal
+ * `Run again` CTA.
+ *
+ * NOTE: an "Up next" suggested-workflows block was specced but no caller
+ * ever supplies `suggestedNext` (every `<WorkflowSurface>` mount omits it),
+ * so the block was permanently dead UI. It was removed rather than left as
+ * an always-hidden branch. `suggestedNext` / `onLaunchNext` remain on the
+ * props type (callers still pass them) but are inert until a real
+ * suggestion source exists.
  *
  * The SPEC's §5.5 originally paired `Run again` with a `Save this run`
  * button that "pins to Recents with a workflow tag" - but the gap audit
@@ -22,7 +29,7 @@
  */
 
 import { Button } from '@arco-design/web-react';
-import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -70,9 +77,7 @@ export const WorkflowCompleteCard: React.FC<WorkflowCompleteCardProps> = ({
   totalTokens,
   totalCostCents,
   keyOutputs,
-  suggestedNext,
   onRunAgain,
-  onLaunchNext,
 }) => {
   const { t } = useTranslation();
 
@@ -80,7 +85,6 @@ export const WorkflowCompleteCard: React.FC<WorkflowCompleteCardProps> = ({
   const duration = formatDuration(end - session.created_at);
   const stepCount = session.steps.length;
   const outputs = (keyOutputs ?? []).slice(0, 3);
-  const next = (suggestedNext ?? []).slice(0, 3);
 
   return (
     <div className={styles.root} data-testid='workflow-complete-card'>
@@ -141,29 +145,6 @@ export const WorkflowCompleteCard: React.FC<WorkflowCompleteCardProps> = ({
           {t('workflow.complete.runAgain', 'Run again')}
         </Button>
       </div>
-
-      {next.length > 0 ? (
-        <section className={styles.section} aria-labelledby='workflow-complete-next-title'>
-          <div className={styles.sectionTitle} id='workflow-complete-next-title'>
-            {t('workflow.complete.nextTitle', 'Up next')}
-          </div>
-          <div className={styles.nextRow}>
-            {next.map((nx) => (
-              <button
-                type='button'
-                key={nx.slug}
-                className={styles.nextCard}
-                onClick={() => onLaunchNext(nx.slug)}
-              >
-                <span className={styles.nextCardIcon}>
-                  <ArrowRight size={14} />
-                </span>
-                <span>{nx.display}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 };

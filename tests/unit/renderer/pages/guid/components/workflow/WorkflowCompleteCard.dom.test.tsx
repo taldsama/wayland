@@ -197,8 +197,10 @@ describe('WorkflowCompleteCard', () => {
     expect(screen.queryByText(/Up next/i)).toBeNull();
   });
 
-  it('renders the "Up next" suggestions and fires onLaunchNext with the slug on click', () => {
-    const onLaunchNext = vi.fn();
+  // S10 regression: the "Up next" block was permanently dead UI because no
+  // <WorkflowSurface> caller ever supplies `suggestedNext`. It was removed,
+  // so the section must NOT render even when suggestions are passed.
+  it('never renders the "Up next" section, even when suggestedNext is provided (S10)', () => {
     render(
       <WorkflowCompleteCard
         session={baseSession()}
@@ -208,15 +210,12 @@ describe('WorkflowCompleteCard', () => {
           { slug: 'plan-a-quarter', display: 'Plan A Quarter' },
         ]}
         onRunAgain={vi.fn()}
-        onLaunchNext={onLaunchNext}
+        onLaunchNext={vi.fn()}
       />
     );
 
-    expect(screen.getByText(/Up next/i)).toBeTruthy();
-    const next = screen.getByText('Ship A Newsletter');
-    fireEvent.click(next);
-    expect(onLaunchNext).toHaveBeenCalledTimes(1);
-    expect(onLaunchNext).toHaveBeenCalledWith('ship-a-newsletter');
+    expect(screen.queryByText(/Up next/i)).toBeNull();
+    expect(screen.queryByText('Ship A Newsletter')).toBeNull();
   });
 
   it('no longer renders the dead "Save this run" CTA (#82)', () => {

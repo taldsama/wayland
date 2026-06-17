@@ -146,11 +146,11 @@ const WorkflowDetailModal: React.FC<WorkflowDetailModalProps> = ({ entry, onClos
     // previous workflow.
     setResumeCandidate(null);
     setLoading(true);
-    void ipcBridge.skills.getReport
+    void ipcBridge.skills.getBody
       .invoke({ name: entry.name })
-      .then(() => {
+      .then((md) => {
         if (cancelled) return;
-        setBody(null);
+        setBody(md);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

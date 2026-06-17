@@ -22,6 +22,7 @@ vi.mock('react-router-dom', () => ({
 const mockStart = vi.fn();
 const mockUpdateSessionState = vi.fn();
 const mockGetReport = vi.fn();
+const mockGetBody = vi.fn();
 const mockFindActive = vi.fn();
 
 vi.mock('@/common', () => ({
@@ -35,6 +36,7 @@ vi.mock('@/common', () => ({
     },
     skills: {
       getReport: { invoke: (...args: unknown[]) => mockGetReport(...args) },
+      getBody: { invoke: (...args: unknown[]) => mockGetBody(...args) },
     },
   },
 }));
@@ -122,12 +124,15 @@ describe('WorkflowDetailModal - launch wiring (v0.6.1 picker)', () => {
     mockStart.mockReset();
     mockUpdateSessionState.mockReset();
     mockGetReport.mockReset();
+    mockGetBody.mockReset();
     mockFindActive.mockReset();
     mockFetchDetectedAgents.mockReset();
     mockConfigStorageGet.mockReset();
     mockConfigStorageSet.mockReset();
 
     mockGetReport.mockResolvedValue({});
+    // Default: no SKILL.md body -> modal shows the generic fallback copy.
+    mockGetBody.mockResolvedValue(null);
     // Default: no active session - modal opens in picker mode
     mockFindActive.mockResolvedValue({ session: null });
 
@@ -175,6 +180,34 @@ describe('WorkflowDetailModal - launch wiring (v0.6.1 picker)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('workflow-backend-select')).toBeTruthy();
     });
+  });
+
+  // S8 regression: the "When you launch this" preview must be populated from
+  // skills.getBody. The old code called skills.getReport (security verdict)
+  // and then setBody(null) unconditionally, so the body was always blank and
+  // the generic fallback always showed.
+  it('populates the preview body from skills.getBody (S8)', async () => {
+    const BODY = 'Step 1. Draft the announcement.\nStep 2. Schedule the send.';
+    mockGetBody.mockResolvedValue(BODY);
+
+    render(<WorkflowDetailModal entry={makeEntry()} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText(/Draft the announcement/)).toBeTruthy());
+
+    // The body must come from getBody, not getReport.
+    expect(mockGetBody).toHaveBeenCalledWith({ name: 'launch-plan' });
+    // The generic fallback copy must NOT be shown when a real body exists.
+    expect(screen.queryByText(/loads this workflow as its first directive/i)).toBeNull();
+  });
+
+  it('falls back to the generic copy when skills.getBody returns null (S8)', async () => {
+    mockGetBody.mockResolvedValue(null);
+
+    render(<WorkflowDetailModal entry={makeEntry()} onClose={vi.fn()} />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/loads this workflow as its first directive/i)).toBeTruthy()
+    );
   });
 
   it('defaults picker to guid.lastSelectedAgent from ConfigStorage', async () => {
