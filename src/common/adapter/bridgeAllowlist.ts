@@ -185,14 +185,18 @@ const REMOTE_DENIED_KEYS: ReadonlySet<string> = new Set([
   'skills.rescan-all',
   'skills.scan',
   'skills.set-pinned',
-  // --- Model registry secret/write IPC (audit C4). `resolveForChatStart`
-  //     returns a DECRYPTED plaintext provider key; connect/rekey/detectKeys
-  //     mutate or disclose stored credentials. A paired WebUI must never reach
-  //     these or it can harvest every stored provider key. ---
+  // --- Model registry secret/write IPC. connect/rekey/detectKeys mutate or
+  //     disclose stored credentials, so a paired WebUI must never reach them.
+  //     `resolveForChatStart` is deliberately NOT denied here: audit C4 hardened
+  //     it to return ONLY a non-secret chat-start handle (id / platform /
+  //     modelId / baseUrl) - the decrypted key is dropped and re-resolved in the
+  //     main process at spawn, never crossing IPC (proven by the
+  //     "never returns decrypted secrets" handler test). A remote/headless WebUI
+  //     MUST reach it to bind a chat to a model; denying it left every remote
+  //     model pick unresolved ("No model configured yet" - cannot chat). ---
   'modelRegistry.connect',
   'modelRegistry.rekey',
   'modelRegistry.detectKeys',
-  'modelRegistry.resolveForChatStart',
   // --- Wayland Core tool-backend key mutation (plant/clear a search API key) ---
   'wcoreToolKeys.set',
   'wcoreToolKeys.delete',
