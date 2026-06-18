@@ -1905,7 +1905,7 @@
     "browse": {
       "title": "All providers",
       "subtitle": "Pick one to connect. Most take a key; cloud providers take a short credential form.",
-      "searchPlaceholder": "Search 30+ providers…",
+      "searchPlaceholder": "Search providers, or type “self-hosted”, “local”, “endpoint”…",
       "noMatch": "No providers match \"{{query}}\"",
       "back": "All providers",
       "connected": "Connected",
@@ -1931,6 +1931,21 @@
       "errorUnrecognized": "That key was not recognized for {{provider}}. Check the key and try again.",
       "errorNoModels": "{{provider}} connected but returned no models. Try refreshing it from Manage.",
       "errorUnknown": "Couldn't connect to {{provider}}. Please try again.",
+      "byo": {
+        "title": "Bring your own endpoint",
+        "desc": "Self-hosted, cloud, or local — point Wayland anywhere",
+        "lead": "Got a model behind your own URL? A RunPod, vLLM, or LM Studio box, a self-hosted model, a cloud deployment, or local Ollama. Anything that speaks the OpenAI API works.",
+        "aliasHint": "Searching “custom”, “self-hosted”, “local”, “runpod”, “vllm”, or “endpoint” jumps you here.",
+        "openaiName": "OpenAI-compatible endpoint",
+        "sub": {
+          "openai-compatible": "Any custom URL · RunPod, vLLM, LM Studio, self-hosted…",
+          "ollama-local": "Models on this machine",
+          "azure": "Your Azure deployment",
+          "aws-bedrock": "Credential form",
+          "vertex": "Credential form",
+          "openrouter": "One key, many models"
+        }
+      },
       "catalog": {
         "entry": "Browse 100+ more providers…",
         "title": "All connectable providers",

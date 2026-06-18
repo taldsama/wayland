@@ -118,15 +118,38 @@ describe('BrowseModal', () => {
   it('renders the grouped provider grid', async () => {
     renderModal();
 
-    // Every group label renders.
+    // The remaining group labels render.
     expect(await screen.findByText('settings.modelsPage.browse.group.frontier')).toBeInTheDocument();
-    expect(screen.getByText('settings.modelsPage.browse.group.cloud')).toBeInTheDocument();
     expect(screen.getByText('settings.modelsPage.browse.group.open')).toBeInTheDocument();
     expect(screen.getByText('settings.modelsPage.browse.group.chinese')).toBeInTheDocument();
     expect(screen.getByText('settings.modelsPage.browse.group.voice')).toBeInTheDocument();
 
-    // All 33 providers render as tiles.
+    // Cloud providers (Bedrock / Vertex / Azure) now lead in the
+    // "Bring your own endpoint" front section, so the standalone Cloud group no
+    // longer renders when not searching.
+    expect(screen.getByText('settings.modelsPage.browse.byo.title')).toBeInTheDocument();
+    expect(screen.queryByText('settings.modelsPage.browse.group.cloud')).not.toBeInTheDocument();
+
+    // Every provider still has exactly one connect surface (featured Flux + 6
+    // BYO cards + the rest grouped = 33 data-provider tiles).
     expect(tiles().length).toBe(33);
+    // The custom OpenAI-compatible endpoint leads the BYO section.
+    expect(document.querySelector('[data-provider="openai-compatible"]')).toBeInTheDocument();
+  });
+
+  it('surfaces the OpenAI-compatible endpoint when searching an alias', async () => {
+    renderModal();
+    await screen.findByText('settings.modelsPage.browse.group.frontier');
+
+    // "self-hosted" appears in no display name, but it is an alias for the
+    // OpenAI-compatible endpoint - the whole point of the alias search.
+    const search = screen.getByPlaceholderText('settings.modelsPage.browse.searchPlaceholder');
+    fireEvent.change(search, { target: { value: 'self-hosted' } });
+
+    await waitFor(() => {
+      const visible = tiles().map((el) => el.getAttribute('data-provider'));
+      expect(visible).toContain('openai-compatible');
+    });
   });
 
   it('filters the grid by the search input', async () => {

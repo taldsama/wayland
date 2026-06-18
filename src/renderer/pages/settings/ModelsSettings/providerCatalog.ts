@@ -232,6 +232,64 @@ export function providersInGroup(group: ProviderGroup): ProviderMeta[] {
   return ALL_PROVIDERS.filter((p) => p.group === group);
 }
 
+/**
+ * "Bring your own endpoint" providers, in render order. Surfaced as a dedicated
+ * section at the FRONT of the Browse modal - the custom / self-hosted /
+ * OpenAI-compatible connect was the single hardest thing to find (buried under
+ * "Open inference"), so it leads now. When NOT searching these are pulled out of
+ * the grouped library to avoid duplication; a search re-includes them so an
+ * explicit "azure" / "openrouter" query still finds them in their group.
+ */
+export const BYO_PROVIDER_ORDER = [
+  'openai-compatible',
+  'ollama-local',
+  'azure',
+  'aws-bedrock',
+  'vertex',
+  'openrouter',
+] as const satisfies readonly ProviderId[];
+
+/** Fast membership test for the BYO front section. */
+export const BYO_PROVIDER_IDS: ReadonlySet<ProviderId> = new Set(BYO_PROVIDER_ORDER);
+
+/** The BYO providers as resolved metadata, in render order. */
+export const BYO_PROVIDERS: readonly ProviderMeta[] = BYO_PROVIDER_ORDER.map((id) => providerMeta(id));
+
+/**
+ * Extra search terms that resolve to a provider beyond its display name. Lets a
+ * user who thinks in terms of "custom", "self-hosted", "runpod", or "vllm" find
+ * the OpenAI-compatible endpoint - none of which appear in any display name.
+ */
+const PROVIDER_SEARCH_ALIASES: Partial<Record<ProviderId, readonly string[]>> = {
+  'openai-compatible': [
+    'custom',
+    'self-hosted',
+    'selfhosted',
+    'self hosted',
+    'local',
+    'runpod',
+    'vllm',
+    'lm studio',
+    'lmstudio',
+    'endpoint',
+    'byo',
+    'compatible',
+  ],
+  'ollama-local': ['local', 'ollama'],
+};
+
+/**
+ * Whether a provider matches a (lowercased, trimmed) search query - by display
+ * name, id, or one of its aliases. An empty query matches nothing here; callers
+ * gate the unsearched view separately.
+ */
+export function providerMatchesQuery(p: ProviderMeta, q: string): boolean {
+  if (!q) return false;
+  if (p.displayName.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)) return true;
+  const aliases = PROVIDER_SEARCH_ALIASES[p.id];
+  return aliases ? aliases.some((a) => a.includes(q) || q.includes(a)) : false;
+}
+
 /** Result of recognizing a provider from a pasted API key. */
 export type KeyRecognition =
   | { kind: 'recognized'; provider: ProviderId }
