@@ -166,6 +166,7 @@ let mockAvailableModels: (p: Record<string, unknown>) => string[] = () => [];
 vi.mock('@/renderer/hooks/agent/useModelProviderList', () => ({
   useModelProviderList: () => ({
     providers: mockProviders,
+    connectedProviders: mockProviders,
     geminiModeLookup: new Map(),
     getAvailableModels: (p: Record<string, unknown>) => mockAvailableModels(p),
     formatModelLabel: () => '',

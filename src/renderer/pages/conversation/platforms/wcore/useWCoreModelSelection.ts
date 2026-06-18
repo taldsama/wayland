@@ -32,12 +32,26 @@ export const useWCoreModelSelection = ({
     setCurrentModel(initialModel);
   }, [initialModel?.id, initialModel?.useModel]);
 
-  const { providers: allProviders, getAvailableModels, formatModelLabel } = useModelProviderList();
+  const {
+    providers: allProviders,
+    connectedProviders: allConnectedProviders,
+    getAvailableModels,
+    formatModelLabel,
+  } = useModelProviderList();
 
   // WaylandCLI does not support Google Auth - filter it out
   const providers = useMemo(
     () => allProviders.filter((p) => !p.platform?.toLowerCase().includes('gemini-with-google-auth')),
     [allProviders]
+  );
+
+  // Unfiltered connected list (before the "has available models" cut) for the
+  // still-connected guard below. A provider whose models are transiently all
+  // filtered out (e.g. an OpenRouter catalog refresh) stays here, so we don't
+  // mistake the empty picker list for a disconnect and clear a live selection.
+  const connectedProviders = useMemo(
+    () => (allConnectedProviders ?? []).filter((p) => !p.platform?.toLowerCase().includes('gemini-with-google-auth')),
+    [allConnectedProviders]
   );
 
   // #64: drop a stale selection whose provider was disconnected/removed (the
@@ -61,11 +75,32 @@ export const useWCoreModelSelection = ({
       providers.find((p) => p.id === currentModel.id && getAvailableModels(p).includes(useModel)) ??
       providers.find((p) => getAvailableModels(p).includes(useModel));
     if (!owner) {
-      setCurrentModel(undefined);
+      // The model isn't in any provider's *curated* available list. Before
+      // dropping it, check whether its OWN provider is still connected.
+      // Dynamic-catalog providers (e.g. OpenRouter) expose brand-new models
+      // like `z-ai/glm-5.2` that models.dev hasn't enriched yet, so the Curator
+      // filters them out of `getAvailableModels` even though the provider is
+      // connected and the model works. Clearing there blanks the picker
+      // mid-conversation ("No model selected"), blocking a model the user just
+      // used successfully. Only drop the selection when the provider itself is
+      // gone (#64); when it's still connected, keep the used model bound to it.
+      // Check against the UNFILTERED connected list, not the picker `providers`
+      // (which hides a provider whose models are transiently all filtered out -
+      // exactly the OpenRouter "model vanished after one message" case).
+      const providerStillConnected = connectedProviders.some(
+        (p) =>
+          p.id === currentModel.id ||
+          (!!currentModel.platform &&
+            p.platform === currentModel.platform &&
+            (p.baseUrl ?? '') === (currentModel.baseUrl ?? ''))
+      );
+      if (!providerStillConnected) {
+        setCurrentModel(undefined);
+      }
     } else if (owner.id !== currentModel.id) {
       setCurrentModel({ ...(owner as unknown as TProviderWithModel), useModel });
     }
-  }, [providers, currentModel, getAvailableModels]);
+  }, [providers, connectedProviders, currentModel, getAvailableModels]);
 
   const handleSelectModel = useCallback(
     async (provider: IProvider, modelName: string) => {

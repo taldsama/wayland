@@ -10,6 +10,14 @@ import { FLUX_MODEL_DISPLAY, isFluxModelId, type FluxModelId } from '@/common/co
 
 export interface ModelProviderListResult {
   providers: IProvider[];
+  /**
+   * All ENABLED connected providers, BEFORE the "has available models" filter.
+   * This is the source of truth for "is this provider still connected" - the
+   * picker `providers` list hides a provider whose models are all transiently
+   * filtered out (e.g. an OpenRouter refresh), which must NOT be read as a
+   * disconnect (see useWCoreModelSelection's stale-model guard).
+   */
+  connectedProviders: IProvider[];
   geminiModeLookup: Map<string, GeminiModeOption>;
   getAvailableModels: (provider: IProvider) => string[];
   formatModelLabel: (provider: { platform?: string } | undefined, modelName?: string) => string;
@@ -75,7 +83,9 @@ export const useModelProviderList = (): ModelProviderListResult => {
     return result;
   }, []);
 
-  const providers = useMemo(() => {
+  // Enabled, connected providers (NOT yet filtered by available-models). Source
+  // of truth for "still connected" checks.
+  const connectedProviders = useMemo(() => {
     let list: IProvider[] = Array.isArray(modelConfig) ? modelConfig : [];
     // Filter out disabled providers (enabled by default)
     list = list.filter((p) => p.enabled !== false);
@@ -93,9 +103,14 @@ export const useModelProviderList = (): ModelProviderListResult => {
       } as unknown as IProvider;
       list = [googleProvider, ...list];
     }
-    // Filter out providers with no available models
-    return list.filter((p) => getAvailableModels(p).length > 0);
-  }, [geminiModeOptions, getAvailableModels, isGoogleAuth, modelConfig]);
+    return list;
+  }, [geminiModeOptions, isGoogleAuth, modelConfig]);
+
+  // Picker list: also hide providers with no available models.
+  const providers = useMemo(
+    () => connectedProviders.filter((p) => getAvailableModels(p).length > 0),
+    [connectedProviders, getAvailableModels]
+  );
 
   const formatModelLabel = useCallback(
     (provider: { platform?: string } | undefined, modelName?: string) => {
@@ -112,5 +127,5 @@ export const useModelProviderList = (): ModelProviderListResult => {
     [geminiModeLookup]
   );
 
-  return { providers, geminiModeLookup, getAvailableModels, formatModelLabel };
+  return { providers, connectedProviders, geminiModeLookup, getAvailableModels, formatModelLabel };
 };

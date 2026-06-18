@@ -13,15 +13,18 @@ import type { IProvider, TProviderWithModel } from '@/common/config/storage';
 
 const providerListState: {
   providers: IProvider[];
+  connectedProviders: IProvider[];
   getAvailableModels: (p: IProvider) => string[];
 } = {
   providers: [],
+  connectedProviders: [],
   getAvailableModels: () => [],
 };
 
 vi.mock('@/renderer/hooks/agent/useModelProviderList', () => ({
   useModelProviderList: () => ({
     providers: providerListState.providers,
+    connectedProviders: providerListState.connectedProviders,
     geminiModeLookup: new Map(),
     getAvailableModels: providerListState.getAvailableModels,
     formatModelLabel: (_m: unknown, name: string) => name,
@@ -34,8 +37,11 @@ const openai = { id: 'openai', platform: 'openai', model: ['gpt-5.5'] } as unkno
 const fluxModel = { id: 'flux', useModel: 'flux-auto' } as unknown as TProviderWithModel;
 const onSelectModel = vi.fn().mockResolvedValue(true);
 
-function setList(providers: IProvider[], avail: Record<string, string[]>) {
+function setList(providers: IProvider[], avail: Record<string, string[]>, connected?: IProvider[]) {
   providerListState.providers = providers;
+  // The unfiltered connected list defaults to the picker list; pass it
+  // explicitly to model the "connected but no available models" case.
+  providerListState.connectedProviders = connected ?? providers;
   providerListState.getAvailableModels = (p) => avail[p.id] ?? [];
 }
 
@@ -52,6 +58,33 @@ describe('useWCoreModelSelection revalidation (#64)', () => {
     const initial = { id: 'openai', useModel: 'gpt-5.5' } as unknown as TProviderWithModel;
     const { result } = renderHook(() => useWCoreModelSelection({ initialModel: initial, onSelectModel }));
     await waitFor(() => expect(result.current.currentModel).toBeUndefined());
+  });
+
+  it('keeps an OpenRouter selection when the provider is still connected but its models are transiently filtered out', async () => {
+    // Regression for the "model vanished after one message" report: after the
+    // first turn a catalog refresh dropped z-ai/glm-5.2 from the *available*
+    // (picker) list, so `providers` is empty - but OpenRouter is still
+    // connected. The selection must survive (the still-connected guard must
+    // read the UNFILTERED connected list, not the picker list).
+    const openrouter = {
+      id: 'openrouter',
+      platform: 'openai-compatible',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      model: ['z-ai/glm-5.2'],
+    } as unknown as IProvider;
+    // picker `providers` = [] (model filtered out -> 0 available), but the
+    // provider is still present in the unfiltered connected list.
+    setList([], { openrouter: [] }, [openrouter]);
+    const initial = {
+      id: 'openrouter',
+      platform: 'openai-compatible',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      useModel: 'z-ai/glm-5.2',
+    } as unknown as TProviderWithModel;
+    const { result } = renderHook(() => useWCoreModelSelection({ initialModel: initial, onSelectModel }));
+    // give the revalidation effect a chance to (wrongly) clear it
+    await new Promise((r) => setTimeout(r, 30));
+    expect(result.current.currentModel?.useModel).toBe('z-ai/glm-5.2');
   });
 
   it('never treats flux-auto as stale, even though its provider is filtered out', async () => {
