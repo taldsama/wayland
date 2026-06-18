@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type SpeechToTextProvider = 'openai' | 'deepgram' | 'whisper-local';
+export type SpeechToTextProvider = 'openai' | 'deepgram' | 'whisper-local' | 'flux-voice';
 
 export type OpenAISpeechToTextConfig = {
   apiKey: string;
