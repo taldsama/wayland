@@ -875,7 +875,7 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
 
     if (this.heartbeatMissedCount >= this.heartbeatMaxMissed) {
       mainError('[WCoreManager]', `wcore process unresponsive after ${this.heartbeatMaxMissed} missed pongs, killing`);
-      this.agent?.kill();
+      void this.agent?.kill();
       return;
     }
 
@@ -1208,16 +1208,18 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
     }
   }
 
-  override kill(): Promise<void> {
+  override async kill(): Promise<void> {
     if (this.agent) {
       try {
-        this.agent.kill();
+        // Await the engine tree-kill (taskkill /T on Windows) before tearing
+        // down the worker, so WorkerTaskManager.clear() on quit doesn't return
+        // before wayland-core's child tree is actually gone (#139).
+        await this.agent.kill();
       } catch {
         // best-effort
       }
     }
-    // super.kill() is async (ForkTask M18); return its promise so callers
-    // (WorkerTaskManager.clear) can await child exit.
-    return Promise.resolve(super.kill());
+    // super.kill() is async (ForkTask M18); await child exit.
+    await super.kill();
   }
 }

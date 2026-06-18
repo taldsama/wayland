@@ -15,6 +15,7 @@ import { buildEngineSpawnEnv, buildSpawnConfig } from './envBuilder';
 import { resolveActiveConfigDir } from './profilePaths';
 import { getToolKeyStore } from './toolKeyStore';
 import { hydrateModelForSpawn } from '@process/providers/ipc/modelRegistryIpc';
+import { killChild } from '@process/agent/acp/utils';
 import type { WCoreEvent, WCoreCommand, WCoreCapabilities } from './protocol';
 
 const WCORE_PROJECT_CONFIG = '.wcore.toml';
@@ -805,11 +806,16 @@ export class WCoreAgent {
     return this.childProcess !== null;
   }
 
-  kill(): void {
+  async kill(): Promise<void> {
     this.restoreProjectConfig();
     if (this.childProcess) {
-      this.childProcess.kill('SIGTERM');
+      // wayland-core spawns its own child tree (MCP servers, tool subprocesses).
+      // A bare SIGTERM is a no-op on Windows and never reaches the tree, leaving
+      // orphaned processes after quit (#139). killChild does a taskkill /T /F on
+      // win32 and a SIGTERM->SIGKILL descendant sweep on POSIX.
+      const child = this.childProcess;
       this.childProcess = null;
+      await killChild(child, false);
     }
   }
 
