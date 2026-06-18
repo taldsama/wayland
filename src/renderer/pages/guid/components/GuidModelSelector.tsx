@@ -334,6 +334,30 @@ const GuidModelSelector: React.FC<GuidModelSelectorProps> = ({
     void handlePickCurated(fallbackModel, { silent: true });
   }, [agentKey, curated, isGeminiMode, selectedCuratedKey, handlePickCurated, currentModel?.useModel, modelList]);
 
+  // ── Cold-start default: pick the recommended curated model when NOTHING is
+  // selected yet (distinct from the dropped-pin repair above, which needs an
+  // existing selection). The legacy getModelConfig-based default in
+  // useGuidModelSelection can resolve empty on a remote/headless WebUI - the
+  // `model.config` legacy mirror lands after the picker's cold SWR snapshot and
+  // never revalidates for an already-connected provider - leaving a brand-new
+  // user stuck on "No model configured yet" until they manually open the picker.
+  // The registry curated list IS the authoritative, populated source here, so
+  // auto-pick the first safe/recommended model (e.g. Flux Auto) through the same
+  // proven chat-start path a manual pick uses. Silent + once-per-agent; the
+  // `!currentModel` guard means it never overrides the desktop's working default
+  // or a real saved pin (a later setDefaultModel result still wins).
+  const coldStartPickedRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!isGeminiMode) return;
+    if (!curated || curated.length === 0) return;
+    if (currentModel?.useModel || selectedCuratedKey) return; // a selection already exists
+    if (coldStartPickedRef.current === agentKey) return;
+    const recommended = firstSafeCuratedModel(curated);
+    if (!recommended) return;
+    coldStartPickedRef.current = agentKey;
+    void handlePickCurated(recommended, { silent: true });
+  }, [agentKey, curated, isGeminiMode, currentModel?.useModel, selectedCuratedKey, handlePickCurated]);
+
   // Resolve a price tier for an ACP model entry. CLI-agent options use short
   // ids/labels (`sonnet`, `haiku`, `Sonnet (1M context)`) that almost never
   // equal a curated model id (`claude-sonnet-4-5`). Wave 4B R3 fix: match the

@@ -215,6 +215,10 @@ beforeEach(() => {
   mockCuratedForAgent.mockReset();
   mockNavigate.mockReset();
   mockResolveForChatStart.mockReset();
+  // Default to a benign not-connected result so the cold-start auto-pick effect
+  // (which now fires on mount for a provider-agent picker with no selection)
+  // resolves cleanly and stays silent in tests that don't exercise it.
+  mockResolveForChatStart.mockResolvedValue({ ok: false, error: 'not-connected' });
   baseProps.setCurrentModel.mockClear();
 });
 
@@ -389,6 +393,40 @@ describe('GuidModelSelector home picker', () => {
     expect(arg.useModel).toBe('claude-sonnet-4-7');
   });
 
+  it('auto-picks the recommended curated model on cold start when nothing is selected', async () => {
+    // Remote/headless WebUI: the legacy getModelConfig-based default can resolve
+    // empty, so the registry curated list drives the cold-start default. With no
+    // selection at all, the home auto-picks the first safe model through the
+    // chat-start path so a brand-new user is not stranded on "No model configured
+    // yet" until they manually open the picker.
+    mockCuratedForAgent.mockResolvedValue([
+      curated({ id: 'flux-auto', providerId: 'flux-router', displayName: 'Flux Auto', family: 'Flux' }),
+    ]);
+    mockResolveForChatStart.mockResolvedValue({
+      ok: true,
+      provider: {
+        id: 'flux-router',
+        providerId: 'flux-router',
+        name: 'Flux Router',
+        platform: 'openai-compatible',
+        modelId: 'flux-auto',
+        baseUrl: '',
+        accountId: 'default',
+      },
+    });
+    const setCurrentModel = vi.fn().mockResolvedValue(undefined);
+
+    render(<GuidModelSelector {...baseProps} agentKey='wcore' setCurrentModel={setCurrentModel} />);
+
+    await waitFor(() =>
+      expect(mockResolveForChatStart).toHaveBeenCalledWith({ providerId: 'flux-router', modelId: 'flux-auto' })
+    );
+    await waitFor(() => expect(setCurrentModel).toHaveBeenCalledTimes(1));
+    expect(setCurrentModel.mock.calls[0][0].useModel).toBe('flux-auto');
+    // Silent: the cold-start pick must never navigate the user off /guid.
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
   it('does not fire the graceful fallback when the pinned model is still curated', async () => {
     mockCuratedForAgent.mockResolvedValue([
       curated({ id: 'claude-opus', providerId: 'anthropic', displayName: 'Claude Opus 4.7', family: 'Claude Opus' }),
@@ -499,6 +537,10 @@ describe('GuidModelSelector home picker', () => {
     render(<GuidModelSelector {...baseProps} agentKey='codex' modelList={[]} setCurrentModel={setCurrentModel} />);
 
     const row = await screen.findByText('GPT-5.5');
+    // The cold-start auto-pick fires resolveForChatStart→setCurrentModel once on
+    // mount (no prior selection). Clear it so this assertion counts only the
+    // explicit click being tested here.
+    setCurrentModel.mockClear();
     fireEventClick(row);
 
     await waitFor(() => expect(setCurrentModel).toHaveBeenCalledTimes(1));
