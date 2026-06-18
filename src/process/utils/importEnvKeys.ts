@@ -24,18 +24,32 @@
 import type { DiscoveredKey } from '@process/providers/detection/KeyDiscovery';
 import { KeyDiscovery } from '@process/providers/detection/KeyDiscovery';
 import { connectModelRegistryProvider, getModelRegistryRepository } from '@process/providers/ipc/modelRegistryIpc';
+import { mirrorDisconnect } from '@process/providers/legacyModelConfigBridge';
+import { ProcessConfig } from '@process/utils/initStorage';
+
+/** Flux Router's API host + key prefix. */
+const FLUX_BASE_HOST = 'fluxrouter.ai';
+const FLUX_KEY_PREFIX = 'sk-flux-';
+
+/**
+ * A Flux key wired through `OPENAI_API_KEY` (+ `OPENAI_BASE_URL=…fluxrouter.ai`)
+ * is the `wayland setup` convention, but it is really the Flux Router provider.
+ * Detect it by the `sk-flux-` key prefix or the fluxrouter base URL so the
+ * import can register it as `flux-router` (Flux branding, Flux catalog,
+ * flux-auto) instead of mislabeling it as `openai`.
+ */
+function isFluxKey(value: string, baseUrl: string | undefined): boolean {
+  return value.startsWith(FLUX_KEY_PREFIX) || (baseUrl ?? '').toLowerCase().includes(FLUX_BASE_HOST);
+}
 
 /**
  * Resolve an optional custom base URL for an env-discovered key.
  *
- * A user who wires Flux through `OPENAI_API_KEY` + `OPENAI_BASE_URL=https://
- * api.fluxrouter.ai/v1` expects the base URL to be honored, not silently
- * dropped. The `installer/bin/wayland.mjs` launcher writes exactly this pair for
- * a Flux key, so we mirror its convention here: the key imports as the `openai`
- * provider with the custom base URL threaded through, rather than remapping to a
- * separate `flux-router` provider. This keeps the headless import identical to
- * what `wayland start` would run, and generalizes to any OpenAI-compatible host
- * (Flux, a self-hosted gateway, etc.).
+ * A user who wires an OpenAI-compatible gateway through `OPENAI_API_KEY` +
+ * `OPENAI_BASE_URL=https://host/v1` expects the base URL to be honored, not
+ * silently dropped (#25). A Flux key is special-cased to the `flux-router`
+ * provider by the caller (see `isFluxKey`); every other custom-base key keeps
+ * this generic OpenAI-compatible path with the base URL threaded through.
  *
  * Only env-sourced keys carry a base URL - the convention is a paired
  * `<VAR_PREFIX>_BASE_URL` env var (e.g. `OPENAI_API_KEY` -> `OPENAI_BASE_URL`).
@@ -74,25 +88,61 @@ export async function importEnvKeysOnBoot(): Promise<void> {
   let imported = 0;
   for (const key of found) {
     try {
-      // Skip providers already connected - don't re-import or overwrite a
-      // working connection on every restart. Retry providers left in `error`.
-      const existing = repo.getRegistryProvider(key.providerId);
-      if (existing && existing.state === 'connected') continue;
-
       const value = discovery.readValue(key);
       if (!value) continue; // source vanished between scan() and readValue()
 
-      // Thread an optional custom base URL (e.g. a Flux/OpenAI-compatible host)
+      // Thread an optional custom base URL (e.g. an OpenAI-compatible gateway)
       // so a `*_BASE_URL` env var is honored instead of silently dropped (#25).
       const baseUrl = resolveBaseUrl(key);
-      const creds = baseUrl ? { key: value, baseUrl } : { key: value };
-      const result = await connectModelRegistryProvider(key.providerId, creds);
+
+      // A Flux key wired through OPENAI_* is the Flux Router provider - register
+      // it as `flux-router` so it shows as Flux (not OpenAI), gets the Flux
+      // catalog + flux-auto, and routes correctly. flux-router carries its own
+      // endpoint, so it needs no custom base URL.
+      const isFlux = key.providerId === 'openai' && isFluxKey(value, baseUrl);
+      const providerId = isFlux ? 'flux-router' : key.providerId;
+
+      // Skip providers already connected - don't re-import or overwrite a
+      // working connection on every restart. Retry providers left in `error`.
+      const existing = repo.getRegistryProvider(providerId);
+      if (existing && existing.state === 'connected') continue;
+
+      // Clean up a stale `openai` row from a pre-fix boot of THIS server: the
+      // env's single OPENAI_API_KEY is the Flux key, so an `openai` provider
+      // here can only be the same Flux key mislabeled. Remove it (and its
+      // legacy mirror) so the user is left with one clean `flux-router` row.
+      if (isFlux && repo.getRegistryProvider('openai')) {
+        try {
+          repo.deleteRegistryProvider('openai');
+          // oxlint-disable-next-line no-await-in-loop -- per-key sequential cleanup of shared registry state
+          await mirrorDisconnect('openai');
+        } catch (cleanupError) {
+          console.warn('[server] Failed to remove stale openai row while remapping to flux-router:', cleanupError);
+        }
+      }
+
+      const creds = isFlux ? { key: value } : baseUrl ? { key: value, baseUrl } : { key: value };
+      // oxlint-disable-next-line no-await-in-loop -- providers are imported one at a time on purpose
+      const result = await connectModelRegistryProvider(providerId, creds);
       if (result.ok) {
         imported += 1;
         // Provider id only - never the key value.
-        console.log(`[server] Imported provider key from environment: ${key.providerId}`);
+        console.log(`[server] Imported provider key from environment: ${providerId}`);
+        // Flux is the headless engine when wired this way, so enable Flux
+        // routing once on first import - the home/chat default then resolves
+        // flux-auto instead of showing "no model configured yet". Only set on a
+        // fresh import (the already-connected skip above means a user who later
+        // turns routing off via the WebUI is not overridden on restart).
+        if (isFlux) {
+          try {
+            // oxlint-disable-next-line no-await-in-loop -- one-time routing enable on first Flux import
+            await ProcessConfig.set('system.routeThroughFlux', true);
+          } catch (routeError) {
+            console.warn('[server] Failed to enable Flux routing after env import:', routeError);
+          }
+        }
       } else {
-        console.warn(`[server] Env key for ${key.providerId} failed to connect: ${result.error}`);
+        console.warn(`[server] Env key for ${providerId} failed to connect: ${result.error}`);
       }
     } catch (error) {
       console.warn(`[server] Failed to import env key for ${key.providerId}:`, error);
