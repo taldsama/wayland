@@ -359,6 +359,18 @@ describe('ApiProviderSource', () => {
     const [url] = fetchMock.mock.calls[0] as [string];
     expect(url).toBe('https://my-gateway.example.com/v1/models');
   });
+
+  // #166 - Perplexity's models endpoint is versioned (`/v1/models`); a bare
+  // `/models` 404s, fails the catalog fetch, and the provider never connects.
+  it('targets Perplexity at the versioned /v1/models endpoint (#166)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ data: [{ id: 'sonar' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new ApiProviderSource('perplexity', 'pplx-test').listModels();
+
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toBe('https://api.perplexity.ai/v1/models');
+  });
 });
 
 // ─── WaylandCoreSource ────────────────────────────────────────────────────────
