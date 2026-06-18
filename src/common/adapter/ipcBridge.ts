@@ -489,6 +489,45 @@ export const skills = {
   >('skills.save'),
 };
 
+/**
+ * Per-item verdict returned by a type-aware import. One entry per imported
+ * SKILL.md, carrying what surface it landed on so the import modal can show
+ * "Registered as Assistant / Workflow / Skill" alongside the SkillGuard
+ * verdict (clean / review / blocked).
+ */
+export type ImportItemResult = {
+  name: string;
+  /** Surface the entry registered into (driven by frontmatter `type:`). */
+  registeredAs: SkillIndexEntry['type'];
+  /** SkillGuard verdict: 'blocked' items are quarantined, not registered. */
+  verdict: SkillVerdict;
+  /** Assistant id, set only when registeredAs === 'agent-profile'. */
+  assistantId?: string;
+};
+
+export type ImportSummary = {
+  items: ImportItemResult[];
+  /** Names routed to quarantine (verdict === 'blocked'). */
+  quarantined: string[];
+  /** Non-fatal warnings surfaced by the importer (e.g. executable-ref). */
+  warnings: string[];
+};
+
+/**
+ * Type-aware import for Assistants and Workflows. Runs the hardened
+ * SkillImport pipeline (folder / git / SKILL.md), then routes each imported
+ * entry by its frontmatter `type:`:
+ *   - 'agent-profile' -> written to the custom-assistant store (surfaces on
+ *     the Assistants page; the SkillLibrary type filter does NOT surface them)
+ *   - 'workflow' / 'skill' -> already registered into SkillLibrary by the
+ *     importer (surface on Workflows / Skills via skills.list).
+ */
+export const imports = {
+  folder: buildProvider<ImportSummary, { srcPath: string }>('imports.folder'),
+  git: buildProvider<ImportSummary, { url: string }>('imports.git'),
+  singleSkillMd: buildProvider<ImportSummary, { srcPath: string }>('imports.single-skill-md'),
+};
+
 export const voiceAsset = {
   download: buildProvider<DownloadResult, VoiceAsset>('voice-asset.download'),
   cancel: buildProvider<{ cancelled: boolean }, { assetId: string }>('voice-asset.cancel'),

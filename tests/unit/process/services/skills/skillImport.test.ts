@@ -6,7 +6,13 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import path from 'node:path';
-import { SkillImport, IMPORTED_DIR, type SkillImportIo, type ZipEntry } from '@process/services/skills/SkillImport';
+import {
+  SkillImport,
+  IMPORTED_DIR,
+  parseFrontmatterType,
+  type SkillImportIo,
+  type ZipEntry,
+} from '@process/services/skills/SkillImport';
 import { SkillGuard } from '@process/services/skills/SkillGuard';
 import { SkillQuarantine } from '@process/services/skills/SkillQuarantine';
 import { SkillLibrary } from '@process/services/skills/SkillLibrary';
@@ -300,5 +306,72 @@ describe('SkillImport - scan integration', () => {
         expect.objectContaining({ name: 'clean-skill', source: 'imported' }),
       ])
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseFrontmatterType - whitelist extraction
+// ---------------------------------------------------------------------------
+
+describe('parseFrontmatterType', () => {
+  it('reads type: workflow from frontmatter', () => {
+    expect(parseFrontmatterType('---\nname: x\ntype: workflow\n---\nbody')).toBe('workflow');
+  });
+
+  it('reads type: agent-profile from frontmatter', () => {
+    expect(parseFrontmatterType('---\nname: x\ntype: agent-profile\n---\nbody')).toBe('agent-profile');
+  });
+
+  it('defaults to skill when type is absent', () => {
+    expect(parseFrontmatterType('---\nname: x\n---\nbody')).toBe('skill');
+  });
+
+  it('defaults to skill when there is no frontmatter block', () => {
+    expect(parseFrontmatterType('# just a heading')).toBe('skill');
+  });
+
+  it('falls back to skill on an unknown type value', () => {
+    expect(parseFrontmatterType('---\nname: x\ntype: malware\n---\nbody')).toBe('skill');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Type-aware registration - imported type:workflow registers as workflow
+// ---------------------------------------------------------------------------
+
+describe('SkillImport - type-aware registration', () => {
+  it('registers an imported type:workflow SKILL.md as a workflow', async () => {
+    vi.spyOn(SkillGuard, 'scan').mockResolvedValue([CLEAN_REPORT]);
+    const lib = SkillLibrary.getInstance({ readFile: async () => '[]' });
+    const registerSpy = vi.spyOn(lib, 'registerSource');
+    const io = makeFakeIo({
+      readFile: vi.fn(async () => Buffer.from('---\nname: my-wf\ntype: workflow\n---\n# Workflow body')),
+    });
+    const importer = new SkillImport(io);
+
+    const result = await importer.importFolder('/home/user/my-wf');
+
+    expect(registerSpy).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ name: 'my-wf', type: 'workflow' })])
+    );
+    expect(result.imported[0].type).toBe('workflow');
+  });
+
+  it('registers a plain SKILL.md as type:skill', async () => {
+    vi.spyOn(SkillGuard, 'scan').mockResolvedValue([CLEAN_REPORT]);
+    const lib = SkillLibrary.getInstance({ readFile: async () => '[]' });
+    const registerSpy = vi.spyOn(lib, 'registerSource');
+    const io = makeFakeIo({
+      readFile: vi.fn(async () => Buffer.from('---\nname: plain\n---\n# Plain skill')),
+    });
+    const importer = new SkillImport(io);
+
+    const result = await importer.importFolder('/home/user/plain');
+
+    expect(registerSpy).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ name: 'plain', type: 'skill' })])
+    );
+    expect(result.imported[0].type).toBe('skill');
+    expect(result.imported[0].body).toContain('Plain skill');
   });
 });

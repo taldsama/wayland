@@ -19,7 +19,7 @@
 
 import path from 'node:path';
 import { homedir } from 'node:os';
-import type { SkillSecurityReport } from '@/common/types/skillTypes';
+import type { SkillSecurityReport, SkillType } from '@/common/types/skillTypes';
 import type { SkillScanInput } from './skillGuardRules';
 import { SkillGuard } from './SkillGuard';
 import { SkillLibrary } from './SkillLibrary';
@@ -107,6 +107,10 @@ export type ImportedSkillResult = {
   destPath: string;
   /** Security scan report. */
   report: SkillSecurityReport;
+  /** Type declared in the SKILL.md frontmatter (default 'skill'). */
+  type: SkillType;
+  /** Raw SKILL.md body - lets the import dispatcher route agent-profiles. */
+  body: string;
 };
 
 export type ImportResult = {
@@ -135,6 +139,26 @@ function isAllowedGitUrl(url: string): boolean {
 
 // Regex to flag SKILL.md bodies that reference relative executable paths.
 const EXECUTABLE_REF_RE = /\.(\/scripts\/[^\s)'"]+|\/bin\/[^\s)'"]+)/;
+
+// Whitelist of valid SKILL.md frontmatter `type:` values. Anything else
+// (missing block, unknown value) falls back to 'skill' so a malformed
+// header can never register an entry under an unexpected surface.
+const VALID_SKILL_TYPES: ReadonlySet<SkillType> = new Set(['skill', 'workflow', 'agent-profile']);
+
+/**
+ * Extract the frontmatter `type:` from a SKILL.md body. Reads only the
+ * leading `---\n…\n---` block; defaults to 'skill' when absent or invalid.
+ * Kept local (and regex-only, no YAML dep) to mirror the rest of this file's
+ * dependency-free posture; the canonical parser in AcpSkillManager is renderer-
+ * adjacent and pulls more surface than the importer needs.
+ */
+export function parseFrontmatterType(body: string): SkillType {
+  const block = body.match(/^---\s*\n([\s\S]*?)\n---/);
+  if (!block) return 'skill';
+  const m = block[1].match(/^type:[ \t]*['"]?([^'"\n]+?)['"]?[ \t]*$/m);
+  const raw = m ? (m[1].trim() as SkillType) : 'skill';
+  return VALID_SKILL_TYPES.has(raw) ? raw : 'skill';
+}
 
 /**
  * Decompression caps to defend against zip-bombs. A skill is a small bundle of
@@ -370,19 +394,27 @@ export class SkillImport {
         await SkillQuarantine.quarantine(skill.name, skill.destDir, this.quarantineIo);
         quarantined.push(skill.name);
       } else {
-        // Register clean and review skills into the library.
+        // Register clean and review skills into the library under the type
+        // declared in the SKILL.md frontmatter (default 'skill'). This is what
+        // surfaces imported `type:'workflow'` entries on the Workflows page.
         SkillLibrary.getInstance().registerSource([
           {
             name: skill.name,
             description: '',
-            type: 'skill',
+            type: parseFrontmatterType(skill.body),
             source: 'imported',
             path: path.join(skill.destDir, 'SKILL.md'),
             metadata: { tags: [] },
             security: report,
           },
         ]);
-        imported.push({ name: skill.name, destPath: skill.destDir, report });
+        imported.push({
+          name: skill.name,
+          destPath: skill.destDir,
+          report,
+          type: parseFrontmatterType(skill.body),
+          body: skill.body,
+        });
       }
     }
 
