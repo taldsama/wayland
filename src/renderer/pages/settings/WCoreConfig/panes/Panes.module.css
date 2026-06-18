@@ -850,3 +850,57 @@
   color: var(--wc-text-muted);
   padding: 13px 4px;
 }
+
+/* In-app engine update card (Overview pane). Accent-bordered when an update is
+   available; success-tinted once an update has been installed. */
+.updateCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--wc-accent);
+  border-radius: var(--wc-r-md);
+  background: linear-gradient(180deg, var(--wc-surface-1), var(--wc-surface-2));
+}
+.updateCardDone {
+  border-color: var(--wc-success);
+}
+.updateIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  color: var(--wc-accent);
+  background: color-mix(in srgb, var(--wc-accent) 14%, transparent);
+}
+.updateCardDone .updateIcon {
+  color: var(--wc-success);
+  background: var(--wc-success-dim);
+}
+.updateText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.updateTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--wc-text-primary);
+}
+.updateBody {
+  font-size: 0.78rem;
+  color: var(--wc-text-secondary);
+  line-height: 1.45;
+}
+.updateProgress {
+  margin-top: 6px;
+  max-width: 320px;
+}
+.updateBtn {
+  flex-shrink: 0;
+}

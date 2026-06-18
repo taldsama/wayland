@@ -33,6 +33,12 @@ import type {
   AutoUpdateStatus,
 } from '../update/updateTypes';
 import type {
+  WCoreInstallRequest,
+  WCoreInstallResult,
+  WCoreUpdateCheck,
+  WCoreUpdateProgress,
+} from '../update/wcoreUpdateTypes';
+import type {
   ChatGptOAuthResult,
   ConnectFluxResult,
   ConnectPastedKeyResult,
@@ -271,6 +277,17 @@ export const autoUpdate = {
    * the renderer should surface this so users know auto-updates are disabled until next launch.
    */
   getStatus: buildProvider<{ available: boolean; error?: string }, void>('auto-update.get-status'),
+};
+
+// In-app updater for the bundled Wayland Core engine binary (HUMAN-only;
+// remote-denied in bridgeAllowlist - install downloads + stages a native binary).
+export const wcoreUpdate = {
+  /** Check GitHub releases for a newer wayland-core than the installed binary. */
+  check: buildProvider<WCoreUpdateCheck, void>('wcoreUpdate.check'),
+  /** Download, SHA-256 verify, and install a release tag into the override dir. */
+  install: buildProvider<WCoreInstallResult, WCoreInstallRequest>('wcoreUpdate.install'),
+  /** Install progress (download percent + phase) emitted by the main process. */
+  progress: buildEmitter<WCoreUpdateProgress>('wcoreUpdate.progress'),
 };
 
 export const starOffice = {

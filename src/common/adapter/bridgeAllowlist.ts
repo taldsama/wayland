@@ -207,6 +207,11 @@ const REMOTE_DENIED_KEYS: ReadonlySet<string> = new Set([
   // Also deny the read: it discloses the engine's security/tools posture to a
   // paired WebUI client (no secret values, but defence-in-depth — SEC review F2).
   'wcoreConfig.getSection',
+  // --- In-app engine updater. `install` downloads + stages a native binary the
+  //     next engine spawn executes; a remote caller reaching it is an RCE chain.
+  //     `check` hits the network + discloses the engine version. HUMAN-only. ---
+  'wcoreUpdate.check',
+  'wcoreUpdate.install',
   // --- Wayland Core profile fs mutation (create/clone/activate/delete profile
   //     directories under the profiles root). Remote-denied (SEC-4). ---
   'wcoreProfiles.create',
