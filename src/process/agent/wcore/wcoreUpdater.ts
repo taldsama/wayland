@@ -73,6 +73,19 @@ export function assetNameFor(tag: string, platform: string = process.platform, a
   return `wayland-core-${tag}-${a}-${p.triple}.${p.ext}`;
 }
 
+/**
+ * A well-formed engine release tag (`v0.12.2`, `0.12.3`, `v0.13.0-rc.1`). The
+ * tag flows into temp paths and (on Windows) a PowerShell `-Command` string, so
+ * it is validated against this strict allowlist BEFORE any use - a tag carrying
+ * shell metacharacters (e.g. a single quote) is rejected outright.
+ */
+const RELEASE_TAG_RE = /^v?\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$/;
+
+/** True when `tag` is a safe, well-formed release tag. */
+export function isValidReleaseTag(tag: string): boolean {
+  return RELEASE_TAG_RE.test(tag);
+}
+
 /** Strip a leading `v` and any prerelease/build suffix to `major.minor.patch`. */
 function semverTriple(v: string): [number, number, number] {
   const m = v.replace(/^v/, '').match(/(\d+)\.(\d+)\.(\d+)/);
@@ -179,14 +192,27 @@ function sha256File(path: string): Promise<string> {
   });
 }
 
+/** Escape a path for a PowerShell single-quoted literal (double any quote). */
+function psQuote(p: string): string {
+  return p.replace(/'/g, "''");
+}
+
 /** Extract a `.tar.gz` / `.zip` archive into `outDir` using the OS tool. */
 function extractArchive(archivePath: string, outDir: string): void {
   mkdirSync(outDir, { recursive: true });
   if (archivePath.endsWith('.zip')) {
     if (process.platform === 'win32') {
+      // Defence-in-depth (the tag is already allowlist-validated): PowerShell
+      // single-quoted strings escape an embedded quote by doubling it, so a
+      // quirky tmpdir/path can never break out of the literal.
       execFileSync(
         'powershell',
-        ['-NoProfile', '-NonInteractive', '-Command', `Expand-Archive -LiteralPath '${archivePath}' -DestinationPath '${outDir}' -Force`],
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          `Expand-Archive -LiteralPath '${psQuote(archivePath)}' -DestinationPath '${psQuote(outDir)}' -Force`,
+        ],
         { timeout: 120_000 }
       );
     } else {
@@ -221,6 +247,10 @@ export async function installWCoreUpdate(
   tag: string,
   onProgress?: (p: WCoreUpdateProgress) => void
 ): Promise<WCoreInstallResult> {
+  // Reject any tag carrying shell/path metacharacters before it reaches a temp
+  // path or (on Windows) a PowerShell command string.
+  if (!isValidReleaseTag(tag)) return { ok: false, error: `invalid release tag: ${tag}` };
+
   const assetName = assetNameFor(tag);
   const binaryName = process.platform === 'win32' ? `${PRIMARY_BINARY}.exe` : PRIMARY_BINARY;
   if (!assetName) return { ok: false, error: `unsupported platform ${runtimeKey()}` };

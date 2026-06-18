@@ -12,7 +12,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { assetNameFor, isNewerVersion, parseChecksum, runtimeKey } from '../../src/process/agent/wcore/wcoreUpdater';
+import {
+  assetNameFor,
+  isNewerVersion,
+  isValidReleaseTag,
+  parseChecksum,
+  runtimeKey,
+} from '../../src/process/agent/wcore/wcoreUpdater';
 
 describe('wcoreUpdater - runtimeKey', () => {
   it('joins platform and arch', () => {
@@ -51,6 +57,24 @@ describe('wcoreUpdater - isNewerVersion', () => {
     expect(isNewerVersion('0.12.3-rc.1', '0.12.2')).toBe(true);
     // Same base version with a prerelease tag is NOT treated as newer.
     expect(isNewerVersion('0.12.2-rc.2', '0.12.2')).toBe(false);
+  });
+});
+
+describe('wcoreUpdater - isValidReleaseTag', () => {
+  it('accepts well-formed release tags', () => {
+    expect(isValidReleaseTag('v0.12.2')).toBe(true);
+    expect(isValidReleaseTag('0.12.3')).toBe(true);
+    expect(isValidReleaseTag('v1.0.0-rc.1')).toBe(true);
+  });
+
+  it('rejects tags carrying shell/path metacharacters (injection guard)', () => {
+    // The single-quote breakout the security review flagged.
+    expect(isValidReleaseTag("v1.0.0'; Remove-Item C:\\ -Recurse #")).toBe(false);
+    expect(isValidReleaseTag('v1.0.0 && rm -rf /')).toBe(false);
+    expect(isValidReleaseTag('../../etc/passwd')).toBe(false);
+    expect(isValidReleaseTag('v1.0.0/../..')).toBe(false);
+    expect(isValidReleaseTag('')).toBe(false);
+    expect(isValidReleaseTag('latest')).toBe(false);
   });
 });
 
