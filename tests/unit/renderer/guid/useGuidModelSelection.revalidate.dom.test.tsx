@@ -33,6 +33,9 @@ let modelConfig: Array<{ id: string; platform: string; model: string[] }> = [];
 // fire the event the same way a real connect does.
 let listChangedHandler: (() => void) | null = null;
 
+// Mutable "Route through Flux" state the mocked systemSettings IPC returns.
+let routeThroughFlux = false;
+
 vi.mock('@/common', () => ({
   ipcBridge: {
     mode: {
@@ -47,6 +50,9 @@ vi.mock('@/common', () => ({
           };
         }),
       },
+    },
+    systemSettings: {
+      getRouteThroughFlux: { invoke: vi.fn(async () => routeThroughFlux) },
     },
     usage: {
       // No telemetry for a brand-new user.
@@ -81,6 +87,7 @@ describe('useGuidModelSelection — issue #108 first-run Flux revalidation', () 
   beforeEach(() => {
     modelConfig = [];
     listChangedHandler = null;
+    routeThroughFlux = false;
     store.clear();
   });
 
@@ -104,5 +111,49 @@ describe('useGuidModelSelection — issue #108 first-run Flux revalidation', () 
     // by the image-model `excludeFromPrimary` rule.)
     await waitFor(() => expect(result.current.currentModel?.useModel).toBe('flux-auto'));
     expect(result.current.modelList).toHaveLength(1);
+  });
+
+  it('#129 - upgrades a stale local default to flux-auto once Route through Flux is on', async () => {
+    // Repro for the live-found bug: a local Ollama model (smollm2:135m) loads
+    // into the catalog instantly and the home locks onto it. A beat later the
+    // onboarding Flux connect pins flux-auto + turns routing on. The lock used to
+    // keep the stale local pick in-session until an app restart re-read the pin.
+    modelConfig = [{ id: 'ollama', platform: 'ollama', model: ['smollm2:135m'] }];
+    const { result } = renderHook(() => useGuidModelSelection('wcore'), { wrapper });
+
+    // Cold start with only the local model present -> it wins the default.
+    await waitFor(() => expect(result.current.currentModel?.useModel).toBe('smollm2:135m'));
+
+    // Onboarding Flux connect: flux-auto becomes available, routing flips on, and
+    // the default-model pin is rewritten to flux-auto. Fire listChanged as a real
+    // connect does.
+    store.set('wcore.defaultModel', { id: 'flux-router', useModel: 'flux-auto' });
+    routeThroughFlux = true;
+    modelConfig = [
+      { id: 'ollama', platform: 'ollama', model: ['smollm2:135m'] },
+      { id: 'flux-router', platform: 'flux-router', model: ['flux-auto', 'flux-fast'] },
+    ];
+    listChangedHandler!();
+
+    // The lock must yield: the stale smollm2 default is superseded by flux-auto.
+    await waitFor(() => expect(result.current.currentModel?.useModel).toBe('flux-auto'));
+  });
+
+  it('#129 - leaves a deliberate non-flux pick alone even with Route through Flux on', async () => {
+    // The lock-yield must only promote an UNCHOSEN default to flux-auto, never
+    // override a model the user actually picked (their saved pin comes first in
+    // the resolution order).
+    store.set('wcore.defaultModel', { id: 'openai', useModel: 'gpt-5.5' });
+    routeThroughFlux = true;
+    modelConfig = [
+      { id: 'openai', platform: 'openai', model: ['gpt-5.5'] },
+      { id: 'flux-router', platform: 'flux-router', model: ['flux-auto'] },
+    ];
+    const { result } = renderHook(() => useGuidModelSelection('wcore'), { wrapper });
+
+    await waitFor(() => expect(result.current.currentModel?.useModel).toBe('gpt-5.5'));
+    // Give the flux-override path a chance to (wrongly) replace it.
+    await new Promise((r) => setTimeout(r, 40));
+    expect(result.current.currentModel?.useModel).toBe('gpt-5.5');
   });
 });

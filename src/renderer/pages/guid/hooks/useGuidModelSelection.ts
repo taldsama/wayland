@@ -12,6 +12,7 @@ import { uuid } from '@/common/utils';
 import { MARQUEE_DEFAULT_RULES } from '@renderer/utils/model/marquee';
 import { useGeminiGoogleAuthModels } from '@/renderer/hooks/agent/useGeminiGoogleAuthModels';
 import { hasAvailableModels } from '../utils/modelUtils';
+import { isFluxModelId } from '@/common/config/flux';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 
@@ -280,7 +281,26 @@ export const useGuidModelSelection = (agentKey: ProviderAgentKey = 'gemini'): Gu
       }
 
       const currentKey = selectedModelKeyRef.current || buildModelKey(currentModel?.id, currentModel?.useModel);
-      if (!agentChanged && isModelKeyAvailable(currentKey, modelList)) {
+      // #129 - a just-enabled "Route through Flux" + an available flux-auto must
+      // supersede a stale non-Flux selection. The onboarding Flux connect pins
+      // flux-auto AFTER the home already locked onto whatever model loaded first
+      // (a local Ollama smollm2:135m loads instantly; cloud catalogs + the Flux
+      // virtual models land a beat later). Without this, the lock below keeps the
+      // stale local pick in-session until an app restart re-reads the pin. When a
+      // Flux override is pending we fall through to the full resolution, which
+      // still puts the user's own saved pin first - so this only ever promotes an
+      // unchosen default to flux-auto, never overrides a deliberate pick.
+      const fluxAutoAvailable = modelList.some((p) => p.model?.includes(FLUX_AUTO_MODEL));
+      const currentIsFlux = currentModel?.useModel ? isFluxModelId(currentModel.useModel) : false;
+      let fluxOverridePending = false;
+      if (fluxAutoAvailable && !currentIsFlux) {
+        try {
+          fluxOverridePending = (await ipcBridge.systemSettings.getRouteThroughFlux.invoke()) ?? false;
+        } catch {
+          /* no override on failure - fall through to the normal lock */
+        }
+      }
+      if (!agentChanged && !fluxOverridePending && isModelKeyAvailable(currentKey, modelList)) {
         if (!selectedModelKeyRef.current && currentKey) {
           selectedModelKeyRef.current = currentKey;
         }

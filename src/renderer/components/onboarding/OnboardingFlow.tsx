@@ -278,6 +278,22 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ detection, onFinish }) 
       if (res.ok) {
         setSuccessMsg(t('onboarding.flow.key.detected', { label: providerLabel(res.providerId) }));
         setAddedProviders((prev) => (prev.includes(res.providerId) ? prev : [...prev, res.providerId]));
+        // A pasted Flux Router key is intent to route through Flux - pin Flux Auto
+        // as the default and turn routing on, exactly like the detected-at-scan
+        // and one-click Flux-door paths above. Without this the home default
+        // chain lands on whatever local model sorts first (a tiny Ollama
+        // smollm2:135m), because Ollama populates the curated list instantly
+        // while the Flux virtual models arrive a beat later (#129). Non-fatal.
+        if (res.providerId === FLUX_PROVIDER_ID) {
+          try {
+            const pin = { id: FLUX_PROVIDER_ID, useModel: FLUX_AUTO_MODEL };
+            await ConfigStorage.set('wcore.defaultModel', pin);
+            await ConfigStorage.set('gemini.defaultModel', pin);
+            await ipcBridge.systemSettings.setRouteThroughFlux.invoke({ enabled: true });
+          } catch (err) {
+            console.warn('[OnboardingFlow] flux pasted-key pin failed', err);
+          }
+        }
         return true;
       }
       setErrorMsg(
