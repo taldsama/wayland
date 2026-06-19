@@ -4,6 +4,45 @@ All notable changes to the Wayland Electron app are documented in this file. For
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-06-19
+
+### Models & providers
+
+- Redesigned provider picker: real brand logos, a bring-your-own-endpoint section up front, and full engine catalog coverage (104 providers).
+- Engine-native providers (xAI/Grok, Perplexity, OpenRouter, Groq, DeepSeek, Cerebras, NVIDIA, and more) now route natively instead of being forced through the OpenAI path (#177).
+- Sign in with Grok: xAI is spawned as the native `--provider xai`.
+- Friendly model names everywhere — the chat header and send box show "Claude Opus 4.8", not a raw model id.
+- Real brand logos in the connected-providers list (no more letter monograms).
+- Claude model picker fixed end to end (#184): it populates from the live agent, holds your selection, and actually switches the running model — pick Opus and it runs on Opus.
+- Fresh Flux connect defaults to Flux Auto instead of a local Ollama model.
+- Your model pick is kept while the provider list loads or is transiently filtered.
+- MiniMax inference uses the international host (#135); WCore/Gemini picks resolve via the registry bridge (#167, #168).
+- Unusable local vision/VLM models are hidden from the Ollama catalog.
+
+### Wayland Core engine
+
+- In-app engine updater for Wayland Core; this build bundles engine 0.12.3.
+- Egress firewall is now a user choice in the engine Security settings.
+- Engine-update archive extraction hardened against tag injection.
+
+### Channels, voice & import
+
+- Flux Voice added as a speech-to-text provider, with actionable error messages.
+- Test & Enable added to Twilio SMS settings (#185).
+- Shared 3-step, type-aware import modal wired into Assistants and Workflows.
+
+### Reliability & fixes
+
+- Transient provider HTTP faults are retried automatically.
+- ACP: a FIFO queue for pending slots, and mid-turn follow-up messages are queued instead of erroring.
+- Updater: no more false "Update available" when only IJFW needs attention; IJFW reports healthy for directory/symlink installs (#178, #179).
+- Headless/remote: file-key JWT secret is decrypted so WebSocket verification matches (#155), a headless Flux key registers as flux-router, a remote WebUI can resolve the chat-start model, the WebSocket reconnect storm on auth expiry is fixed, a fresh chat auto-picks a recommended model on cold start, and the installer ensures `libasound2` so the bundled engine starts on a fresh box.
+- Skills import hardened: recursive mkdir, builtin-shadowing guard, and frontmatter validation.
+- Standalone mode wires the missing project/team/skills bridge inits (#76).
+- Assigned chats are hidden from global recents (#77); macOS detection improved (#97).
+- Mobile WebUI: the Assistants filter rail stacks (#153) and library header actions wrap (#154).
+- App data is removed on Windows uninstall (#138); the Effort submenu is opaque so it no longer overlaps the model list.
+
 ### IJFW v0.6.3 - system service + first-boot install (Wave 1)
 
 - New `src/process/services/ijfwSystemService.ts` replaces the previous
