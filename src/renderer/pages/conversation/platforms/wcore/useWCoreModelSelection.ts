@@ -6,6 +6,7 @@
 
 import type { IProvider, TProviderWithModel } from '@/common/config/storage';
 import { useModelProviderList } from '@/renderer/hooks/agent/useModelProviderList';
+import { useModelDisplayName } from '@/renderer/hooks/agent/useModelDisplayName';
 import { isFluxModelId } from '@/common/config/flux';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -37,8 +38,12 @@ export const useWCoreModelSelection = ({
     connectedProviders: allConnectedProviders,
     isLoading: providerListLoading,
     getAvailableModels,
-    formatModelLabel,
   } = useModelProviderList();
+
+  // Resolve a picked model id to its catalog display name ("Claude Haiku 4.5"),
+  // the same source the picker reads. The legacy `formatModelLabel` only knew
+  // Flux aliases, so a real model surfaced its raw id in the header + send box.
+  const resolveModelDisplayName = useModelDisplayName('wcore');
 
   // WaylandCLI does not support Google Auth - filter it out
   const providers = useMemo(
@@ -128,11 +133,11 @@ export const useWCoreModelSelection = ({
   const getDisplayModelName = useCallback(
     (modelName?: string) => {
       if (!modelName) return '';
-      const label = formatModelLabel(currentModel, modelName);
+      const label = resolveModelDisplayName(modelName);
       const maxLength = 20;
       return label.length > maxLength ? `${label.slice(0, maxLength)}...` : label;
     },
-    [currentModel, formatModelLabel]
+    [resolveModelDisplayName]
   );
 
   return {

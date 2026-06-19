@@ -16,7 +16,6 @@ import classNames from 'classnames';
 import useSWR from 'swr';
 import { ipcBridge } from '@/common';
 import type { IProvider } from '@/common/config/storage';
-import { FLUX_MODEL_DISPLAY, isFluxModelId, type FluxModelId } from '@/common/config/flux';
 import ModelSelectorFlyout from '@renderer/components/model/modelSelector/ModelSelectorFlyout';
 import {
   resolveActiveModelKey,
@@ -25,10 +24,7 @@ import {
 import { useModelSelectorViewModel } from '@renderer/components/model/modelSelector/useModelSelectorViewModel';
 import { useModelEffort } from '@renderer/components/model/modelSelector/useModelEffort';
 import { usePinnedModels } from '@renderer/hooks/usage/usePinnedModels';
-
-/** Render a Flux routing alias (flux-auto, ...) as its brand name ("Flux Auto"). */
-const toDisplayName = (modelName: string): string =>
-  isFluxModelId(modelName) ? FLUX_MODEL_DISPLAY[modelName as FluxModelId] : modelName;
+import { useModelDisplayName } from '@renderer/hooks/agent/useModelDisplayName';
 
 const WCoreModelSelector: React.FC<{
   selection?: WCoreModelSelection;
@@ -59,6 +55,7 @@ const WCoreModelSelector: React.FC<{
     [modelConfig, currentSelection?.id, currentSelection?.useModel]
   );
   const vm = useModelSelectorViewModel('wcore', activeModelKey);
+  const resolveModelDisplayName = useModelDisplayName('wcore');
   const { toggle } = usePinnedModels(true);
   const { effort, setEffort } = useModelEffort(conversationId ?? '');
 
@@ -107,7 +104,7 @@ const WCoreModelSelector: React.FC<{
 
   const label = getModelDisplayLabel({
     selectedValue: currentModel?.useModel,
-    selectedLabel: currentModel?.useModel ? toDisplayName(currentModel.useModel) : '',
+    selectedLabel: currentModel?.useModel ? resolveModelDisplayName(currentModel.useModel) : '',
     defaultModelLabel,
     fallbackLabel: t('conversation.welcome.selectModel'),
   });
