@@ -7,6 +7,8 @@
 import type { TProviderWithModel } from '@/common/config/storage';
 import { isOpenAIHost } from '@/common/utils/urlValidation';
 import { loadBaselineProviderCatalog } from '@process/providers/catalog/providerCatalogStore';
+import { PROVIDER_ENV_VARS } from '@process/providers/detection/KeyDiscovery';
+import type { ProviderId } from '@process/providers/types';
 import { getEnhancedEnv } from '@process/utils/shellEnv';
 
 /**
@@ -90,14 +92,65 @@ function catalogIdFor(model: TProviderWithModel): string | undefined {
 }
 
 /**
- * Whether a model is xAI / Grok, so it routes to the engine's native `xai`
- * provider. xAI is stored as a generic `openai-compatible` provider (api.x.ai),
- * so its identity survives only in the registry bridge tag `v2:xai`. The
- * `platform === 'xai'` arm is forward-compat for a future direct-platform store.
+ * Engine-native providers (#177). The app persists these as generic
+ * `openai-compatible` rows (their real base URL lives only in the model
+ * registry, stripped from the legacy bridge row), so without this they collapse
+ * to `--provider openai` and the engine presents the key to api.openai.com -> a
+ * false 401 (the Perplexity symptom in #177).
+ *
+ * The bundled wcore (0.12.2) resolves each of these slugs natively from its own
+ * baked provider catalog: passing `--provider <id>` lets the engine own the
+ * base URL + scoped key (e.g. Perplexity -> api.perplexity.ai with
+ * PERPLEXITY_API_KEY). Every slug here is accepted by the 0.12.2 binary as a
+ * `--provider` value and has a canonical key env var in {@link PROVIDER_ENV_VARS}
+ * (the single, models.dev-checked source of truth - reused so the two tables
+ * can never diverge, which is the exact failure class behind #177).
+ *
+ * Generalizes the original one-off xai arm: xai stays in the set (same routing),
+ * and the engine additionally refreshes a Grok OAuth bearer when one exists,
+ * ignoring XAI_API_KEY in that case.
  */
-function isXaiModel(model: TProviderWithModel): boolean {
+const NATIVE_ENGINE_PROVIDER_IDS = [
+  'xai',
+  'perplexity',
+  'openrouter',
+  'groq',
+  'mistral',
+  'cohere',
+  'deepseek',
+  'together',
+  'fireworks',
+  'cerebras',
+  'nvidia',
+] as const;
+const NATIVE_ENGINE_PROVIDER_SET: ReadonlySet<string> = new Set(NATIVE_ENGINE_PROVIDER_IDS);
+
+/**
+ * The engine-native provider id for a model, or `undefined`. Mirrors
+ * {@link catalogIdFor}: the id survives only in the `v2:<id>` registry bridge
+ * tag (the legacy `platform` collapses to `openai-compatible`); the
+ * `platform === '<id>'` arm is forward-compat for a future direct-platform
+ * store. Validated against {@link NATIVE_ENGINE_PROVIDER_SET} so an unrecognized
+ * id never reaches `--provider`.
+ */
+function nativeEngineProviderId(model: TProviderWithModel): string | undefined {
   const tag = (model as unknown as Record<string, unknown>).__waylandModelRegistryBridge;
-  return tag === 'v2:xai' || model.platform === 'xai';
+  if (typeof tag === 'string' && tag.startsWith('v2:')) {
+    const id = tag.slice('v2:'.length);
+    if (NATIVE_ENGINE_PROVIDER_SET.has(id)) return id;
+  }
+  if (model.platform && NATIVE_ENGINE_PROVIDER_SET.has(model.platform)) return model.platform;
+  return undefined;
+}
+
+/**
+ * The scoped key env var for an engine-native provider value (e.g.
+ * `perplexity` -> `PERPLEXITY_API_KEY`), or `undefined` if `provider` is not a
+ * native engine provider. Sourced from {@link PROVIDER_ENV_VARS}.
+ */
+function nativeEngineEnvVar(provider: WCoreProvider): string | undefined {
+  if (!NATIVE_ENGINE_PROVIDER_SET.has(provider)) return undefined;
+  return PROVIDER_ENV_VARS[provider as ProviderId]?.[0];
 }
 
 /**
@@ -112,13 +165,12 @@ function mapProvider(model: TProviderWithModel): WCoreProvider {
   const catalogId = catalogIdFor(model);
   if (catalogId) return catalogId;
 
-  // xAI / Grok: route to the engine's NATIVE `xai` provider (0.12.2+) instead of
-  // the generic openai+base-url path. Only `--provider xai` gets the engine's
-  // Grok OAuth token refresh, the grok-4.3 stop-param fix, and the
-  // auth_required/auth_invalid codes. xAI is persisted as platform
-  // 'openai-compatible' (api.x.ai), so the only surviving identity carrier here
-  // is the registry bridge tag `v2:xai`.
-  if (isXaiModel(model)) return 'xai';
+  // Engine-native providers (xai, perplexity, openrouter, groq, ...): route to
+  // the engine's native slug so it owns the base URL + scoped key, instead of
+  // the generic openai+base-url path that 401s against api.openai.com (#177).
+  // xai additionally gets the engine's Grok OAuth refresh + grok-4.3 stop fix.
+  const nativeId = nativeEngineProviderId(model);
+  if (nativeId) return nativeId;
 
   // Special handling for new-api: respect per-model protocol setting
   if (model.platform === 'new-api' && model.useModel && model.modelProtocols) {
@@ -293,6 +345,18 @@ export function buildSpawnConfig(
     return { args, env, projectConfig, resolvedMaxTokens };
   }
 
+  // Engine-native providers (#177): the app persists these as openai-compatible
+  // but the bundled engine resolves <id> -> base_url + scoped key from its own
+  // baked catalog. Set ONLY the scoped env var (e.g. PERPLEXITY_API_KEY) and pass
+  // NO --base-url, so the engine routes to the provider's real host instead of
+  // api.openai.com. Mirrors the catalog block above.
+  const nativeEnvVar = nativeEngineEnvVar(provider);
+  if (nativeEnvVar !== undefined) {
+    if (model.apiKey) env[nativeEnvVar] = model.apiKey;
+    const projectConfig = buildProjectConfig(model, provider);
+    return { args, env, projectConfig, resolvedMaxTokens };
+  }
+
   switch (provider) {
     case 'anthropic':
       if (model.apiKey) env.ANTHROPIC_API_KEY = model.apiKey;
@@ -305,15 +369,6 @@ export function buildSpawnConfig(
       if (baseUrl) args.push('--base-url', stripTrailingV1(baseUrl));
       break;
     }
-
-    case 'xai':
-      // Native xAI/Grok provider (engine 0.12.2+). The engine owns api.x.ai as
-      // its default base URL and, when a Grok OAuth credential exists (its own
-      // store or ~/.grok/auth.json), drives a self-refreshing bearer - so pass
-      // NO `--base-url`. `XAI_API_KEY` carries the plain-key case; the engine
-      // ignores it when an OAuth credential is present and refreshes instead.
-      if (model.apiKey) env.XAI_API_KEY = model.apiKey;
-      break;
 
     case 'bedrock': {
       const bc = (model as TProviderWithModel & { bedrockConfig?: any }).bedrockConfig;

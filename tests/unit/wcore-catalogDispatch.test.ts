@@ -175,3 +175,77 @@ describe('buildSpawnConfig - catalog provider dispatch (T3.5)', () => {
     expect(env.NOVITA_API_KEY).toBe('sk-z');
   });
 });
+
+/**
+ * #177 - Generalized engine-native provider routing. The app persists these as
+ * generic `openai-compatible` rows (real base URL stripped from the legacy
+ * bridge row), so the identity survives only in the `v2:<id>` tag. Each must
+ * reach the engine as `--provider <id>` with its scoped key env var and NO
+ * `--base-url`, so the engine routes to the provider's real host instead of
+ * collapsing to api.openai.com (the false 401 in #177). Mirrors the xai tests.
+ */
+describe('buildSpawnConfig - engine-native provider routing (#177)', () => {
+  // [providerId, scoped env var] - mirrors PROVIDER_ENV_VARS (the source of truth).
+  const NATIVE: ReadonlyArray<readonly [string, string]> = [
+    ['perplexity', 'PERPLEXITY_API_KEY'],
+    ['openrouter', 'OPENROUTER_API_KEY'],
+    ['groq', 'GROQ_API_KEY'],
+    ['mistral', 'MISTRAL_API_KEY'],
+    ['cohere', 'COHERE_API_KEY'],
+    ['deepseek', 'DEEPSEEK_API_KEY'],
+    ['together', 'TOGETHER_API_KEY'],
+    ['fireworks', 'FIREWORKS_API_KEY'],
+    ['cerebras', 'CEREBRAS_API_KEY'],
+    ['nvidia', 'NVIDIA_API_KEY'],
+  ];
+
+  it.each(NATIVE)('routes %s via the v2 bridge tag as --provider %s with the scoped key, NO --base-url', (id, envVar) => {
+    // Persisted exactly as the legacy bridge stores it: platform collapses to
+    // 'openai-compatible', a non-empty (but wrong-for-engine) base URL is
+    // present, and the only identity carrier is the `v2:<id>` tag.
+    const model: TProviderWithModel = {
+      id: 'native-uuid',
+      platform: 'openai-compatible',
+      name: id,
+      baseUrl: 'https://example.invalid/v1',
+      apiKey: `${id}-secret`,
+      useModel: 'some-model',
+      __waylandModelRegistryBridge: `v2:${id}`,
+    } as TProviderWithModel;
+    const { args, env } = buildSpawnConfig(model, OPTS);
+
+    expect(providerArg(args)).toBe(id);
+    expect(hasBaseUrl(args)).toBe(false);
+    expect(env[envVar]).toBe(`${id}-secret`);
+    // Must NOT leak to the shared OpenAI key (the #177 root cause).
+    expect(env.OPENAI_API_KEY).toBeUndefined();
+  });
+
+  it.each(NATIVE)('routes %s stored directly as the platform (forward-compat) as --provider %s', (id, envVar) => {
+    const { args, env } = buildSpawnConfig(makeNativeModel(id, `${id}-key`), OPTS);
+
+    expect(providerArg(args)).toBe(id);
+    expect(hasBaseUrl(args)).toBe(false);
+    expect(env[envVar]).toBe(`${id}-key`);
+    expect(env.OPENAI_API_KEY).toBeUndefined();
+  });
+
+  it('reproduces #177: a Perplexity pplx- key no longer routes to --provider openai', () => {
+    const model: TProviderWithModel = {
+      id: 'pplx-uuid',
+      platform: 'openai-compatible',
+      name: 'Perplexity',
+      baseUrl: '',
+      apiKey: 'pplx-realkey',
+      useModel: 'sonar-pro',
+      __waylandModelRegistryBridge: 'v2:perplexity',
+    } as TProviderWithModel;
+    const { args, env } = buildSpawnConfig(model, OPTS);
+
+    expect(providerArg(args)).toBe('perplexity');
+    expect(env.PERPLEXITY_API_KEY).toBe('pplx-realkey');
+    // The bug: key landed in OPENAI_API_KEY -> api.openai.com -> 401. Never again.
+    expect(env.OPENAI_API_KEY).toBeUndefined();
+    expect(hasBaseUrl(args)).toBe(false);
+  });
+});
