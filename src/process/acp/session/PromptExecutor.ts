@@ -67,6 +67,12 @@ export class PromptExecutor {
     const { lifecycle } = this.host;
     if (!lifecycle.client || !lifecycle.sessionId) return;
 
+    // New user prompt = new logical response. Open a fresh dedup window so an
+    // identical consecutive prompt still emits, while keeping the doubling
+    // dedup (#184) scoped to this single turn (which may span onTurnEnd + a
+    // late real-id full-text restate).
+    this.host.messageTranslator.onTurnStart();
+
     this.host.setStatus('prompting');
 
     try {

@@ -145,4 +145,82 @@ describe('MessageTranslator', () => {
     ]);
     expect(Array.from(byId.values())).toEqual(['Hello world']);
   });
+
+  // ─── Safe-variant doubling dedup (#184: scenarios A / B / D + identical turns) ───
+
+  // Sum ALL emitted text deltas (any msg_id) into the single visible string the
+  // user sees for the assistant's reply.
+  const visible = (
+    translator: MessageTranslator,
+    chunks: Array<{ kind?: 'text' | 'tool' | 'plan'; messageId?: string; text?: string }>
+  ): string => {
+    let out = '';
+    for (const c of chunks) {
+      let notif: SessionNotification;
+      if (c.kind === 'tool') {
+        notif = {
+          sessionId: 's1',
+          update: { sessionUpdate: 'tool_call', toolCallId: 'tc-x', title: 'run', rawInput: {} },
+        } as unknown as SessionNotification;
+      } else if (c.kind === 'plan') {
+        notif = {
+          sessionId: 's1',
+          update: { sessionUpdate: 'plan', entries: [{ content: 'step', status: 'pending' }] },
+        } as unknown as SessionNotification;
+      } else {
+        notif = {
+          sessionId: 's1',
+          update: {
+            sessionUpdate: 'agent_message_chunk',
+            messageId: c.messageId,
+            content: { type: 'text', text: c.text ?? '' },
+          },
+        } as unknown as SessionNotification;
+      }
+      for (const m of translator.translate(notif)) {
+        if (m.type === 'text') out += (m.content as { content: string }).content;
+      }
+    }
+    return out;
+  };
+
+  it('Scenario A: turn-end wipe then late real-id full-text restate does not double', () => {
+    const translator = new MessageTranslator();
+    let out = visible(translator, [{ messageId: undefined, text: 'reply with exactly X' }]);
+    translator.onTurnEnd();
+    out += visible(translator, [{ messageId: 'msg_real', text: 'reply with exactly X' }]);
+    expect(out).toBe('reply with exactly X');
+  });
+
+  it('Scenario B: Flux non-prefix restate of the full text does not double', () => {
+    const translator = new MessageTranslator();
+    const out = visible(translator, [
+      { messageId: 'a', text: 'Done.' },
+      { messageId: 'b', text: 'Done.' },
+    ]);
+    expect(out).toBe('Done.');
+  });
+
+  it('Scenario D: plan/tool clear then full-text restate does not double', () => {
+    const translator = new MessageTranslator();
+    const out = visible(translator, [
+      { messageId: 'm1', text: 'Building the thing.' },
+      { kind: 'plan' },
+      { kind: 'tool' },
+      { messageId: 'm2', text: 'Building the thing.' },
+    ]);
+    expect(out).toBe('Building the thing.');
+  });
+
+  it('Safe-variant: two separate identical user-prompt turns BOTH emit', () => {
+    const translator = new MessageTranslator();
+    translator.onTurnStart();
+    const out1 = visible(translator, [{ messageId: 'm1', text: 'X' }]);
+    translator.onTurnEnd();
+    translator.onTurnStart();
+    const out2 = visible(translator, [{ messageId: 'm2', text: 'X' }]);
+    translator.onTurnEnd();
+    expect(out1).toBe('X');
+    expect(out2).toBe('X');
+  });
 });

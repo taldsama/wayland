@@ -81,6 +81,16 @@ export class MessageTranslator {
   private accumulated = new Map<string, string>();
   /** last SDK messageId seen this turn, so undefined-id chunks join the right message */
   private lastMessageId: string | null = null;
+  /**
+   * Full visible agent text emitted so far in the CURRENT logical response.
+   * Spans the onTurnEnd wipe and mid-turn tool/plan clears (so a late real-id
+   * full-text restate is recognized as a duplicate), but is reset at the START
+   * of each new user prompt via onTurnStart() — so two separate identical
+   * prompts both emit (#184 doubling).
+   */
+  private lastEmittedText = '';
+  /** Same dedup window, tracked separately for thought chunks. */
+  private lastEmittedThought = '';
 
   constructor(private readonly conversationId: string) {}
 
@@ -120,10 +130,23 @@ export class MessageTranslator {
     this.lastMessageId = null;
   }
 
+  /**
+   * Called at the START of each new user prompt (PromptExecutor.execute).
+   * Opens a fresh dedup window so a genuinely new turn whose text is
+   * byte-identical to the previous turn still emits. Does NOT touch
+   * messageMap/accumulated — onTurnEnd already cleared those.
+   */
+  onTurnStart(): void {
+    this.lastEmittedText = '';
+    this.lastEmittedThought = '';
+  }
+
   reset(): void {
     this.messageMap.clear();
     this.accumulated.clear();
     this.lastMessageId = null;
+    this.lastEmittedText = '';
+    this.lastEmittedThought = '';
   }
 
   /** Get or create a stable UUID for a SDK messageId within the current turn. */
@@ -153,6 +176,25 @@ export class MessageTranslator {
     }
     this.accumulated.set(msgId, prev + text);
     return text;
+  }
+
+  /**
+   * Safe cross-message dedup for the doubling bug (#184). `fullMsgText` is this
+   * message's full accumulated text; `delta` is what the handler would emit.
+   * Compares against the running visible text of the whole logical response
+   * (`window`) so a late full-text restate under a fresh msg_id (after the
+   * onTurnEnd wipe, a Flux non-prefix restate, or a plan/tool clear) emits
+   * nothing. Returns the delta to actually emit ('' = suppress) + the new window.
+   *
+   * It does NOT dedup across user prompts: onTurnStart() resets `window` to ''
+   * at the start of every turn, so an identical NEW prompt sees window='',
+   * fails the restate check, and emits normally.
+   */
+  private dedupAgainstWindow(window: string, fullMsgText: string, delta: string): { emit: string; window: string } {
+    if (fullMsgText && (window === fullMsgText || window.endsWith(fullMsgText))) {
+      return { emit: '', window };
+    }
+    return { emit: delta, window: window + delta };
   }
 
   /**
@@ -189,13 +231,18 @@ export class MessageTranslator {
     const delta = this.netNewDelta(msgId, text);
     if (!delta) return [];
 
+    const fullMsgText = this.accumulated.get(msgId) ?? '';
+    const { emit, window } = this.dedupAgainstWindow(this.lastEmittedText, fullMsgText, delta);
+    this.lastEmittedText = window;
+    if (!emit) return [];
+
     return [
       {
         id: msgId,
         msg_id: msgId,
         conversation_id: this.conversationId,
         type: 'text',
-        content: { content: delta },
+        content: { content: emit },
         position: 'left',
         status: 'work',
       },
@@ -211,13 +258,18 @@ export class MessageTranslator {
     const delta = this.netNewDelta(msgId, text);
     if (!delta) return [];
 
+    const fullMsgText = this.accumulated.get(msgId) ?? '';
+    const { emit, window } = this.dedupAgainstWindow(this.lastEmittedThought, fullMsgText, delta);
+    this.lastEmittedThought = window;
+    if (!emit) return [];
+
     return [
       {
         id: msgId,
         msg_id: msgId,
         conversation_id: this.conversationId,
         type: 'thinking',
-        content: { content: delta, status: 'thinking' },
+        content: { content: emit, status: 'thinking' },
         position: 'left',
         status: 'work',
       },
