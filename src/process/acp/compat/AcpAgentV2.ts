@@ -369,7 +369,22 @@ export class AcpAgentV2 {
       },
 
       onModelUpdate: (model: ModelSnapshot) => {
-        this.cachedModelInfo = toAcpModelInfo(model);
+        const next = toAcpModelInfo(model);
+
+        // The claude-agent-acp bridge periodically emits a model snapshot with an
+        // EMPTY model list (notably under subscription/OAuth auth). Adopting it
+        // would wipe cachedModelInfo and push an empty acp_model_info to the
+        // renderer, reverting the in-chat picker to "Select Model" a moment after
+        // a selection (#184). Keep the last good info when the update is empty.
+        if (next.availableModels.length === 0 && this.cachedModelInfo?.availableModels.length) {
+          if (this.modelOp) {
+            this.resolveOp(this.modelOp, this.cachedModelInfo);
+            this.modelOp = null;
+          }
+          return;
+        }
+
+        this.cachedModelInfo = next;
 
         // Resolve modelOp if pending
         if (this.modelOp) {
