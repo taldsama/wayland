@@ -1,6 +1,14 @@
 {
   "_comment": "Authoritative SHA-256 checksums for bundled wayland-core release archives (the downloaded .tar.gz / .zip assets), keyed by release tag then asset filename. Mirrors scripts/bundled-bun-shasums.json. Source of truth: the SHASUMS published alongside each signed FerroxLabs/wayland-core release. The downloaded archive is verified against this file BEFORE it is extracted, copied, or executed. Update this file in lockstep with DEFAULT_WCORE_VERSION in scripts/prepareWaylandCore.js and regenerate on every engine version bump.",
   "_ownerAction": "Fill in the canonical per-platform archive SHA-256 values from the signed wayland-core release for each tag below. Until the real values are present, release builds (CI=1 / npm_config_production / NODE_ENV=production without WCORE_ALLOW_UNVERIFIED=1) will fail closed on a missing entry. The 'PENDING-...' placeholders are intentionally invalid 64-hex strings so they can never accidentally match a real artifact.",
+  "v0.12.3": {
+    "wayland-core-v0.12.3-aarch64-apple-darwin.tar.gz": "sha256:9f79bd8e8c18d0517a8ef03845ffb2de9e4c5f6779cbba5a618f180e41613cf9",
+    "wayland-core-v0.12.3-x86_64-apple-darwin.tar.gz": "sha256:eb85307f81f395723b85ef54bfeadd9d6de2802580b8817d24a40fc41cc01869",
+    "wayland-core-v0.12.3-aarch64-unknown-linux-gnu.tar.gz": "sha256:00e0654f61c8ef42b7abba99929b4bdad43705bed7c5bd365bf7826330b898ac",
+    "wayland-core-v0.12.3-x86_64-unknown-linux-gnu.tar.gz": "sha256:5906d09d8e68935edf1f86bc8d15d3b160f8b03638ad6e1f1f5c563213aa0bc3",
+    "wayland-core-v0.12.3-aarch64-pc-windows-msvc.zip": "sha256:9b41881647a04dc6390c836ceaaee3b3a78da6f54ba11d3911252639410131ea",
+    "wayland-core-v0.12.3-x86_64-pc-windows-msvc.zip": "sha256:dc7e41ed0444c311e4538f6b9126a4d211ccf4cd43c03ce20510cd89529c8520"
+  },
   "v0.12.2": {
     "wayland-core-v0.12.2-aarch64-apple-darwin.tar.gz": "sha256:be6bc58a7d5123ba88f9d377465b1543ee0a32e15086b54ebd828d504a39b28d",
     "wayland-core-v0.12.2-x86_64-apple-darwin.tar.gz": "sha256:9d7fe741cef936c1dc49d2ce11b02865091247d87392c6c187d71d76b4cc9137",
