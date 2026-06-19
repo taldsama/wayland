@@ -5,6 +5,7 @@ import type { IModelRegistryProviderView } from '@/common/adapter/ipcBridge';
 import type { ConnectError, CuratedModel } from '@process/providers/types';
 import { useModelRegistry } from '@renderer/hooks/useModelRegistry';
 import FluxRouterMark from '@renderer/components/icons/FluxRouterMark';
+import ProviderLogo from '@renderer/components/model/ProviderLogo';
 import { providerMeta } from '../providerCatalog';
 import { defaultOnIds, enabledCount, mergeCatalogRows } from './bulkToggle';
 import styles from '../ModelsSettings.module.css';
@@ -151,13 +152,7 @@ const ConnectedRow: React.FC<Props> = ({ provider, onManage, onFix }) => {
           <FluxRouterMark size={20} />
         </div>
       ) : (
-        <div
-          className={styles.avatar}
-          style={{ background: meta.bg, color: meta.darkText ? '#1a1a1a' : '#fff' }}
-          aria-hidden
-        >
-          {meta.mono}
-        </div>
+        <ProviderLogo id={meta.id} mono={meta.mono} bg={meta.bg} darkText={meta.darkText} size={34} />
       )}
 
       <div className='min-w-0'>
