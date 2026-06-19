@@ -192,6 +192,11 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
+  # #138: wipe the app's per-user data (config, cache, DB) on uninstall so a later
+  # reinstall starts clean instead of a stale DB shadowing the new build. Scope is
+  # the Electron userData dirs only; home dotfiles (~/.wayland, ~/.codex, ~/.grok)
+  # are user-owned and intentionally left in place.
+  deleteAppDataOnUninstall: true
   artifactName: ${productName}-${version}-${os}-${arch}.${ext}
   differentialPackage: false
 
