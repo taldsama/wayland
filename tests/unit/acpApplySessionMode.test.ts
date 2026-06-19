@@ -53,6 +53,14 @@ vi.mock('../../src/process/agent/acp/ApprovalStore', () => ({
 vi.mock('../../src/process/agent/acp/utils', () => ({
   getClaudeModel: vi.fn().mockReturnValue(null),
   getClaudeModelSlot: vi.fn().mockReturnValue(null),
+  buildClaudeSlotModelInfo: vi.fn(() => ({
+    currentModelId: 'sonnet',
+    currentModelLabel: 'Sonnet',
+    availableModels: [{ id: 'sonnet', label: 'Sonnet' }],
+    canSwitch: true,
+    source: 'models',
+    sourceDetail: 'claude-slots',
+  })),
   killChild: vi.fn(),
   readTextFile: vi.fn(),
   writeJsonRpcMessage: vi.fn(),

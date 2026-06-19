@@ -298,10 +298,14 @@ describe('ApiProviderSource', () => {
       // Surface the rejection so an unhandled-rejection warning is not emitted.
       const assertion = expect(pending).rejects.toMatchObject({ code: 'offline' });
 
-      // Advance past the 15s fetch-timeout constant - the setTimeout fires and aborts.
-      await vi.advanceTimersByTimeAsync(15_000);
+      // fetchWithRetry runs 3 attempts: each 15s per-attempt timeout aborts the
+      // hung fetch, then a bounded backoff precedes the next attempt. Advance
+      // through every attempt + backoff so the retry budget is spent and the
+      // final AbortError surfaces as `offline` (3*15s timeouts + 2 backoffs,
+      // padded for jitter). This is fake time, so the test still runs in ms.
+      await vi.advanceTimersByTimeAsync(60_000);
       await assertion;
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
     } finally {
       vi.useRealTimers();
     }

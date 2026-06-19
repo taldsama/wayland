@@ -62,6 +62,12 @@ vi.mock('../../../../src/common', () => ({
       activate: { invoke: () => Promise.resolve({ ok: true }) },
       delete: { invoke: () => Promise.resolve({ ok: true }) },
     },
+    // In-app engine updater (Overview pane "update available" card).
+    wcoreUpdate: {
+      check: { invoke: () => Promise.resolve(null) },
+      install: { invoke: () => Promise.resolve({ ok: true }) },
+      progress: { on: () => () => {} },
+    },
   },
 }));
 
