@@ -470,7 +470,7 @@ const getIjfwUpdateStatus = async (): Promise<UpdateCheckResult['ijfw']> => {
       cliOnPath: local.cliOnPath,
       mcpServerPath: local.mcpServerPath,
       commandPath,
-      pathHealthy: Boolean(local.cliOnPath),
+      pathHealthy: Boolean(local.cliOnPath) || local.detectedVia === 'directory' || local.detectedVia === 'symlink',
     };
   } catch (err) {
     return {

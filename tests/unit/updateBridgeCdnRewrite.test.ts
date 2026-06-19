@@ -149,7 +149,8 @@ describe('updateBridge GitHub asset URLs', () => {
         currentVersion: '1.5.6',
         latestVersion: '1.6.0',
         updateAvailable: true,
-        pathHealthy: false,
+        // #179: a directory install is healthy (cliOnPath need not be separately set).
+        pathHealthy: true,
       });
       const assets = result.data?.latest?.assets ?? [];
       expect(assets.length).toBe(3);
