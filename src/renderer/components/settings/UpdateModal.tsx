@@ -38,6 +38,9 @@ const UpdateModal: React.FC = () => {
   // Whether electron-updater auto-update is available (determined automatically, not user-controllable)
   const [autoUpdateAvailable, setAutoUpdateAvailable] = useState(false);
   const [autoUpdateInfo, setAutoUpdateInfo] = useState<{ version: string; releaseNotes?: string } | null>(null);
+  // True only when a genuine Desktop app update exists (auto-update or manual updateAvailable===true).
+  // IJFW-only conditions must NOT set this true.
+  const [waylandUpdateAvailable, setWaylandUpdateAvailable] = useState(false);
 
   const resetState = () => {
     setStatus('checking');
@@ -52,13 +55,14 @@ const UpdateModal: React.FC = () => {
     setIjfwActionPending(false);
     setAutoUpdateAvailable(false);
     setAutoUpdateInfo(null);
+    setWaylandUpdateAvailable(false);
   };
 
   const includePrerelease = useMemo(() => localStorage.getItem('update.includePrerelease') === 'true', [visible]);
   const hasCompatibleManualAsset = Boolean(updateInfo?.recommendedAsset);
   const hasIjfwUpdate = Boolean(ijfwStatus?.installed && ijfwStatus.updateAvailable);
   const hasIjfwPathIssue = Boolean(ijfwStatus?.installed && !ijfwStatus.pathHealthy);
-  const hasWaylandUpdate = Boolean(updateInfo || autoUpdateInfo || autoUpdateAvailable);
+  const hasWaylandUpdate = waylandUpdateAvailable || autoUpdateAvailable;
 
   const openReleasePage = () => {
     if (!releasePageUrl) return;
@@ -102,6 +106,7 @@ const UpdateModal: React.FC = () => {
           setUpdateInfo(res.data.latest);
           setReleasePageUrl(res.data.latest.htmlUrl || '');
         }
+        setWaylandUpdateAvailable(true);
         setStatus('available');
         return;
       }
@@ -113,19 +118,23 @@ const UpdateModal: React.FC = () => {
         if (!res.data.latest.recommendedAsset) {
           setErrorMsg(t('update.noCompatibleAssetManual'));
         }
+        setWaylandUpdateAvailable(true);
         setStatus('available');
         return;
       }
 
       if (res.data?.ijfw?.updateAvailable || (res.data?.ijfw?.installed && !res.data.ijfw.pathHealthy)) {
+        // IJFW-only condition: populate display metadata but do NOT set waylandUpdateAvailable
         setUpdateInfo(res.data?.latest || null);
         setReleasePageUrl(res.data?.latest?.htmlUrl || '');
+        setWaylandUpdateAvailable(false);
         setStatus('available');
         return;
       }
 
       setUpdateInfo(res.data?.latest || null);
       setReleasePageUrl(res.data?.latest?.htmlUrl || '');
+      setWaylandUpdateAvailable(false);
       setStatus('upToDate');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -299,6 +308,7 @@ const UpdateModal: React.FC = () => {
           break;
         case 'available':
           setAutoUpdateAvailable(true);
+          setWaylandUpdateAvailable(true);
           setAutoUpdateInfo({
             version: evt.version || '',
             releaseNotes: evt.releaseNotes,
