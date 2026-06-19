@@ -1079,7 +1079,8 @@ export type AcpModelInfoSourceDetail =
   | 'acp-config-option'
   | 'acp-models'
   | 'persisted-model'
-  | 'codex-stream';
+  | 'codex-stream'
+  | 'claude-slots';
 
 export interface AcpModelInfo {
   /** Currently active model ID */

@@ -6,6 +6,7 @@
 
 import type { ChildProcess } from 'child_process';
 import { execFile as execFileCb } from 'child_process';
+import type { AcpModelInfo } from '@/common/types/acpTypes';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import { promises as fsAsync } from 'fs';
@@ -263,6 +264,41 @@ export function getClaudeModelSlot(): 'default' | 'opus' | 'haiku' | null {
   const model = settings?.model?.trim().toLowerCase();
   if (model === 'sonnet') return 'default';
   return model === 'default' || model === 'opus' || model === 'haiku' ? model : null;
+}
+
+/**
+ * The Claude Code model slots Wayland exposes when the ACP bridge returns no
+ * model list of its own. The claude-agent-acp bridge enumerates models from the
+ * Claude Agent SDK init result, but that list comes back EMPTY for some auth
+ * modes (notably Claude subscription / OAuth), leaving the in-chat picker stuck
+ * on a dead "Select Model" (issue #184). Each id here is a valid `--model` /
+ * `ANTHROPIC_MODEL` alias (verified live against the claude CLI: `--model opus`
+ * and `ANTHROPIC_MODEL=opus` both resolve to claude-opus-4-8), so the pick
+ * applies via the bridge `set_model` and is honored on a (re)spawn + `--resume`.
+ */
+export const CLAUDE_SLOT_MODELS: ReadonlyArray<{ id: string; label: string }> = [
+  { id: 'sonnet', label: 'Sonnet' },
+  { id: 'opus', label: 'Opus' },
+  { id: 'haiku', label: 'Haiku' },
+];
+
+/**
+ * Build the static Claude slot model catalog (Sonnet / Opus / Haiku) used as a
+ * fallback when the bridge advertises no models. `currentModelId` reflects the
+ * user's pick; unknown/absent values default to Sonnet.
+ */
+export function buildClaudeSlotModelInfo(currentModelId?: string | null): AcpModelInfo {
+  const current =
+    currentModelId && CLAUDE_SLOT_MODELS.some((m) => m.id === currentModelId) ? currentModelId : 'sonnet';
+  const label = CLAUDE_SLOT_MODELS.find((m) => m.id === current)?.label ?? current;
+  return {
+    currentModelId: current,
+    currentModelLabel: label,
+    availableModels: CLAUDE_SLOT_MODELS.map((m) => ({ id: m.id, label: m.label })),
+    canSwitch: true,
+    source: 'models',
+    sourceDetail: 'claude-slots',
+  };
 }
 
 // --- CodeBuddy settings support ---
