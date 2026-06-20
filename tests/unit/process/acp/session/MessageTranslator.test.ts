@@ -223,4 +223,52 @@ describe('MessageTranslator', () => {
     expect(out1).toBe('X');
     expect(out2).toBe('X');
   });
+
+  // ─── Plan/todo card stability (regression: stacked "To do list" cards) ───
+
+  // Return the msg_id emitted for one plan/TodoWrite update.
+  const planMsgId = (translator: MessageTranslator, entries: Array<{ content: string; status: string }>): string => {
+    const msgs = translator.translate({
+      sessionId: 's1',
+      update: { sessionUpdate: 'plan', entries },
+    } as unknown as SessionNotification);
+    return msgs.find((m) => m.type === 'plan')?.msg_id ?? '';
+  };
+
+  it('reuses one msg_id across evolving plan updates within a turn (no stacked todo cards)', () => {
+    const translator = new MessageTranslator();
+    translator.onTurnStart();
+    const id1 = planMsgId(translator, [{ content: 'a', status: 'pending' }]);
+    // A tool_call between plan updates clears messageMap — it must NOT orphan the
+    // plan id (that orphaning was the doubling bug). The next plan update has to
+    // reuse the same id so the renderer merges, not stacks.
+    translator.translate({
+      sessionId: 's1',
+      update: { sessionUpdate: 'tool_call', toolCallId: 'tc-1', title: 'TodoWrite', rawInput: {} },
+    } as unknown as SessionNotification);
+    const id2 = planMsgId(translator, [
+      { content: 'a', status: 'completed' },
+      { content: 'b', status: 'in_progress' },
+    ]);
+    const id3 = planMsgId(translator, [
+      { content: 'a', status: 'completed' },
+      { content: 'b', status: 'completed' },
+      { content: 'c', status: 'pending' },
+    ]);
+    expect(id1).toBeTruthy();
+    expect(id2).toBe(id1);
+    expect(id3).toBe(id1);
+  });
+
+  it('starts a fresh plan card id on a new turn', () => {
+    const translator = new MessageTranslator();
+    translator.onTurnStart();
+    const id1 = planMsgId(translator, [{ content: 'a', status: 'pending' }]);
+    translator.onTurnEnd();
+    translator.onTurnStart();
+    const id2 = planMsgId(translator, [{ content: 'a', status: 'pending' }]);
+    expect(id1).toBeTruthy();
+    expect(id2).toBeTruthy();
+    expect(id2).not.toBe(id1);
+  });
 });

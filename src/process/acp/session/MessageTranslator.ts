@@ -91,6 +91,15 @@ export class MessageTranslator {
   private lastEmittedText = '';
   /** Same dedup window, tracked separately for thought chunks. */
   private lastEmittedThought = '';
+  /**
+   * Stable per-turn msg_id for the plan/todo block, kept OUTSIDE messageMap so
+   * the mid-turn `messageMap.clear()` calls (the tool_call handler, and the one
+   * in handlePlan that isolates surrounding text) cannot orphan it. Without this
+   * every TodoWrite update minted a fresh id via resolveMsgId('plan') and the
+   * renderer APPENDED instead of merging, stacking N "To do list" cards. Reset
+   * per turn in onTurnEnd()/reset() so each new turn gets its own plan card.
+   */
+  private planMsgId: string | null = null;
 
   constructor(private readonly conversationId: string) {}
 
@@ -128,6 +137,7 @@ export class MessageTranslator {
     this.messageMap.clear();
     this.accumulated.clear();
     this.lastMessageId = null;
+    this.planMsgId = null;
   }
 
   /**
@@ -147,6 +157,7 @@ export class MessageTranslator {
     this.lastMessageId = null;
     this.lastEmittedText = '';
     this.lastEmittedThought = '';
+    this.planMsgId = null;
   }
 
   /** Get or create a stable UUID for a SDK messageId within the current turn. */
@@ -353,8 +364,12 @@ export class MessageTranslator {
     // SDK Plan type has entries at top level: { entries: PlanEntry[] }
     if (!plan.entries || plan.entries.length === 0) return [];
 
-    // Use stable per-turn ID so the renderer merges plan updates within a turn
-    const planMsgId = this.resolveMsgId('plan');
+    // Stable per-turn id from a dedicated field — NOT resolveMsgId('plan'), whose
+    // entry the clear() above (and the tool_call clear) would wipe, minting a
+    // fresh id per update and stacking duplicate "To do list" cards. Reusing one
+    // id lets the renderer merge every TodoWrite update into a single card.
+    this.planMsgId ??= crypto.randomUUID();
+    const planMsgId = this.planMsgId;
 
     return [
       {
