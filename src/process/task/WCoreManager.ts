@@ -122,6 +122,40 @@ type WCoreManagerData = {
   };
 };
 
+/**
+ * Net-new tail of a streamed reasoning chunk, given what has already accumulated.
+ *
+ * The wcore engine streams `thought` reasoning events as CUMULATIVE restates (the
+ * full thought-so-far on each chunk), not incremental deltas. Appending them
+ * verbatim doubled the text ("The userThe user wants…"). Both the persisted
+ * thinking content and the renderer's live append consume this delta, so they
+ * stay in sync. Cases, in order:
+ * The engine streams a thought as incremental deltas, then re-emits the WHOLE
+ * thought as one cumulative restate — and that restate can DIVERGE slightly from
+ * the incrementally-built text (e.g. "what make money" -> "what to make money"),
+ * so an exact prefix check misses it and the thought doubles. Cases, in order:
+ *  - `incoming` extends `prev` exactly (prefix)  -> the part past `prev`
+ *  - `incoming` already contained in `prev`      -> '' (stale/shorter restate)
+ *  - `incoming` shares a long head with `prev`   -> a (possibly divergent) restate:
+ *      append only the positional tail past what we already have, never the whole
+ *      thing, so the thought can't double
+ *  - otherwise (a genuine incremental delta)     -> `incoming` unchanged
+ *
+ * A real incremental delta is a short continuation that shares ~no common prefix
+ * with `prev`, so it falls through to the last case and is appended whole.
+ */
+export function dedupeThinkingDelta(prev: string, incoming: string): string {
+  if (!incoming) return '';
+  if (incoming.startsWith(prev)) return incoming.slice(prev.length);
+  if (prev.includes(incoming)) return '';
+  let common = 0;
+  const max = Math.min(prev.length, incoming.length);
+  while (common < max && prev[common] === incoming[common]) common++;
+  const isRestate = common >= 10 || (prev.length > 0 && common >= prev.length * 0.5);
+  if (isRestate) return incoming.length > prev.length ? incoming.slice(prev.length) : '';
+  return incoming;
+}
+
 export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
   workspace: string;
   model: TProviderWithModel;
@@ -149,6 +183,11 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
   private thinkingMsgId: string | null = null;
   private thinkingStartTime: number | null = null;
   private thinkingContent: string = '';
+  /** How much of `thinkingContent` has already been flushed to the DB. The DB sync
+   *  is 'accumulate' (append), so each flush must send only the unflushed tail —
+   *  sending the full content every tick re-appended it and doubled the stored
+   *  thought ("LetLet me think…"). */
+  private lastFlushedThinkingLen = 0;
   private thinkingDbFlushTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly streamDbFlushIntervalMs: number = 120;
 
@@ -509,10 +548,16 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
       this.thinkingMsgId = uuid();
       this.thinkingStartTime = Date.now();
       this.thinkingContent = '';
+      this.lastFlushedThinkingLen = 0;
     }
 
-    if (status === 'thinking') {
-      this.thinkingContent += content;
+    // The engine re-streams reasoning as cumulative restates, so emit/persist only
+    // the net-new tail — otherwise both the DB content and the renderer's append
+    // double it ("The userThe user wants…").
+    let delta = content;
+    if (status === 'thinking' && content) {
+      delta = dedupeThinkingDelta(this.thinkingContent, content);
+      this.thinkingContent += delta;
     }
 
     const duration = status === 'done' && this.thinkingStartTime ? Date.now() - this.thinkingStartTime : undefined;
@@ -522,7 +567,7 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
       conversation_id: this.conversation_id,
       msg_id: this.thinkingMsgId,
       data: {
-        content,
+        content: delta,
         duration,
         status,
       },
@@ -543,6 +588,9 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
       this.thinkingDbFlushTimer = null;
     }
     if (!this.thinkingMsgId) return;
+    // 'accumulate' appends, so send only the tail written since the last flush.
+    const tail = this.thinkingContent.slice(this.lastFlushedThinkingLen);
+    this.lastFlushedThinkingLen = this.thinkingContent.length;
     const tMessage: TMessage = {
       id: this.thinkingMsgId,
       msg_id: this.thinkingMsgId,
@@ -550,7 +598,7 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
       position: 'left',
       conversation_id: this.conversation_id,
       content: {
-        content: this.thinkingContent,
+        content: tail,
         duration,
         status,
       },
@@ -563,6 +611,7 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
     this.thinkingMsgId = null;
     this.thinkingStartTime = null;
     this.thinkingContent = '';
+    this.lastFlushedThinkingLen = 0;
   }
 
   private queueBufferedStreamText(message: Extract<TMessage, { type: 'text' }>): void {
