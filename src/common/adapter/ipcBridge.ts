@@ -1058,6 +1058,11 @@ export const systemSettings = {
   setKeepAwake: buildProvider<void, { enabled: boolean }>('system-settings:set-keep-awake'),
   getRouteThroughFlux: buildProvider<boolean, void>('system-settings:get-route-through-flux'),
   setRouteThroughFlux: buildProvider<void, { enabled: boolean }>('system-settings:set-route-through-flux'),
+  // Native Claude default model slot for a new Claude Code chat (null = no native
+  // login). Lets a Claude chat default to the subscription instead of flux-auto.
+  getClaudeNativeDefaultModelId: buildProvider<string | null, void>(
+    'system-settings:get-claude-native-default-model-id'
+  ),
   changeLanguage: buildProvider<void, { language: string }>('system-settings:change-language'),
   // Broadcast language change to all renderers (desktop + WebUI) for real-time sync
   languageChanged: buildEmitter<{ language: string }>('system-settings:language-changed'),

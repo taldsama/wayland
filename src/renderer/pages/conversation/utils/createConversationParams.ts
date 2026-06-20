@@ -70,6 +70,24 @@ async function resolvePreferredAcpModelId(backend: string): Promise<string | und
     return preferredModelId;
   }
 
+  // A native Claude login must not be silently routed through Flux: when the
+  // user is on the Claude Code backend with a real Claude login, a fresh chat
+  // defaults to their subscription slot (e.g. Opus) rather than flux-auto, so it
+  // runs on their subscription (native) and the explicit-native-pick rule keeps
+  // it off Flux even when "Route all agents through Flux" is globally on. An
+  // explicit per-backend pin (above) still wins, so they can deliberately choose
+  // Flux. Returns null when there is no native Claude login (keeps flux default).
+  if (backend === 'claude') {
+    try {
+      const nativeClaudeDefault = await systemSettings.getClaudeNativeDefaultModelId.invoke();
+      if (typeof nativeClaudeDefault === 'string' && nativeClaudeDefault.trim().length > 0) {
+        return nativeClaudeDefault;
+      }
+    } catch {
+      /* no native login signal — fall through to cached/flux default */
+    }
+  }
+
   const cachedModels = await ConfigStorage.get('acp.cachedModels');
   const cachedModelId = cachedModels?.[backend]?.currentModelId;
   if (typeof cachedModelId === 'string' && cachedModelId.trim().length > 0) {
