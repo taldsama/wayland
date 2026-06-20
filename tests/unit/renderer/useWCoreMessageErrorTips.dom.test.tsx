@@ -78,6 +78,21 @@ const finish = (): IResponseMessage => ({
   data: '',
 });
 
+const finishWithReason = (reason: 'stop' | 'length' | 'error'): IResponseMessage => ({
+  type: 'finish',
+  conversation_id: CONV,
+  msg_id: ACTIVE_MSG,
+  data: { finish_reason: reason } as unknown as IResponseMessage['data'],
+});
+
+const fatalError = (): IResponseMessage =>
+  ({
+    type: 'error',
+    conversation_id: CONV,
+    msg_id: ACTIVE_MSG,
+    data: 'Provider error: API error 400: `tool calling` is not supported',
+  }) as unknown as IResponseMessage;
+
 describe('useWCoreMessage — transient error tip clearing on finish (#101)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -121,6 +136,68 @@ describe('useWCoreMessage — transient error tip clearing on finish (#101)', ()
         content?: { type?: string };
       }>;
       expect(list.some((m) => m.type === 'tips' && m.content?.type === 'error')).toBe(true);
+    });
+  });
+
+  it('keeps a fatal error tip when content streamed BEFORE the error (agentic preamble)', async () => {
+    // Regression for the live bug: Groq Compound streams a short preamble, then
+    // fails with a fatal provider 400. The preamble set hasContentInTurn=true, so
+    // the old `if (hasContentInTurn) clearErrorTips()` wrongly deleted the fatal
+    // banner on finish — the user saw the chat stop with no explanation.
+    renderHarness();
+    await waitFor(() => expect(streamHandler).toBeTypeOf('function'));
+
+    emit(content("I'll look that up"));
+    emit(fatalError());
+    emit(finish());
+
+    await waitFor(() => {
+      const list = JSON.parse(screen.getByTestId('messages').textContent ?? '[]') as Array<{
+        type: string;
+        content?: { type?: string; content?: string };
+      }>;
+      // The fatal provider error remains visible to the user...
+      expect(
+        list.some((m) => m.type === 'tips' && m.content?.type === 'error' && m.content?.content?.includes('tool calling'))
+      ).toBe(true);
+    });
+  });
+
+  it('keeps a fatal error tip when finish_reason is error even after a trailing empty content frame', async () => {
+    // Some turns emit a trailing empty content frame after the error. The engine
+    // still reports finish_reason 'error', which must win over content ordering.
+    renderHarness();
+    await waitFor(() => expect(streamHandler).toBeTypeOf('function'));
+
+    emit(content('working'));
+    emit(fatalError());
+    emit(content(''));
+    emit(finishWithReason('error'));
+
+    await waitFor(() => {
+      const list = JSON.parse(screen.getByTestId('messages').textContent ?? '[]') as Array<{
+        type: string;
+        content?: { type?: string };
+      }>;
+      expect(list.some((m) => m.type === 'tips' && m.content?.type === 'error')).toBe(true);
+    });
+  });
+
+  it('still clears a transient error when the turn recovers and finishes with finish_reason stop', async () => {
+    renderHarness();
+    await waitFor(() => expect(streamHandler).toBeTypeOf('function'));
+
+    emit(errorTip() as unknown as IResponseMessage);
+    emit(content('Recovered and produced the real answer.'));
+    emit(finishWithReason('stop'));
+
+    await waitFor(() => {
+      const list = JSON.parse(screen.getByTestId('messages').textContent ?? '[]') as Array<{
+        type: string;
+        content?: { type?: string; content?: string };
+      }>;
+      expect(list.some((m) => m.type === 'text' && m.content?.content?.includes('real answer'))).toBe(true);
+      expect(list.some((m) => m.type === 'tips' && m.content?.type === 'error')).toBe(false);
     });
   });
 });
