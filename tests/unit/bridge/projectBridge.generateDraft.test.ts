@@ -54,9 +54,7 @@ const mockComplete = vi.mocked(oneShotComplete);
 
 // A truthy model so the handler proceeds to oneShotComplete (shape is irrelevant:
 // oneShotComplete is mocked, so the real provider fields are never read).
-const A_MODEL = { provider: { apiKey: 'k' }, modelId: 'gpt-5' } as unknown as Awaited<
-  ReturnType<typeof pickBestModel>
->;
+const A_MODEL = { provider: { apiKey: 'k' }, modelId: 'gpt-5' } as unknown as Awaited<ReturnType<typeof pickBestModel>>;
 const draftArgs = { kind: 'context' as const, description: 'a thing' };
 
 type DraftResult = { draft: string; error?: 'no-model' | 'failed'; detail?: string };

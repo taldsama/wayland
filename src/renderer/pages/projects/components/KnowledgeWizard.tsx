@@ -110,7 +110,11 @@ const KnowledgeWizard: React.FC<{
     setGenDetail(null);
     try {
       const constraintText = [...constraints, extra.trim()].filter(Boolean).join('; ');
-      const { draft: out, error, detail } = await ipcBridge.project.generateKnowledgeDraft.invoke({
+      const {
+        draft: out,
+        error,
+        detail,
+      } = await ipcBridge.project.generateKnowledgeDraft.invoke({
         name: projectName,
         description: projectDescription,
         kind,
@@ -142,8 +146,7 @@ const KnowledgeWizard: React.FC<{
     t('projects.wizard.step.questions'),
     t('projects.wizard.step.draft'),
   ];
-  const heading =
-    kind === 'rules' ? t('projects.wizard.titleRules') : t('projects.wizard.titleInstructions');
+  const heading = kind === 'rules' ? t('projects.wizard.titleRules') : t('projects.wizard.titleInstructions');
 
   const next = () => setStep((s) => Math.min(2, s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
@@ -288,9 +291,7 @@ const KnowledgeWizard: React.FC<{
                 ) : genError ? (
                   <div className='flex flex-col items-center justify-center gap-8px py-36px text-center'>
                     <span className='text-13px text-t-secondary'>
-                      {genError === 'no-model'
-                        ? t('projects.wizard.draft.noModel')
-                        : t('projects.wizard.draft.failed')}
+                      {genError === 'no-model' ? t('projects.wizard.draft.noModel') : t('projects.wizard.draft.failed')}
                     </span>
                     {genError === 'failed' && genDetail && (
                       <span className='max-w-340px text-11px text-t-tertiary'>
