@@ -15,6 +15,7 @@ import { ProcessConfig } from '@process/utils/initStorage';
 import { getZoomFactor, setZoomFactor } from '@process/utils/zoom';
 import { getCdpStatus, updateCdpConfig } from '@process/utils/configureChromium';
 import { initApplicationBridgeCore } from './applicationBridgeCore';
+import { openRoutePopoutWindow } from '@process/utils/popoutWindowManager';
 import type { IStartOnBootStatus } from '@/common/adapter/ipcBridge';
 
 let mainWindowRef: BrowserWindow | null = null;
@@ -214,6 +215,12 @@ export function initApplicationBridge(workerTaskManager: IWorkerTaskManager): vo
   });
 
   ipcBridge.application.getZoomFactor.provider(() => Promise.resolve(getZoomFactor()));
+
+  // Pop a main destination (e.g. Mission Control) out into its own window (#157).
+  // The route is validated against an allowlist inside openRoutePopoutWindow.
+  ipcBridge.application.popoutRoute.provider(async ({ route }) => {
+    return openRoutePopoutWindow(route);
+  });
 
   ipcBridge.application.setZoomFactor.provider(async ({ factor }) => {
     const updatedFactor = setZoomFactor(factor);
