@@ -6,6 +6,8 @@
 
 import { ipcBridge } from '@/common';
 import Markdown from '@/renderer/components/Markdown';
+import { generateKnowledgeDraftHttp } from '@/renderer/services/ProjectDraftService';
+import { isElectronDesktop } from '@/renderer/utils/platform';
 import { Button, Input, Message, Modal, Spin, Tag } from '@arco-design/web-react';
 import { FileText, RefreshCw, Sparkles, Upload, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -110,11 +112,7 @@ const KnowledgeWizard: React.FC<{
     setGenDetail(null);
     try {
       const constraintText = [...constraints, extra.trim()].filter(Boolean).join('; ');
-      const {
-        draft: out,
-        error,
-        detail,
-      } = await ipcBridge.project.generateKnowledgeDraft.invoke({
+      const params = {
         name: projectName,
         description: projectDescription,
         kind,
@@ -123,7 +121,12 @@ const KnowledgeWizard: React.FC<{
         relatedKnowledge: relatedKnowledge?.trim() || undefined,
         audience: audience.length > 0 ? audience.join(', ') : undefined,
         constraints: constraintText || undefined,
-      });
+      };
+      // Desktop uses Electron IPC; headless/remote WebUI uses the token-authed
+      // HTTP route (#234). Both return the same shape, including #221's `detail`.
+      const { draft: out, error, detail } = isElectronDesktop()
+        ? await ipcBridge.project.generateKnowledgeDraft.invoke(params)
+        : await generateKnowledgeDraftHttp(params);
       if (error) {
         setGenError(error);
         setGenDetail(detail ?? null);
