@@ -462,6 +462,11 @@ const ENGINE_ENV_ALLOWLIST: readonly string[] = [
   'TMP',
   'TEMP',
   'PWD',
+  // ── Linux dynamic linker ───────────────────────────────────────────────
+  // Shared-library search path. Required on ARM64 Ubuntu 24.04 (Noble) when
+  // the engine needs OpenSSL 1.1 from a non-system prefix. Without it the
+  // dynamic linker can't find the .so and the engine fails on startup (#233).
+  'LD_LIBRARY_PATH',
   // ── Wayland engine config (non-secret) ─────────────────────────────────
   // The user's bash-tool shell selection. Set in the environment (never by the
   // app), so a GUI-launched engine only receives it when it survives this
