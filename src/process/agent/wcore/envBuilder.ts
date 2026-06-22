@@ -122,6 +122,10 @@ const NATIVE_ENGINE_PROVIDER_IDS = [
   'fireworks',
   'cerebras',
   'nvidia',
+  // minimax is an Anthropic-wire native provider in the bundled engine (0.12.5):
+  // `--provider minimax` -> api.minimax.io/anthropic with MINIMAX_API_KEY. Without
+  // this it falls through to `--provider openai` and breaks (#135).
+  'minimax',
 ] as const;
 const NATIVE_ENGINE_PROVIDER_SET: ReadonlySet<string> = new Set(NATIVE_ENGINE_PROVIDER_IDS);
 

@@ -197,29 +197,33 @@ describe('buildSpawnConfig - engine-native provider routing (#177)', () => {
     ['fireworks', 'FIREWORKS_API_KEY'],
     ['cerebras', 'CEREBRAS_API_KEY'],
     ['nvidia', 'NVIDIA_API_KEY'],
+    ['minimax', 'MINIMAX_API_KEY'],
   ];
 
-  it.each(NATIVE)('routes %s via the v2 bridge tag as --provider %s with the scoped key, NO --base-url', (id, envVar) => {
-    // Persisted exactly as the legacy bridge stores it: platform collapses to
-    // 'openai-compatible', a non-empty (but wrong-for-engine) base URL is
-    // present, and the only identity carrier is the `v2:<id>` tag.
-    const model: TProviderWithModel = {
-      id: 'native-uuid',
-      platform: 'openai-compatible',
-      name: id,
-      baseUrl: 'https://example.invalid/v1',
-      apiKey: `${id}-secret`,
-      useModel: 'some-model',
-      __waylandModelRegistryBridge: `v2:${id}`,
-    } as TProviderWithModel;
-    const { args, env } = buildSpawnConfig(model, OPTS);
+  it.each(NATIVE)(
+    'routes %s via the v2 bridge tag as --provider %s with the scoped key, NO --base-url',
+    (id, envVar) => {
+      // Persisted exactly as the legacy bridge stores it: platform collapses to
+      // 'openai-compatible', a non-empty (but wrong-for-engine) base URL is
+      // present, and the only identity carrier is the `v2:<id>` tag.
+      const model: TProviderWithModel = {
+        id: 'native-uuid',
+        platform: 'openai-compatible',
+        name: id,
+        baseUrl: 'https://example.invalid/v1',
+        apiKey: `${id}-secret`,
+        useModel: 'some-model',
+        __waylandModelRegistryBridge: `v2:${id}`,
+      } as TProviderWithModel;
+      const { args, env } = buildSpawnConfig(model, OPTS);
 
-    expect(providerArg(args)).toBe(id);
-    expect(hasBaseUrl(args)).toBe(false);
-    expect(env[envVar]).toBe(`${id}-secret`);
-    // Must NOT leak to the shared OpenAI key (the #177 root cause).
-    expect(env.OPENAI_API_KEY).toBeUndefined();
-  });
+      expect(providerArg(args)).toBe(id);
+      expect(hasBaseUrl(args)).toBe(false);
+      expect(env[envVar]).toBe(`${id}-secret`);
+      // Must NOT leak to the shared OpenAI key (the #177 root cause).
+      expect(env.OPENAI_API_KEY).toBeUndefined();
+    }
+  );
 
   it.each(NATIVE)('routes %s stored directly as the platform (forward-compat) as --provider %s', (id, envVar) => {
     const { args, env } = buildSpawnConfig(makeNativeModel(id, `${id}-key`), OPTS);
