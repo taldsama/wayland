@@ -157,6 +157,18 @@ describe('buildSpawnConfig - catalog provider dispatch (T3.5)', () => {
     expect(env.XAI_API_KEY).toBe('xai-key');
   });
 
+  it('routes ChatGPT subscription to --provider openai-chatgpt with NO key and NO --base-url (#243)', () => {
+    // chatgpt-subscription resolves (CHAT_START_PLATFORM) to platform
+    // 'openai-chatgpt' and carries no api key - the engine reads the OAuth token
+    // from ~/.codex/auth.json itself. Must route to the native slug, never inject
+    // OPENAI_API_KEY, and never pass a --base-url (the engine owns the backend).
+    const { args, env } = buildSpawnConfig(makeNativeModel('openai-chatgpt', '', 'gpt-5.2-codex'), OPTS);
+
+    expect(providerArg(args)).toBe('openai-chatgpt');
+    expect(hasBaseUrl(args)).toBe(false);
+    expect(env.OPENAI_API_KEY).toBeUndefined();
+  });
+
   it('routes a catalog provider whose platform was stored directly as the catalog id (forward-compat)', () => {
     // Forward-compat: if a future connect path stores the catalog id directly in
     // `platform` (no bridge tag), it must still route as a catalog provider.

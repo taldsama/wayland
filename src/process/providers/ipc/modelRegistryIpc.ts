@@ -1060,6 +1060,12 @@ const CHAT_START_PLATFORM: Partial<Record<ProviderId, string>> = {
   'google-gemini': 'gemini',
   'aws-bedrock': 'bedrock',
   vertex: 'gemini-vertex-ai',
+  // ChatGPT subscription -> the engine's native `openai-chatgpt` provider, which
+  // reads the OAuth token from its OWN store (~/.codex/auth.json, written by the
+  // desktop on sign-in). Keyless: no CHAT_START_BASE_URL and no api key in the
+  // payload - the engine owns the ChatGPT backend URL and credential. Without
+  // this entry the pick returns `unsupported` and bounces to Settings (#243).
+  'chatgpt-subscription': 'openai-chatgpt',
   // The OpenAI-compatible long tail - all dispatched as the `openai` protocol
   // via their stored `baseUrl`. `mapProvider()` falls through to OpenAI for an
   // unknown platform string, so a plain `openai-compatible` label is honest
@@ -1153,6 +1159,7 @@ const CHAT_START_NAME: Partial<Record<ProviderId, string>> = {
   'google-gemini': 'Google Gemini',
   'aws-bedrock': 'AWS Bedrock',
   vertex: 'Google Vertex',
+  'chatgpt-subscription': 'ChatGPT',
   openrouter: 'OpenRouter',
   groq: 'Groq',
   xai: 'xAI',
@@ -1230,6 +1237,15 @@ function buildChatStartPayload(
   if (isGoogleAuthGemini) {
     // No credential material in the payload - the dispatcher reads the OAuth
     // tokens from the main-process auth store.
+    return { kind: 'payload', payload };
+  }
+
+  // ── ChatGPT subscription ───────────────────────────────────────────────
+  if (providerId === 'chatgpt-subscription') {
+    // Keyless, like Google-auth Gemini: no credential in the payload. The engine
+    // reads the ChatGPT OAuth token from its own store (~/.codex/auth.json,
+    // written by the desktop on sign-in) via `--provider openai-chatgpt`, so the
+    // empty-key branch below (-> undecryptable) must NOT apply here (#243).
     return { kind: 'payload', payload };
   }
 

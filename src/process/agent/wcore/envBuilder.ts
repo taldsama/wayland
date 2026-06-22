@@ -176,6 +176,12 @@ function mapProvider(model: TProviderWithModel): WCoreProvider {
   const nativeId = nativeEngineProviderId(model);
   if (nativeId) return nativeId;
 
+  // ChatGPT subscription: route to the engine's native `openai-chatgpt` provider
+  // (platform set by CHAT_START_PLATFORM). The engine reads the OAuth token from
+  // its own store (~/.codex/auth.json, written by the desktop on sign-in), so we
+  // pass NO key env var and NO --base-url - it owns the ChatGPT backend (#243).
+  if (model.platform === 'openai-chatgpt') return 'openai-chatgpt';
+
   // Special handling for new-api: respect per-model protocol setting
   if (model.platform === 'new-api' && model.useModel && model.modelProtocols) {
     const protocol = model.modelProtocols[model.useModel];
