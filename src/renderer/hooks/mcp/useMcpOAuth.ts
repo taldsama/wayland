@@ -22,7 +22,7 @@ export type McpOAuthLoginResult =
   | { success: true }
   | {
       success: false;
-      code: 'needs_byo' | 'transport_unsupported' | 'no_url' | 'cancelled' | 'unknown';
+      code: 'needs_byo' | 'transport_unsupported' | 'no_url' | 'cancelled' | 'timeout' | 'unknown';
       error?: string;
       redirectUri?: string;
       authorizationUrl?: string;
@@ -96,7 +96,7 @@ export const useMcpOAuth = () => {
     }
   }, []);
 
-  const login = useCallback(async (server: IMcpServer): Promise<McpOAuthLoginResult> => {
+  const login = useCallback(async (server: IMcpServer, scopes?: string[]): Promise<McpOAuthLoginResult> => {
     setLoggingIn((prev) => ({ ...prev, [server.id]: true }));
 
     // Headless WebUI: the loginMcpOAuth IPC is denied to remote callers (it
@@ -125,7 +125,10 @@ export const useMcpOAuth = () => {
     try {
       const response = await mcpService.loginMcpOAuth.invoke({
         server,
-        config: undefined, // Use auto discovery
+        // Pass catalog-declared scopes (e.g. GitHub repo / read:org / workflow)
+        // so the authorization request actually asks for them; auto-discover the
+        // rest of the OAuth config.
+        config: scopes && scopes.length > 0 ? { enabled: true, scopes } : undefined,
       });
 
       if (response.success && response.data) {
@@ -164,6 +167,25 @@ export const useMcpOAuth = () => {
       };
     } finally {
       setLoggingIn((prev) => ({ ...prev, [server.id]: false }));
+    }
+  }, []);
+
+  /**
+   * Cancel an in-flight login(). Fires the cancel IPC so the main-process
+   * service aborts the OAuth wait + frees the callback port, and immediately
+   * flips loggingIn -> false so the user is never stuck behind a spinner with a
+   * disabled Cancel button (bug #242). Best-effort: a failed IPC still clears
+   * the local in-flight state.
+   */
+  const cancel = useCallback(async (server: IMcpServer): Promise<void> => {
+    setLoggingIn((prev) => ({ ...prev, [server.id]: false }));
+    if (!isElectronDesktop()) return;
+    try {
+      // The service keys in-flight logins by server.name (it calls
+      // authenticate(server.name, ...)), so cancel must target the NAME, not id.
+      await mcpService.cancelMcpOAuth.invoke(server.name);
+    } catch (error) {
+      console.error('Failed to cancel OAuth login:', error);
     }
   }, []);
 
@@ -270,6 +292,7 @@ export const useMcpOAuth = () => {
     checkOAuthStatus,
     checkMultipleServers,
     login,
+    cancel,
     logout,
     setByoCredentials,
   };

@@ -870,7 +870,7 @@ export const mcpService = {
       | { success: true }
       | {
           success: false;
-          code: 'needs_byo' | 'transport_unsupported' | 'no_url' | 'cancelled' | 'unknown';
+          code: 'needs_byo' | 'transport_unsupported' | 'no_url' | 'cancelled' | 'timeout' | 'unknown';
           error?: string;
           redirectUri?: string;
           authorizationUrl?: string;
@@ -878,6 +878,12 @@ export const mcpService = {
     >,
     { server: IMcpServer; config?: any }
   >('mcp.login-oauth'),
+  /**
+   * Abort an in-flight loginMcpOAuth. Optional serverName targets a single
+   * login; omit to cancel all. Lets the renderer's Cancel button unstick a user
+   * waiting on an OAuth callback that will never arrive.
+   */
+  cancelMcpOAuth: buildProvider<IBridgeResponse, string | undefined>('mcp.cancel-oauth'),
   logoutMcpOAuth: buildProvider<IBridgeResponse, string>('mcp.logout-oauth'),
   getAuthenticatedServers: buildProvider<IBridgeResponse<string[]>, void>('mcp.get-authenticated-servers'),
   /**

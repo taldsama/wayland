@@ -125,7 +125,7 @@ export function DetailPage() {
   const { mcpServers, saveMcpServers } = useMcpServers();
   const { agentInstallStatus, setAgentInstallStatus, checkSingleServerInstallStatus } = useMcpAgentStatus();
   const { syncMcpToAgents, removeMcpFromAgents } = useMcpOperations(mcpServers, message);
-  const { login, loggingIn, oauthStatus, setByoCredentials } = useMcpOAuth();
+  const { login, cancel: cancelOAuth, loggingIn, oauthStatus, setByoCredentials } = useMcpOAuth();
   const crud = useMcpServerCRUD(
     mcpServers,
     saveMcpServers,
@@ -194,6 +194,10 @@ export function DetailPage() {
   if (!entry) return <div className={styles.unknown}>Unknown entry: {id}</div>;
 
   const w = entry['x-wayland'];
+
+  // Catalog-declared OAuth scope names (e.g. GitHub repo / read:org / workflow)
+  // threaded into login() so the authorization request actually asks for them.
+  const oauthScopes = w.auth.scopes?.map((s) => s.name).filter((n) => n.length > 0);
 
   const install = async (): Promise<IMcpServer | null> => {
     setInstalling(true);
@@ -308,7 +312,7 @@ export function DetailPage() {
       if (!server) return;
     }
 
-    const result = await login(server);
+    const result = await login(server, oauthScopes);
     if (result.success === true) {
       await finishOAuthSuccess(server);
       return;
@@ -357,7 +361,7 @@ export function DetailPage() {
       prev.map((s) => (s.id === saveResult.server!.id ? saveResult.server! : s)),
     );
 
-    const retryResult = await login(saveResult.server);
+    const retryResult = await login(saveResult.server, oauthScopes);
     if (retryResult.success === true) {
       await finishOAuthSuccess(saveResult.server);
       return;
@@ -558,6 +562,15 @@ export function DetailPage() {
               ? t('mcpLibrary.detail.signingIn', 'Signing in…')
               : t('mcpLibrary.detail.signIn', 'Sign in')}
           </button>
+          {oauthInFlight && installedServer && (
+            <button
+              type="button"
+              className={styles.btn2}
+              onClick={() => void cancelOAuth(installedServer)}
+            >
+              {t('mcpLibrary.detail.cancelSignIn', 'Cancel')}
+            </button>
+          )}
           <div className={styles.lifecycle}>
             <button type="button" className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
               <Trash2 size={14} />
@@ -625,6 +638,15 @@ export function DetailPage() {
                 : t('mcpLibrary.detail.signIn', 'Sign in')
               : t('mcpLibrary.detail.addToken', 'Add token')}
           </button>
+          {isOauth && oauthInFlight && installedServer && (
+            <button
+              type="button"
+              className={styles.btn2}
+              onClick={() => void cancelOAuth(installedServer)}
+            >
+              {t('mcpLibrary.detail.cancelSignIn', 'Cancel')}
+            </button>
+          )}
           <div className={styles.lifecycle}>
             <button type="button" className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
               <Trash2 size={14} />
@@ -868,6 +890,15 @@ export function DetailPage() {
                             provider: w.auth.providerName ?? entry.title,
                           })}
                   </button>
+                  {!isApiKey && oauthInFlight && installedServer && (
+                    <button
+                      type="button"
+                      className={styles.btn2}
+                      onClick={() => void cancelOAuth(installedServer)}
+                    >
+                      {t('mcpLibrary.detail.cancelSignIn', 'Cancel')}
+                    </button>
+                  )}
                   {isApiKey && (
                     <span className={styles.connectHint}>
                       {t('mcpLibrary.detail.saveConnectHint', 'Paste your key above, then connect.')}
@@ -984,6 +1015,12 @@ export function DetailPage() {
             : undefined) as ByoVendorHint | undefined
         }
         onCancel={() => setByoModal({ ...byoModal, visible: false, server: null })}
+        onCancelInFlight={() => {
+          // Abort the in-flight retry login() (bug #242) and close the modal so
+          // the user is never stuck behind a frozen "Save & sign in".
+          if (byoModal.server) void cancelOAuth(byoModal.server);
+          setByoModal({ ...byoModal, visible: false, server: null });
+        }}
         onSubmit={handleByoSubmit}
       />
     </div>
