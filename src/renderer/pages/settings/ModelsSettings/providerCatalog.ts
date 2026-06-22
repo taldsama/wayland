@@ -353,9 +353,13 @@ export function recognizeKey(raw: string): KeyRecognition {
   if (key.startsWith('csk-')) return { kind: 'recognized', provider: 'cerebras' };
   if (key.startsWith('nvapi-')) return { kind: 'recognized', provider: 'nvidia' };
   if (key.startsWith('esecret_')) return { kind: 'recognized', provider: 'anyscale' };
-  if (key.startsWith('dg_')) return { kind: 'recognized', provider: 'deepgram' };
-  if (key.startsWith('aai_')) return { kind: 'recognized', provider: 'assemblyai' };
-  if (key.startsWith('xi-api-')) return { kind: 'recognized', provider: 'elevenlabs' };
+  // GitHub Models inference uses a GitHub PAT (classic `ghp_` / fine-grained
+  // `github_pat_`); route to the connectable github-models catalog provider (#224 audit).
+  if (key.startsWith('ghp_') || key.startsWith('github_pat_')) {
+    return { kind: 'recognized', provider: 'github-models' };
+  }
+  // Removed dead `dg_` (deepgram), `aai_` (assemblyai), `xi-api-` (elevenlabs)
+  // rules - never real key prefixes; those providers connect via Browse (#224 audit).
 
   // Multi-field cloud provider (priority 90) - needs the credential form, not a
   // bare key.

@@ -436,9 +436,8 @@ describe('recognizeKey', () => {
     ['cerebras', 'csk-abcdef'],
     ['nvidia', 'nvapi-abcdef'],
     ['anyscale', 'esecret_abcdef'],
-    ['deepgram', 'dg_abcdef'],
-    ['assemblyai', 'aai_abcdef'],
-    ['elevenlabs', 'xi-api-abcdef'],
+    ['github-models', 'ghp_abcdef1234567890'],
+    ['github-models', 'github_pat_11ABCDEF0_abcdef'],
     // Structural sk- variants - these resolve uniquely despite the bare-sk
     // prefix because their internal shape is distinctive (32-hex for DeepSeek;
     // 48-mixed-alnum minus OpenAI's `T3BlbkFJ` signature for Moonshot).
