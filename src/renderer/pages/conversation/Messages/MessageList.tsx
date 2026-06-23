@@ -39,7 +39,6 @@ import MessageSkillSuggest from './components/MessageSkillSuggest';
 import MessageText from './components/MessageText';
 import MessageThinking from './components/MessageThinking';
 import SubAgentActivityCard from './components/SubAgentActivityCard';
-import MessageActivity from './components/MessageActivity';
 import type { WriteFileResult } from './types';
 import { useAutoScroll } from './useAutoScroll';
 import { useAutoPreviewOfficeFiles } from '@/renderer/hooks/file/useAutoPreviewOfficeFiles';
@@ -154,7 +153,10 @@ const MessageItem: React.FC<{ message: TMessage; highlighted?: boolean }> = Reac
       case 'sub_agent':
         return <SubAgentActivityCard message={message} />;
       case 'activity':
-        return <MessageActivity message={message} />;
+        // #252 reframe: the activity tree moved to the opt-in ObservabilityPanel.
+        // The chat center stays calm - the inline StatusFooter pulse is the only
+        // cue here. The message still lives in the list so the panel can read it.
+        return null;
       case 'available_commands':
         return null;
       default:
