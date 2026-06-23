@@ -969,6 +969,18 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
         return;
       }
 
+      // W7 S4 HITL: wcore forwards `approval_required` typed (index.ts) so a
+      // future renderer can show an approval modal. There is no such UI yet and
+      // `reason:'info'` is an auto-approve info signal, so consume it here.
+      // Must return before transformMessage (chatLib has no `approval_required`
+      // case) — otherwise it hits the default branch and logs an "Unsupported
+      // message type" warning, then gets dropped. Mirrors config_changed /
+      // sub_agent_event pre-processing above.
+      if (data.type === 'approval_required') {
+        mainLog('[WCoreManager]', 'approval_required (auto-approve info)', data.data);
+        return;
+      }
+
       // When the inference provider rejects the key (401 / invalid x-api-key),
       // flip that provider off "connected" so the UI stops showing it healthy
       // and the next spawn does not reuse the dead key. Side-effect only: the

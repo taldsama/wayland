@@ -17,11 +17,13 @@ const {
   mockDb,
   mockTeamEventBusEmit,
   mockChannelEmitAgentMessage,
+  mockAddOrUpdateMessage,
 } = vi.hoisted(() => ({
   emitResponseStream: vi.fn(),
   emitConfirmationAdd: vi.fn(),
   emitConfirmationUpdate: vi.fn(),
   emitConfirmationRemove: vi.fn(),
+  mockAddOrUpdateMessage: vi.fn(),
   mockDb: {
     getConversationMessages: vi.fn(() => ({ data: [] })),
     getConversation: vi.fn(() => ({ success: false })),
@@ -92,7 +94,7 @@ vi.mock('@process/utils/initStorage', () => ({
 
 vi.mock('@process/utils/message', () => ({
   addMessage: vi.fn(),
-  addOrUpdateMessage: vi.fn(),
+  addOrUpdateMessage: mockAddOrUpdateMessage,
 }));
 
 vi.mock('@/common/utils', () => {
@@ -441,6 +443,29 @@ describe('GAP-8: WCoreManager Multi EventBus Emission', () => {
       const channelCalls = findChannelEmissions();
       const channelFinish = channelCalls.find(([convId]: [string]) => convId === 'conv-eb-2');
       expect(channelFinish).toBeDefined();
+    });
+  });
+
+  // ── #264: approval_required is pre-processed, never reaches transformMessage ─
+
+  describe('#264: approval_required pre-processed by WCoreManager', () => {
+    it('does NOT reach transformMessage as an unsupported type', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Non-empty msg_id is the bug condition: the event is stamped with the
+      // active msg_id, so it survives the empty-msg_id guard and would fall
+      // through to transformMessage's default branch on base.
+      emitEvent(manager, { type: 'start', data: '', msg_id: 'msg-1' });
+      emitEvent(manager, { type: 'approval_required', data: { callId: 'c1', reason: 'info' }, msg_id: 'msg-1' });
+
+      const unsupportedWarn = warnSpy.mock.calls.find(([msg]: [unknown]) =>
+        typeof msg === 'string' && msg.includes("Unsupported message type 'approval_required'")
+      );
+      expect(unsupportedWarn).toBeUndefined();
+
+      // Consumed: not re-emitted to the renderer and not persisted as a message.
+      expect(findIpcEmissions('approval_required')).toHaveLength(0);
+      expect(mockAddOrUpdateMessage).not.toHaveBeenCalled();
     });
   });
 
