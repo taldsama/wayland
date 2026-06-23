@@ -90,9 +90,10 @@ describe('MessageActivity', () => {
     expect(screen.getByText('1.5s')).toBeTruthy();
   });
 
-  it('renders per-turn cost rows when expanded', () => {
+  it('renders per-turn cost rows when expanded and showCost is on', () => {
     render(
       <MessageActivity
+        showCost
         message={make({
           status: 'running',
           nodes: [{ id: 'c1', kind: 'tool', callId: 'c1', name: 'Bash', status: 'running', startTime: 1 }],
@@ -103,6 +104,54 @@ describe('MessageActivity', () => {
     // Card auto-expands while running, so cost rows are visible.
     expect(screen.getByText('gpt-x')).toBeTruthy();
     expect(screen.getByText('openai')).toBeTruthy();
+  });
+
+  // #252 reframe: cost is opt-in (off by default). With showCost omitted, the
+  // cost chip must NOT render even on a turn that carries perTurnCost.
+  it('hides per-turn cost by default (showCost off)', () => {
+    render(
+      <MessageActivity
+        message={make({
+          status: 'running',
+          nodes: [{ id: 'c1', kind: 'tool', callId: 'c1', name: 'Bash', status: 'running', startTime: 1 }],
+          perTurnCost: [{ turn: 1, model: 'gpt-x', provider: 'openai', costUsd: 0.0123 }],
+        })}
+      />
+    );
+    // The node still renders, but no cost rows.
+    expect(screen.getByText('Bash')).toBeTruthy();
+    expect(screen.queryByText('gpt-x')).toBeNull();
+    expect(screen.queryByText('openai')).toBeNull();
+  });
+
+  // A cost-only turn (no nodes) renders nothing when showCost is off...
+  it('renders nothing for a cost-only turn when showCost is off', () => {
+    const { container } = render(
+      <MessageActivity
+        message={make({
+          status: 'done',
+          nodes: [],
+          perTurnCost: [{ turn: 1, model: 'gpt-x', provider: 'openai', costUsd: 0.0123 }],
+        })}
+      />
+    );
+    expect(container.querySelector('[data-testid="activity-card"]')).toBeNull();
+  });
+
+  // ...but shows the cost card when showCost is on (running keeps it expanded).
+  it('renders a cost-only turn when showCost is on', () => {
+    render(
+      <MessageActivity
+        showCost
+        message={make({
+          status: 'running',
+          nodes: [],
+          perTurnCost: [{ turn: 1, model: 'gpt-x', provider: 'openai', costUsd: 0.0123 }],
+        })}
+      />
+    );
+    expect(screen.getByTestId('activity-card')).toBeTruthy();
+    expect(screen.getByText('gpt-x')).toBeTruthy();
   });
 
   it('reflects failed status on the card', () => {

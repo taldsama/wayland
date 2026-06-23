@@ -335,6 +335,14 @@
     "kindCua": "Computer",
     "costPerTurn": "${{cost}}"
   },
+  "observability": {
+    "title": "Observability",
+    "toggle": "Observability",
+    "close": "Close panel",
+    "empty": "Activity from this conversation will appear here.",
+    "showCost": "Show cost",
+    "showCostHint": "off by default"
+  },
   "skills": {
     "loaded": "Loaded Skills"
   },

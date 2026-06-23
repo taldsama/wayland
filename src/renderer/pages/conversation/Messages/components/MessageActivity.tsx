@@ -41,7 +41,10 @@ const computeTotalDuration = (nodes: ActivityNode[]): string | null => {
   return ((latest - earliest) / 1000).toFixed(1) + 's';
 };
 
-const MessageActivity: React.FC<{ message: IMessageActivity }> = ({ message }) => {
+const MessageActivity: React.FC<{ message: IMessageActivity; showCost?: boolean }> = ({
+  message,
+  showCost = false,
+}) => {
   const { t } = useTranslation();
   const { nodes, perTurnCost, status } = message.content;
 
@@ -58,8 +61,11 @@ const MessageActivity: React.FC<{ message: IMessageActivity }> = ({ message }) =
     prevHadRunning.current = hasRunning;
   }, [nodes, status]);
 
-  // Nothing to render until at least one node or cost row exists.
-  if (nodes.length === 0 && (!perTurnCost || perTurnCost.length === 0)) {
+  // Cost is opt-in (off by default): a cost-only turn renders nothing unless shown.
+  const costVisible = showCost && perTurnCost != null && perTurnCost.length > 0;
+
+  // Nothing to render until at least one node or a visible cost row exists.
+  if (nodes.length === 0 && !costVisible) {
     return null;
   }
 
@@ -108,7 +114,7 @@ const MessageActivity: React.FC<{ message: IMessageActivity }> = ({ message }) =
         <div className={styles.list}>
           <ActivityNodeTree nodes={nodes} />
 
-          {perTurnCost && perTurnCost.length > 0 && (
+          {costVisible && (
             <div className={styles.cost}>
               {perTurnCost.map((c) => (
                 <div key={c.turn} className={styles.costRow}>
@@ -130,4 +136,7 @@ const MessageActivity: React.FC<{ message: IMessageActivity }> = ({ message }) =
   );
 };
 
-export default React.memo(MessageActivity, (prev, next) => prev.message.content === next.message.content);
+export default React.memo(
+  MessageActivity,
+  (prev, next) => prev.message.content === next.message.content && prev.showCost === next.showCost
+);
