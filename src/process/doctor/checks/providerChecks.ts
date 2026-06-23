@@ -37,6 +37,33 @@ function providerLabel(id: ProviderId): string {
 }
 
 /**
+ * Providers that connect successfully but expose NO chat-model catalog by
+ * design — audio/speech/image/transcription tools (Deepgram, AssemblyAI,
+ * ElevenLabs, Stability). The model-registry check must not flag their empty
+ * chat catalog as a fault: zero chat models is the correct, healthy state for a
+ * tool provider, so they are excluded from the empty-catalog warning (#270).
+ */
+const TOOL_PROVIDER_IDS: ReadonlySet<string> = new Set(['deepgram', 'assemblyai', 'elevenlabs', 'stability']);
+
+/**
+ * Providers whose connection is verified by an OAuth/session or cloud-credential
+ * flow rather than an API key, and which have no standard `/v1/models` HTTP
+ * probe: the ChatGPT subscription (OAuth bearer rejected by `api.openai.com`),
+ * the cloud providers (Bedrock/Vertex/Azure), and google-auth providers. The
+ * connectivity check must NOT run the API-key probe against these — doing so
+ * sends a non-API-key credential to the wrong endpoint and false-reports
+ * `unauthorized` after a perfectly good reconnect (#272). A stored credential is
+ * the strongest available signal, mirroring the live `testModelRegistryConnection`
+ * IPC path.
+ */
+const NON_PROBEABLE_PROVIDER_IDS: ReadonlySet<string> = new Set([
+  'chatgpt-subscription',
+  'aws-bedrock',
+  'vertex',
+  'azure',
+]);
+
+/**
  * Pull a single API key out of a decrypted creds record, or `undefined`. Mirrors
  * the field names `ConnectionTester.extractKey` accepts so a keyed provider is
  * probed with a real inference call rather than the degraded auth-only path.
@@ -89,6 +116,16 @@ export async function checkProviderConnectivity(
       continue;
     }
 
+    // OAuth/session, cloud-credential, and google-auth providers have no API-key
+    // HTTP probe — running one sends the wrong credential to the wrong endpoint
+    // and false-reports `unauthorized` (#272). A stored credential is the
+    // strongest signal available; count it as connected, mirroring the live
+    // `testModelRegistryConnection` path.
+    if (NON_PROBEABLE_PROVIDER_IDS.has(provider.providerId) || credsResult.creds.useGoogleAuth === true) {
+      okCount += 1;
+      continue;
+    }
+
     const key = keyFromCreds(credsResult.creds);
     const creds = key
       ? { key }
@@ -99,10 +136,16 @@ export async function checkProviderConnectivity(
       okCount += 1;
       continue;
     }
-    // An auth/credit failure is a real, actionable break; an offline/unknown
-    // result is "could not verify" — surfaced as a warning, not a failure.
-    if (result.error === 'unauthorized' || result.error === 'no-credit' || result.error === 'no-models') {
+    // A `no-credit` result means the credential AUTHENTICATES — it is just out of
+    // billing. That is a configured, working connection (the user may have the
+    // provider's models switched off), not a Doctor failure: surface it as a
+    // warning, never a fail (#271). A genuine auth/no-models failure is a real,
+    // actionable break; an offline/unknown result is "could not verify" — both
+    // surfaced below their respective severities.
+    if (result.error === 'unauthorized' || result.error === 'no-models') {
       failed.push(`${providerLabel(provider.providerId)} (${result.error})`);
+    } else if (result.error === 'no-credit') {
+      warned.push(`${providerLabel(provider.providerId)} (no credit — authenticated but out of billing)`);
     } else {
       warned.push(`${providerLabel(provider.providerId)} (${result.error ?? 'unverified'})`);
     }
@@ -146,7 +189,12 @@ export async function checkModelRegistrySanity(reader: ProviderRegistryReader): 
   for (const provider of providers) {
     const count = reader.countRegistryCatalog(provider.providerId);
     totalModels += count;
-    if (count === 0) emptyProviders.push(providerLabel(provider.providerId));
+    // Tool providers (audio/speech/image/transcription) expose no chat-model
+    // catalog by design — an empty catalog is their healthy state, so they are
+    // never flagged as "empty catalog" (#270).
+    if (count === 0 && !TOOL_PROVIDER_IDS.has(provider.providerId)) {
+      emptyProviders.push(providerLabel(provider.providerId));
+    }
   }
 
   if (totalModels === 0) {

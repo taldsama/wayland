@@ -14,12 +14,20 @@
  * degrades to a single-fail report instead of an unhandled rejection.
  */
 
+import { clipboard } from 'electron';
 import { ipcBridge } from '@/common';
 import { runDoctor } from '@process/doctor/runner';
 import { buildDoctorChecks } from '@process/doctor/registry';
 import type { DoctorReport } from '@process/doctor/types';
 
 export function initDoctorBridge(): void {
+  // Write the report text to the OS clipboard from MAIN. The renderer's
+  // `navigator.clipboard` is unreliable on Windows; Electron's `clipboard`
+  // writes natively and always works (#269).
+  ipcBridge.doctor.copyText.provider(async ({ text }) => {
+    clipboard.writeText(text);
+  });
+
   ipcBridge.doctor.runDoctor.provider(async () => {
     try {
       return await runDoctor(buildDoctorChecks());

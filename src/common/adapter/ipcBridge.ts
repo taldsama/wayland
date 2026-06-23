@@ -1090,6 +1090,12 @@ export const systemSettings = {
 // posture, so a paired WebUI client must never enumerate it.
 export const doctor = {
   runDoctor: buildProvider<DoctorReport, void>('doctor.run'),
+  // Copy the rendered report text to the OS clipboard from the MAIN process.
+  // `navigator.clipboard.writeText` is unreliable in the Electron renderer on
+  // Windows (it silently rejects without a focused document / secure-context
+  // gesture), so the Doctor "Copy report" button routes through Electron's
+  // `clipboard.writeText` here instead (#269).
+  copyText: buildProvider<void, { text: string }>('doctor.copy-text'),
 };
 
 // Flux compatibility-layer connectors (opencode, etc.)

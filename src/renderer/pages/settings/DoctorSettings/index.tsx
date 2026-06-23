@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, EmptyState } from '@renderer/components/settings/shared';
 import { useToast } from '@renderer/hooks/settings/useToast';
 import SettingsPageShell from '@renderer/pages/settings/components/SettingsPageShell';
+import { copyText } from '@/renderer/utils/ui/clipboard';
 import { doctor } from '@/common/adapter/ipcBridge';
 import type { DoctorCheckResult, DoctorReport, DoctorStatus } from '@process/doctor/types';
 import { buildDoctorReportText } from './reportText';
@@ -93,7 +94,11 @@ const DoctorSettings: React.FC = () => {
   const copyReport = useCallback(async () => {
     if (!report) return;
     try {
-      await navigator.clipboard.writeText(buildDoctorReportText(report, (key) => t(key, { defaultValue: key })));
+      // Use the shared clipboard helper, which prefers `navigator.clipboard`
+      // and falls back to `document.execCommand('copy')` when the async API
+      // rejects (it does so unreliably in the Electron renderer on Windows /
+      // non-secure contexts) — the established, Windows-hardened path (#10, #269).
+      await copyText(buildDoctorReportText(report, (key) => t(key, { defaultValue: key })));
       toast.show({ variant: 'success', title: t('settings.doctor.copied', { defaultValue: 'Report copied' }) });
     } catch {
       toast.show({
