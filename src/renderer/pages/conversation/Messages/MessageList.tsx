@@ -39,6 +39,7 @@ import MessageSkillSuggest from './components/MessageSkillSuggest';
 import MessageText from './components/MessageText';
 import MessageThinking from './components/MessageThinking';
 import SubAgentActivityCard from './components/SubAgentActivityCard';
+import MessageActivity from './components/MessageActivity';
 import type { WriteFileResult } from './types';
 import { useAutoScroll } from './useAutoScroll';
 import { useAutoPreviewOfficeFiles } from '@/renderer/hooks/file/useAutoPreviewOfficeFiles';
@@ -152,6 +153,8 @@ const MessageItem: React.FC<{ message: TMessage; highlighted?: boolean }> = Reac
         return <CronProposeCard message={message} />;
       case 'sub_agent':
         return <SubAgentActivityCard message={message} />;
+      case 'activity':
+        return <MessageActivity message={message} />;
       case 'available_commands':
         return null;
       default:

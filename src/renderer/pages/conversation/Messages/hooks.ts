@@ -7,6 +7,7 @@
 import { ipcBridge } from '@/common';
 import type { TMessage } from '@/common/chat/chatLib';
 import { composeMessage } from '@/common/chat/chatLib';
+import { mergeActivityContent } from '@/common/chat/activityTree';
 import { useCallback, useEffect, useRef } from 'react';
 import { createContext } from '@renderer/utils/ui/createContext';
 
@@ -234,6 +235,27 @@ function composeMessageWithIndex(message: TMessage, list: TMessage[], index: Mes
         newList[existingIdx] = {
           ...existingMsg,
           content: { ...prev, status: mergedStatus, body: prev.body + next.body },
+        };
+        return newList;
+      }
+    }
+    const newIdx = list.length;
+    index.msgIdIndex.set(message.msg_id, newIdx);
+    return list.concat(message);
+  }
+
+  // #252 activity card: merge by turnId (stored as msg_id) via msgIdIndex.
+  // Each incoming message is a single-event delta; fold its nodes/cost into the
+  // existing card. Mirrors the sub_agent branch above (index-optimized).
+  if (message.type === 'activity' && message.msg_id) {
+    const existingIdx = index.msgIdIndex.get(message.msg_id);
+    if (existingIdx !== undefined && existingIdx < list.length) {
+      const existingMsg = list[existingIdx];
+      if (existingMsg.type === 'activity') {
+        const newList = list.slice();
+        newList[existingIdx] = {
+          ...existingMsg,
+          content: mergeActivityContent(existingMsg.content, message.content),
         };
         return newList;
       }

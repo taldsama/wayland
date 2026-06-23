@@ -320,6 +320,21 @@
     "statusDone": "Done",
     "statusFailed": "Failed"
   },
+  "activity": {
+    "activeHeader": "Activity",
+    "stepCount": "{{count}} steps",
+    "completedSummary": "Completed {{count}} steps in {{duration}}",
+    "statusWorking": "Working",
+    "statusDone": "Done",
+    "statusFailed": "Failed",
+    "kindTool": "Tool",
+    "kindThinking": "Thinking",
+    "kindSubAgent": "Sub-agent",
+    "kindCircuit": "Provider",
+    "kindBrowser": "Browser",
+    "kindCua": "Computer",
+    "costPerTurn": "${{cost}}"
+  },
   "skills": {
     "loaded": "Loaded Skills"
   },
