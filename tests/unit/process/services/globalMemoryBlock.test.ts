@@ -40,13 +40,34 @@ function entry(over: Partial<MemoryEntry> & { id: string; summary: string; sourc
   };
 }
 
-/** Minimal fake exposing only the two methods loadGlobalMemoryBlock calls. */
+/**
+ * Minimal fake exposing only the two methods loadGlobalMemoryBlock calls.
+ *
+ * `listEntries` mirrors the real service: it sorts by recency and applies the
+ * `limit`/`offset` slice. The earlier fake ignored both, which is exactly why
+ * the #256 cap-before-filter bug slipped past the suite - the bug only shows
+ * when a recency-ordered `limit` can rank a global entry out of the corpus
+ * before the global filter runs.
+ */
 function fakeService(opts: {
   entries: MemoryEntry[];
   bodies?: Record<string, string>;
 }): IjfwArchiveService {
   return {
-    listEntries: async () => ({ entries: opts.entries, total: opts.entries.length }),
+    listEntries: async (filter: { sort?: string; offset?: number; limit?: number } = {}) => {
+      let entries = [...opts.entries];
+      if ((filter.sort ?? 'recent') === 'recent') {
+        entries = entries.toSorted((a, b) => b.storedAt - a.storedAt);
+      }
+      const total = entries.length;
+      const offset = filter.offset ?? 0;
+      if (filter.limit !== undefined) {
+        entries = entries.slice(offset, offset + filter.limit);
+      } else if (offset > 0) {
+        entries = entries.slice(offset);
+      }
+      return { entries, total };
+    },
     getEntry: async (id: string) => {
       const e = opts.entries.find((x) => x.id === id);
       if (!e) return null;
@@ -77,6 +98,47 @@ describe('loadGlobalMemoryBlock (#256)', () => {
     expect(block).toContain('User memory (from Wayland Memory)');
     expect(block).toContain('HyperFrames overview');
     // The FULL body must be present, not just the 200-char list preview.
+    expect(block).toContain('persist per workspace.');
+  });
+
+  it('still injects an older global entry when newer per-project entries fill the cap (#256)', async () => {
+    // A heavy active project has written 60 recent entries - more than the
+    // entry cap (50). The single global "HyperFrames" drop is OLDER than all of
+    // them. Under the old cap-before-filter code, listEntries({limit:50}) sliced
+    // the corpus down to the 50 newest (all per-project) BEFORE the global
+    // filter ran, so the global entry was ranked out and nothing was injected -
+    // the exact #256 "not found" regression for heavy-project users.
+    const projectPath = path.join(os.homedir(), 'dev', 'busyproj', '.ijfw', 'memory', 'journal.md');
+    const base = Date.now();
+    const projectEntries: MemoryEntry[] = Array.from({ length: 60 }, (_, i) =>
+      entry({
+        id: `proj-${i}`,
+        summary: `project note ${i}`,
+        sourcePath: projectPath,
+        project: 'busyproj',
+        // Newer than the global entry below.
+        storedAt: base + (i + 1) * 1000,
+        bodyPreview: `local note ${i}`,
+      })
+    );
+    const globalPath = path.join(GLOBAL_DIR, 'dropped-1-hyperframes.md');
+    const globalEntry = entry({
+      id: 'hf',
+      summary: 'HyperFrames overview',
+      sourcePath: globalPath,
+      // Oldest of all -> ranked last by recency.
+      storedAt: base,
+      bodyPreview: 'HyperFrames are a modular UI',
+    });
+    setIjfwArchiveService(
+      fakeService({
+        entries: [...projectEntries, globalEntry],
+        bodies: { hf: 'HyperFrames snap to a 12-col grid and persist per workspace.' },
+      })
+    );
+
+    const block = await loadGlobalMemoryBlock();
+    expect(block).toContain('HyperFrames overview');
     expect(block).toContain('persist per workspace.');
   });
 
