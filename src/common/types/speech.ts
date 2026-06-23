@@ -37,6 +37,7 @@ export type SpeechToTextConfig = {
   enabled: boolean;
   provider: SpeechToTextProvider;
   deepgram?: DeepgramSpeechToTextConfig;
+  fluxVoice?: OpenAISpeechToTextConfig;
   openai?: OpenAISpeechToTextConfig;
   whisperLocal?: WhisperLocalSpeechToTextConfig;
 };

@@ -233,6 +233,9 @@
       "permissionDenied": "Se denegó el permiso del micrófono",
       "recordingUnsupported": "La grabación en directo no es compatible aquí. Sube un archivo de audio en su lugar",
       "transcriptionFailed": "Error en la transcripción del audio",
+      "authError": "La clave de Flux no es válida: vuelve a conectar Flux Router para usar la entrada de voz",
+      "premiumLocked": "Flux Voice necesita un plan de pago de Flux: actualiza para usar el dictado",
+      "rateLimited": "Demasiadas solicitudes: inténtalo de nuevo en breve",
       "genericError": "La entrada de voz falló. Inténtalo de nuevo"
     }
   },

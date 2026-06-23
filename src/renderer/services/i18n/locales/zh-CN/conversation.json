@@ -233,6 +233,9 @@
       "permissionDenied": "麦克风权限被拒绝",
       "recordingUnsupported": "当前环境不支持直接录音，请改为上传音频文件",
       "transcriptionFailed": "音频转写失败",
+      "authError": "Flux 密钥无效 — 请重新连接 Flux Router 以使用语音输入",
+      "premiumLocked": "Flux Voice 需要付费的 Flux 套餐 — 请升级以使用语音听写",
+      "rateLimited": "请求过于频繁 — 请稍后再试",
       "genericError": "语音输入失败，请重试"
     }
   },
