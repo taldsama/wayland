@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Message, Switch, Modal } from '@arco-design/web-react';
@@ -34,6 +34,7 @@ import {
   useMcpServerCRUD,
   useMcpConnection,
 } from '@renderer/hooks/mcp';
+import type { McpOAuthLoginResult } from '@renderer/hooks/mcp/useMcpOAuth';
 import { openExternalUrl } from '@renderer/utils/platform';
 import { mcpService } from '@/common/adapter/ipcBridge';
 import type { IMcpServer } from '@/common/config/storage';
@@ -155,6 +156,10 @@ export function DetailPage() {
     server: IMcpServer | null;
     redirectUri: string;
   }>({ visible: false, server: null, redirectUri: 'http://localhost:57000/oauth/callback' });
+
+  // Lets the user back out of an in-flight OAuth sign-in (the upstream call
+  // can't be aborted, so login() races the IPC against this signal).
+  const oauthAbortRef = useRef<AbortController | null>(null);
 
   // Steps the user has completed (beyond static autoCompletedByInstall):
   // - any step whose primaryAction is 'oauth-flow' when the server has a
@@ -308,7 +313,10 @@ export function DetailPage() {
       if (!server) return;
     }
 
-    const result = await login(server);
+    const controller = new AbortController();
+    oauthAbortRef.current = controller;
+    const result = await login(server, { signal: controller.signal });
+    oauthAbortRef.current = null;
     if (result.success === true) {
       await finishOAuthSuccess(server);
       return;
@@ -326,11 +334,34 @@ export function DetailPage() {
       return;
     }
 
+    if (handleOAuthAbort(result)) return;
+
     message.error(
       t('mcpLibrary.install.oauthFailed', 'Authorization failed: {{error}}', {
         error: (result.success === false && result.error) || 'unknown',
       }),
     );
+  };
+
+  /**
+   * Surface a cancelled / timed-out OAuth wait. Returns true when the result was
+   * handled here (so callers skip their generic oauthFailed toast):
+   *  - cancelled: silent back-out, the user chose to stop.
+   *  - timeout: actionable toast pointing at the likely BYO mistake.
+   */
+  const handleOAuthAbort = (result: McpOAuthLoginResult): boolean => {
+    if (result.success !== false) return false;
+    if (result.code === 'cancelled') return true;
+    if (result.code === 'unknown' && result.error === 'timeout') {
+      message.error(
+        t(
+          'mcpLibrary.install.oauthTimeout',
+          'Sign-in timed out. Check the client ID/secret and redirect URI, then try again.',
+        ),
+      );
+      return true;
+    }
+    return false;
   };
 
   /**
@@ -357,16 +388,27 @@ export function DetailPage() {
       prev.map((s) => (s.id === saveResult.server!.id ? saveResult.server! : s)),
     );
 
-    const retryResult = await login(saveResult.server);
+    const controller = new AbortController();
+    oauthAbortRef.current = controller;
+    const retryResult = await login(saveResult.server, { signal: controller.signal });
+    oauthAbortRef.current = null;
     if (retryResult.success === true) {
       await finishOAuthSuccess(saveResult.server);
       return;
     }
+    if (handleOAuthAbort(retryResult)) return;
     message.error(
       t('mcpLibrary.install.oauthFailed', 'Authorization failed: {{error}}', {
         error: (retryResult.success === false && retryResult.error) || 'unknown',
       }),
     );
+  };
+
+  // Abort the in-flight OAuth wait (wired to the Cancel button surfaced while
+  // signing in). login() then settles to a `cancelled` result and clears the
+  // spinner; no error toast is shown for a user-initiated back-out.
+  const cancelOAuth = () => {
+    oauthAbortRef.current?.abort();
   };
 
   // "Connected and ready" must reflect a real connection, not just an install.
@@ -558,6 +600,11 @@ export function DetailPage() {
               ? t('mcpLibrary.detail.signingIn', 'Signing in…')
               : t('mcpLibrary.detail.signIn', 'Sign in')}
           </button>
+          {oauthInFlight && (
+            <button type="button" className={styles.btn2} onClick={cancelOAuth}>
+              {t('mcpLibrary.detail.cancelSignIn', 'Cancel sign-in')}
+            </button>
+          )}
           <div className={styles.lifecycle}>
             <button type="button" className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
               <Trash2 size={14} />
@@ -625,6 +672,11 @@ export function DetailPage() {
                 : t('mcpLibrary.detail.signIn', 'Sign in')
               : t('mcpLibrary.detail.addToken', 'Add token')}
           </button>
+          {isOauth && oauthInFlight && (
+            <button type="button" className={styles.btn2} onClick={cancelOAuth}>
+              {t('mcpLibrary.detail.cancelSignIn', 'Cancel sign-in')}
+            </button>
+          )}
           <div className={styles.lifecycle}>
             <button type="button" className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
               <Trash2 size={14} />
