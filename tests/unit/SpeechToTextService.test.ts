@@ -140,11 +140,11 @@ describe('SpeechToTextService', () => {
   });
 
   describe('typed error mapping (#277)', () => {
-    it('maps OpenAI 401 to STT_FLUX_AUTH_ERROR', async () => {
+    it('maps OpenAI 401 to STT_REQUEST_FAILED (not the Flux-branded auth code)', async () => {
       processConfigGetMock.mockResolvedValue(baseConfig);
       fetchMock.mockResolvedValue(errorResponse(401));
 
-      await expect(SpeechToTextService.transcribe(baseRequest)).rejects.toThrow('STT_FLUX_AUTH_ERROR');
+      await expect(SpeechToTextService.transcribe(baseRequest)).rejects.toThrow('STT_REQUEST_FAILED');
     });
 
     it('maps OpenAI 429 to STT_RATE_LIMITED', async () => {
@@ -154,11 +154,22 @@ describe('SpeechToTextService', () => {
       await expect(SpeechToTextService.transcribe(baseRequest)).rejects.toThrow('STT_RATE_LIMITED');
     });
 
-    it('maps Deepgram 401 to STT_FLUX_AUTH_ERROR', async () => {
+    it('maps Deepgram 401 to STT_REQUEST_FAILED (not the Flux-branded auth code)', async () => {
       processConfigGetMock.mockResolvedValue({
         enabled: true,
         provider: 'deepgram' as const,
         deepgram: { apiKey: 'dg-test', model: 'nova-2' },
+      });
+      fetchMock.mockResolvedValue(errorResponse(401));
+
+      await expect(SpeechToTextService.transcribe(baseRequest)).rejects.toThrow('STT_REQUEST_FAILED');
+    });
+
+    it('maps Flux Voice 401 to STT_FLUX_AUTH_ERROR', async () => {
+      processConfigGetMock.mockResolvedValue({
+        enabled: true,
+        provider: 'flux-voice' as const,
+        fluxVoice: { apiKey: 'flux-key', baseUrl: 'https://api.fluxrouter.ai/v1', model: 'flux-voice' },
       });
       fetchMock.mockResolvedValue(errorResponse(401));
 

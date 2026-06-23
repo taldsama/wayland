@@ -96,29 +96,35 @@ const resolveFluxVoiceConfig = (config: SpeechToTextConfig): OpenAISpeechToTextC
 
 /**
  * Maps an HTTP error response to a typed STT error so the renderer can surface
- * an actionable message. Mirrors the Flux Voice mapping (handoff spec §5) so all
- * providers raise the same codes the renderer (useSpeechInput) already routes:
- *   402 premium_locked → STT_FLUX_PREMIUM_LOCKED (upgrade prompt, no retry)
- *   401               → STT_FLUX_AUTH_ERROR      (bad/missing key)
+ * an actionable message. The provider-neutral codes (413/429) apply to every
+ * provider; the Flux-branded codes (401 → STT_FLUX_AUTH_ERROR with "reconnect
+ * Flux Router" copy, 402 premium_locked → STT_FLUX_PREMIUM_LOCKED) are only
+ * raised for the Flux Voice provider — for OpenAI/Deepgram a 401/402 falls
+ * through to STT_REQUEST_FAILED so the user is not told to reconnect Flux when
+ * their own OpenAI/Deepgram key is the problem.
+ *   402 premium_locked → STT_FLUX_PREMIUM_LOCKED (Flux only; upgrade, no retry)
+ *   401               → STT_FLUX_AUTH_ERROR      (Flux only; bad/missing key)
  *   413               → STT_FILE_TOO_LARGE
  *   429               → STT_RATE_LIMITED
  *   other 4xx/5xx     → STT_REQUEST_FAILED:<message>
  */
-const toTypedSttError = async (response: Response): Promise<Error> => {
-  if (response.status === 402) {
-    const code = await toFluxErrorCode(response);
-    if (code === 'premium_locked') {
-      return new Error('STT_FLUX_PREMIUM_LOCKED');
-    }
-  }
-  if (response.status === 401) {
-    return new Error('STT_FLUX_AUTH_ERROR');
-  }
+const toTypedSttError = async (response: Response, provider: SpeechToTextProvider): Promise<Error> => {
   if (response.status === 413) {
     return new Error('STT_FILE_TOO_LARGE');
   }
   if (response.status === 429) {
     return new Error('STT_RATE_LIMITED');
+  }
+  if (provider === 'flux-voice') {
+    if (response.status === 402) {
+      const code = await toFluxErrorCode(response);
+      if (code === 'premium_locked') {
+        return new Error('STT_FLUX_PREMIUM_LOCKED');
+      }
+    }
+    if (response.status === 401) {
+      return new Error('STT_FLUX_AUTH_ERROR');
+    }
   }
   return new Error(`STT_REQUEST_FAILED:${await toErrorMessage(response)}`);
 };
@@ -337,7 +343,7 @@ export class SpeechToTextService {
     });
 
     if (!response.ok) {
-      throw await toTypedSttError(response);
+      throw await toTypedSttError(response, 'flux-voice');
     }
 
     const payload = (await response.json()) as OpenAITranscriptionResponse;
@@ -383,7 +389,7 @@ export class SpeechToTextService {
     });
 
     if (!response.ok) {
-      throw await toTypedSttError(response);
+      throw await toTypedSttError(response, 'openai');
     }
 
     const payload = (await response.json()) as OpenAITranscriptionResponse;
@@ -410,7 +416,7 @@ export class SpeechToTextService {
     });
 
     if (!response.ok) {
-      throw await toTypedSttError(response);
+      throw await toTypedSttError(response, 'deepgram');
     }
 
     const payload = (await response.json()) as DeepgramTranscriptionResponse;
