@@ -65,7 +65,7 @@ quality**:
    fix gets flagged.
 3. Policy/ethos scan (the Tier 4 list above).
 4. Does it fix the root cause, or mask a symptom?
-5. Gates pass locally: `bunx tsc --noEmit`, `bun run lint`, `bun run test`,
+5. Gates pass locally: `bun run typecheck`, `bun run lint`, `bun run test`,
    `node scripts/check-i18n.js`, and the `prek` CI replication.
 6. Is the fix already shipped or in flight? (Check before duplicating work.)
 7. Author/provenance is sane and the CLA is acknowledged.
