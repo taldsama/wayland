@@ -969,6 +969,28 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
         return;
       }
 
+      // W7 S4 HITL: wcore forwards `approval_required` typed (index.ts) so a
+      // future renderer can show an approval modal. There is no such UI nor any
+      // `approval_resume` sender yet, so consume it here to avoid the
+      // "Unsupported message type" warning in transformMessage (chatLib has no
+      // `approval_required` case → default branch). Mirrors config_changed /
+      // sub_agent_event pre-processing above.
+      //
+      // `reason` is an opaque engine string. In auto-approve (yolo) runs it is
+      // an info signal and dropping it is correct. A non-'info' reason means the
+      // engine is genuinely gated on a resume the app cannot send — log loudly
+      // so a hung turn is diagnosable rather than silent. Renderer wiring +
+      // approval_resume are out of scope (tracked separately).
+      if (data.type === 'approval_required') {
+        const reason = (data.data as { reason?: string } | undefined)?.reason;
+        if (reason && reason !== 'info') {
+          mainError('[WCoreManager]', `approval_required reason='${reason}' but no approval UI; dropping`, data.data);
+        } else {
+          mainLog('[WCoreManager]', 'approval_required (auto-approve info)', data.data);
+        }
+        return;
+      }
+
       // When the inference provider rejects the key (401 / invalid x-api-key),
       // flip that provider off "connected" so the UI stops showing it healthy
       // and the next spawn does not reuse the dead key. Side-effect only: the
