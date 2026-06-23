@@ -257,7 +257,7 @@ bun run start
 # Tests, lint, typecheck
 bun run test
 bun run lint
-bunx tsc --noEmit
+bun run typecheck
 ```
 
 Package installers with electron-builder:
