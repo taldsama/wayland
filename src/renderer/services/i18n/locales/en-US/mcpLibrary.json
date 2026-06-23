@@ -68,6 +68,7 @@
     "needsSignInMeta": "Installed, but not connected yet.",
     "signIn": "Sign in",
     "signingIn": "Signing in…",
+    "cancelSignIn": "Cancel sign-in",
     "needsAttention": "Needs attention",
     "errorMeta": "The last connection attempt failed.",
     "reconnect": "Reconnect",
@@ -127,6 +128,7 @@
     "tokenRequired": "Enter your token first.",
     "oauthSuccess": "Connected to {{name}}.",
     "oauthFailed": "Authorization failed: {{error}}",
+    "oauthTimeout": "Sign-in timed out. Check the client ID/secret and redirect URI, then try again.",
     "setupComplete": "{{name}} is connected and ready. Ask any chat to use it."
   },
   "byo": {

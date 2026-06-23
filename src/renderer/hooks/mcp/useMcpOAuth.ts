@@ -29,6 +29,22 @@ export type McpOAuthLoginResult =
     };
 
 /**
+ * Options for a login() call. The upstream authenticate() (aioncli-core) takes
+ * no AbortSignal and only self-times-out after 5 minutes, so the time bound and
+ * cancel are enforced HERE by racing the IPC promise. The abandoned upstream
+ * call self-closes its own callback server at its 5-min timeout.
+ */
+export interface McpOAuthLoginOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+// Default ceiling on the OAuth wait. A real sign-in resolves far below this; the
+// timeout only fires when a vendor endpoint stalls or the user never completes
+// (or mis-pastes) the consent, so the spinner can't hang the app indefinitely.
+const DEFAULT_LOGIN_TIMEOUT_MS = 120_000;
+
+/**
  * MCP OAuth management hook.
  * Handles OAuth status checks and login flow for MCP servers.
  */
@@ -96,76 +112,114 @@ export const useMcpOAuth = () => {
     }
   }, []);
 
-  const login = useCallback(async (server: IMcpServer): Promise<McpOAuthLoginResult> => {
-    setLoggingIn((prev) => ({ ...prev, [server.id]: true }));
+  const login = useCallback(
+    async (server: IMcpServer, options?: McpOAuthLoginOptions): Promise<McpOAuthLoginResult> => {
+      setLoggingIn((prev) => ({ ...prev, [server.id]: true }));
 
-    // Headless WebUI: the loginMcpOAuth IPC is denied to remote callers (it
-    // mutates credential material). Start the flow over the write-only HTTP route
-    // instead, which derives an origin-aware DCR redirect and persists the token
-    // server-side. The route returns the vendor authorization URL; we navigate
-    // this tab there so the vendor can redirect back to /api/mcp/oauth/callback.
-    if (!isElectronDesktop()) {
-      try {
-        const result = await startMcpOAuthHttp(server.id);
-        if (result.ok === true) {
-          // Navigate to the vendor auth page. The vendor redirect lands on the
-          // server callback, which completes + persists the token; the user
-          // returns and re-checks status. Success is NOT asserted here.
-          window.location.assign(result.authUrl);
-          return { success: true };
+      // The actual sign-in work. Raced below against a timeout + abort so a
+      // stalled vendor endpoint or an unfinished consent can't hang forever -
+      // the upstream authenticate() can't be aborted, so the bound lives here.
+      const runLogin = async (): Promise<McpOAuthLoginResult> => {
+        // Headless WebUI: the loginMcpOAuth IPC is denied to remote callers (it
+        // mutates credential material). Start the flow over the write-only HTTP route
+        // instead, which derives an origin-aware DCR redirect and persists the token
+        // server-side. The route returns the vendor authorization URL; we navigate
+        // this tab there so the vendor can redirect back to /api/mcp/oauth/callback.
+        if (!isElectronDesktop()) {
+          try {
+            const result = await startMcpOAuthHttp(server.id);
+            if (result.ok === true) {
+              // Navigate to the vendor auth page. The vendor redirect lands on the
+              // server callback, which completes + persists the token; the user
+              // returns and re-checks status. Success is NOT asserted here.
+              window.location.assign(result.authUrl);
+              return { success: true };
+            }
+            return { success: false, code: 'unknown', error: result.error || 'Login failed' };
+          } catch (error) {
+            return { success: false, code: 'unknown', error: error instanceof Error ? error.message : 'Unknown error' };
+          }
         }
-        return { success: false, code: 'unknown', error: result.error || 'Login failed' };
-      } catch (error) {
-        return { success: false, code: 'unknown', error: error instanceof Error ? error.message : 'Unknown error' };
-      } finally {
-        setLoggingIn((prev) => ({ ...prev, [server.id]: false }));
-      }
-    }
 
-    try {
-      const response = await mcpService.loginMcpOAuth.invoke({
-        server,
-        config: undefined, // Use auto discovery
+        try {
+          const response = await mcpService.loginMcpOAuth.invoke({
+            server,
+            config: undefined, // Use auto discovery
+          });
+
+          if (response.success && response.data) {
+            const inner = response.data;
+            if (inner.success === true) {
+              setOAuthStatus((prev) => ({
+                ...prev,
+                [server.id]: {
+                  isAuthenticated: true,
+                  needsLogin: false,
+                  isChecking: false,
+                },
+              }));
+              return { success: true };
+            }
+            // inner.success === false: discriminator narrows to the BYO/error shape.
+            return {
+              success: false,
+              code: inner.code,
+              error: inner.error,
+              redirectUri: inner.redirectUri,
+              authorizationUrl: inner.authorizationUrl,
+            };
+          }
+
+          return {
+            success: false,
+            code: 'unknown',
+            error: response.msg || 'Login failed',
+          };
+        } catch (error) {
+          return {
+            success: false,
+            code: 'unknown',
+            error: error instanceof Error ? error.message : 'Unknown error',
+          };
+        }
+      };
+
+      const timeoutMs = options?.timeoutMs ?? DEFAULT_LOGIN_TIMEOUT_MS;
+      const signal = options?.signal;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      // Time bound: resolve to a discriminable timeout result instead of hanging.
+      const timeout = new Promise<McpOAuthLoginResult>((resolve) => {
+        timer = setTimeout(() => {
+          resolve({ success: false, code: 'unknown', error: 'timeout' });
+        }, timeoutMs);
       });
 
-      if (response.success && response.data) {
-        const inner = response.data;
-        if (inner.success === true) {
-          setOAuthStatus((prev) => ({
-            ...prev,
-            [server.id]: {
-              isAuthenticated: true,
-              needsLogin: false,
-              isChecking: false,
-            },
-          }));
-          return { success: true };
+      // Cancel path: an already-aborted signal short-circuits; otherwise resolve
+      // when the user aborts. The abandoned IPC promise settles in the background
+      // (upstream callback server self-closes), it just no longer gates the UI.
+      const abort = new Promise<McpOAuthLoginResult>((resolve) => {
+        if (!signal) return;
+        if (signal.aborted) {
+          resolve({ success: false, code: 'cancelled', error: 'Sign-in cancelled' });
+          return;
         }
-        // inner.success === false: discriminator narrows to the BYO/error shape.
-        return {
-          success: false,
-          code: inner.code,
-          error: inner.error,
-          redirectUri: inner.redirectUri,
-          authorizationUrl: inner.authorizationUrl,
-        };
-      }
+        signal.addEventListener(
+          'abort',
+          () => resolve({ success: false, code: 'cancelled', error: 'Sign-in cancelled' }),
+          { once: true },
+        );
+      });
 
-      return {
-        success: false,
-        code: 'unknown',
-        error: response.msg || 'Login failed',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        code: 'unknown',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    } finally {
-      setLoggingIn((prev) => ({ ...prev, [server.id]: false }));
-    }
-  }, []);
+      try {
+        return await Promise.race([runLogin(), timeout, abort]);
+      } finally {
+        if (timer) clearTimeout(timer);
+        setLoggingIn((prev) => ({ ...prev, [server.id]: false }));
+      }
+    },
+    [],
+  );
 
   /**
    * Persist user-supplied OAuth client credentials for vendors that don't
