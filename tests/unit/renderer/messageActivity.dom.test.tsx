@@ -154,6 +154,42 @@ describe('MessageActivity', () => {
     expect(screen.getByText('gpt-x')).toBeTruthy();
   });
 
+  // #252 cross-audit fix: a completed turn auto-collapses, but with Show cost on
+  // the final spend must stay visible in the collapsed summary (mock attaches
+  // cost to the completed answer, not gated behind re-expanding).
+  it('keeps per-turn cost visible after a turn auto-collapses (showCost on)', () => {
+    const { rerender } = render(
+      <MessageActivity
+        showCost
+        message={make({
+          status: 'running',
+          nodes: [{ id: 'c1', kind: 'tool', callId: 'c1', name: 'Bash', status: 'running', startTime: 1000 }],
+          perTurnCost: [{ turn: 1, model: 'gpt-x', provider: 'openai', costUsd: 0.0123 }],
+        })}
+      />
+    );
+    // While running: expanded, cost visible.
+    expect(screen.getByText('gpt-x')).toBeTruthy();
+
+    // Turn finishes on the same instance -> auto-collapses.
+    rerender(
+      <MessageActivity
+        showCost
+        message={make({
+          status: 'done',
+          nodes: [{ id: 'c1', kind: 'tool', callId: 'c1', name: 'Bash', status: 'done', startTime: 1000, endTime: 2000 }],
+          perTurnCost: [{ turn: 1, model: 'gpt-x', provider: 'openai', costUsd: 0.0123 }],
+        })}
+      />
+    );
+
+    // Collapsed (node body hidden) but cost still shown alongside the summary.
+    expect(screen.queryByText('Bash')).toBeNull();
+    expect(screen.getByText(/Completed .* steps/)).toBeTruthy();
+    expect(screen.getByText('gpt-x')).toBeTruthy();
+    expect(screen.getByText('openai')).toBeTruthy();
+  });
+
   it('reflects failed status on the card', () => {
     render(
       <MessageActivity

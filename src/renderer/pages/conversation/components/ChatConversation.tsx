@@ -202,7 +202,7 @@ type WCoreConversation = Extract<TChatConversation, { type: 'wcore' }>;
 // #252 reframe: header control that opens/closes the opt-in observability panel.
 // State is shared with the panel (WCoreChat) via the cross-instance settings
 // store, so toggling here keeps both in lockstep and survives reload.
-const ObservabilityToggle: React.FC = () => {
+export const ObservabilityToggle: React.FC = () => {
   const { t } = useTranslation();
   const { settings, update } = useObservabilitySettings();
   return (

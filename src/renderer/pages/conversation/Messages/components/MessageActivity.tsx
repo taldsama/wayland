@@ -75,6 +75,27 @@ const MessageActivity: React.FC<{ message: IMessageActivity; showCost?: boolean 
 
   const headerStatus = status === 'running' ? 'processing' : status === 'failed' ? 'error' : 'success';
 
+  // Per-turn cost block, reused in both the collapsed summary and the expanded
+  // detail. With Show cost on, a completed turn auto-collapses but must still
+  // surface its final spend (mock: cost attaches to the completed answer, not
+  // gated behind re-expanding the card).
+  const costBlock = costVisible ? (
+    <div className={styles.cost}>
+      {perTurnCost.map((c) => (
+        <div key={c.turn} className={styles.costRow}>
+          <span className={styles.costModel}>{c.model}</span>
+          <span className={styles.costProvider}>{c.provider}</span>
+          <span className={styles.costValue}>
+            {t('conversation.activity.costPerTurn', {
+              defaultValue: '${{cost}}',
+              cost: c.costUsd.toFixed(4),
+            })}
+          </span>
+        </div>
+      ))}
+    </div>
+  ) : null;
+
   return (
     <div className={styles.container} data-testid='activity-card' data-activity-status={status}>
       <div
@@ -98,38 +119,27 @@ const MessageActivity: React.FC<{ message: IMessageActivity; showCost?: boolean 
       </div>
 
       {!expanded && allDone && (
-        <div className={styles.summary}>
-          <Badge status={headerStatus} />
-          <span>
-            {t('conversation.activity.completedSummary', {
-              defaultValue: 'Completed {{count}} steps in {{duration}}',
-              count: nodes.length,
-              duration: totalDuration || '?',
-            })}
-          </span>
-        </div>
+        <>
+          {nodes.length > 0 && (
+            <div className={styles.summary}>
+              <Badge status={headerStatus} />
+              <span>
+                {t('conversation.activity.completedSummary', {
+                  defaultValue: 'Completed {{count}} steps in {{duration}}',
+                  count: nodes.length,
+                  duration: totalDuration || '?',
+                })}
+              </span>
+            </div>
+          )}
+          {costBlock}
+        </>
       )}
 
       {expanded && (
         <div className={styles.list}>
           <ActivityNodeTree nodes={nodes} />
-
-          {costVisible && (
-            <div className={styles.cost}>
-              {perTurnCost.map((c) => (
-                <div key={c.turn} className={styles.costRow}>
-                  <span className={styles.costModel}>{c.model}</span>
-                  <span className={styles.costProvider}>{c.provider}</span>
-                  <span className={styles.costValue}>
-                    {t('conversation.activity.costPerTurn', {
-                      defaultValue: '${{cost}}',
-                      cost: c.costUsd.toFixed(4),
-                    })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          {costBlock}
         </div>
       )}
     </div>
