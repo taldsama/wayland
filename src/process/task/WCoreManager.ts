@@ -970,14 +970,24 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
       }
 
       // W7 S4 HITL: wcore forwards `approval_required` typed (index.ts) so a
-      // future renderer can show an approval modal. There is no such UI yet and
-      // `reason:'info'` is an auto-approve info signal, so consume it here.
-      // Must return before transformMessage (chatLib has no `approval_required`
-      // case) — otherwise it hits the default branch and logs an "Unsupported
-      // message type" warning, then gets dropped. Mirrors config_changed /
+      // future renderer can show an approval modal. There is no such UI nor any
+      // `approval_resume` sender yet, so consume it here to avoid the
+      // "Unsupported message type" warning in transformMessage (chatLib has no
+      // `approval_required` case → default branch). Mirrors config_changed /
       // sub_agent_event pre-processing above.
+      //
+      // `reason` is an opaque engine string. In auto-approve (yolo) runs it is
+      // an info signal and dropping it is correct. A non-'info' reason means the
+      // engine is genuinely gated on a resume the app cannot send — log loudly
+      // so a hung turn is diagnosable rather than silent. Renderer wiring +
+      // approval_resume are out of scope (tracked separately).
       if (data.type === 'approval_required') {
-        mainLog('[WCoreManager]', 'approval_required (auto-approve info)', data.data);
+        const reason = (data.data as { reason?: string } | undefined)?.reason;
+        if (reason && reason !== 'info') {
+          mainError('[WCoreManager]', `approval_required reason='${reason}' but no approval UI; dropping`, data.data);
+        } else {
+          mainLog('[WCoreManager]', 'approval_required (auto-approve info)', data.data);
+        }
         return;
       }
 
