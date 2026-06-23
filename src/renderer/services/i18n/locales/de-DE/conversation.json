@@ -233,6 +233,9 @@
       "permissionDenied": "Mikrofonberechtigung wurde verweigert",
       "recordingUnsupported": "Live-Aufnahme wird hier nicht unterstützt. Bitte stattdessen eine Audiodatei hochladen",
       "transcriptionFailed": "Audiotranskription fehlgeschlagen",
+      "authError": "Flux-Schlüssel ist ungültig – verbinde Flux Router erneut, um die Spracheingabe zu nutzen",
+      "premiumLocked": "Flux Voice erfordert ein kostenpflichtiges Flux-Abo – führe ein Upgrade durch, um zu diktieren",
+      "rateLimited": "Zu viele Anfragen – bitte versuche es in Kürze erneut",
       "genericError": "Spracheingabe fehlgeschlagen. Bitte erneut versuchen"
     }
   },

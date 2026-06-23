@@ -58,6 +58,12 @@ export const DEFAULT_SPEECH_TO_TEXT_CONFIG: SpeechToTextConfig = {
     language: '',
     model: 'whisper-1',
   },
+  fluxVoice: {
+    apiKey: '',
+    baseUrl: '',
+    language: '',
+    model: 'flux-voice',
+  },
   deepgram: {
     apiKey: '',
     baseUrl: '',
@@ -75,6 +81,10 @@ export const normalizeSpeechToTextConfig = (config?: SpeechToTextConfig): Speech
   openai: {
     ...DEFAULT_SPEECH_TO_TEXT_CONFIG.openai,
     ...config?.openai,
+  },
+  fluxVoice: {
+    ...DEFAULT_SPEECH_TO_TEXT_CONFIG.fluxVoice,
+    ...config?.fluxVoice,
   },
   deepgram: {
     ...DEFAULT_SPEECH_TO_TEXT_CONFIG.deepgram,

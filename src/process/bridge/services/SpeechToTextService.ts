@@ -5,6 +5,7 @@
  */
 
 import type {
+  OpenAISpeechToTextConfig,
   SpeechToTextAudioBuffer,
   SpeechToTextConfig,
   SpeechToTextProvider,
@@ -83,6 +84,43 @@ const getRequestLogMeta = (request: SpeechToTextRequest) => {
 const normalizeBaseUrl = (baseUrl: string | undefined, fallback: string) => {
   const trimmed = baseUrl?.trim();
   return trimmed && trimmed.length > 0 ? trimmed.replace(/\/+$/, '') : fallback;
+};
+
+/**
+ * Resolves the Flux Voice credentials block. New configs store Flux creds under
+ * `fluxVoice`; older persisted configs (seeded before Flux had its own block)
+ * stored them under `openai`, so fall back to `openai` for backward compat.
+ */
+const resolveFluxVoiceConfig = (config: SpeechToTextConfig): OpenAISpeechToTextConfig | undefined =>
+  config.fluxVoice ?? config.openai;
+
+/**
+ * Maps an HTTP error response to a typed STT error so the renderer can surface
+ * an actionable message. Mirrors the Flux Voice mapping (handoff spec §5) so all
+ * providers raise the same codes the renderer (useSpeechInput) already routes:
+ *   402 premium_locked → STT_FLUX_PREMIUM_LOCKED (upgrade prompt, no retry)
+ *   401               → STT_FLUX_AUTH_ERROR      (bad/missing key)
+ *   413               → STT_FILE_TOO_LARGE
+ *   429               → STT_RATE_LIMITED
+ *   other 4xx/5xx     → STT_REQUEST_FAILED:<message>
+ */
+const toTypedSttError = async (response: Response): Promise<Error> => {
+  if (response.status === 402) {
+    const code = await toFluxErrorCode(response);
+    if (code === 'premium_locked') {
+      return new Error('STT_FLUX_PREMIUM_LOCKED');
+    }
+  }
+  if (response.status === 401) {
+    return new Error('STT_FLUX_AUTH_ERROR');
+  }
+  if (response.status === 413) {
+    return new Error('STT_FILE_TOO_LARGE');
+  }
+  if (response.status === 429) {
+    return new Error('STT_RATE_LIMITED');
+  }
+  return new Error(`STT_REQUEST_FAILED:${await toErrorMessage(response)}`);
 };
 
 const toErrorMessage = async (response: Response): Promise<string> => {
@@ -167,10 +205,18 @@ const resolveSpeechToTextConfig = async (): Promise<SpeechToTextConfig> => {
 };
 
 const resolveProviderApiKey = (provider: SpeechToTextProvider, config: SpeechToTextConfig): string => {
-  if (provider === 'openai' || provider === 'flux-voice') {
+  if (provider === 'flux-voice') {
+    const apiKey = resolveFluxVoiceConfig(config)?.apiKey?.trim();
+    if (!apiKey) {
+      throw new Error('STT_FLUX_NOT_CONFIGURED');
+    }
+    return apiKey;
+  }
+
+  if (provider === 'openai') {
     const apiKey = config.openai?.apiKey?.trim();
     if (!apiKey) {
-      throw new Error(provider === 'flux-voice' ? 'STT_FLUX_NOT_CONFIGURED' : 'STT_OPENAI_NOT_CONFIGURED');
+      throw new Error('STT_OPENAI_NOT_CONFIGURED');
     }
     return apiKey;
   }
@@ -191,7 +237,7 @@ const resolveProviderModel = (config: SpeechToTextConfig): string | undefined =>
     return config.openai?.model || DEFAULT_OPENAI_MODEL;
   }
   if (config.provider === 'flux-voice') {
-    return config.openai?.model || FLUX_VOICE_MODEL;
+    return resolveFluxVoiceConfig(config)?.model || FLUX_VOICE_MODEL;
   }
   if (config.provider === 'deepgram') {
     return config.deepgram?.model || DEFAULT_DEEPGRAM_MODEL;
@@ -262,8 +308,9 @@ export class SpeechToTextService {
     request: SpeechToTextRequest
   ): Promise<SpeechToTextResult> {
     const apiKey = resolveProviderApiKey('flux-voice', config);
-    const model = config.openai?.model || FLUX_VOICE_MODEL;
-    const baseUrl = normalizeBaseUrl(config.openai?.baseUrl, FLUX_VOICE_BASE_URL);
+    const fluxConfig = resolveFluxVoiceConfig(config);
+    const model = fluxConfig?.model || FLUX_VOICE_MODEL;
+    const baseUrl = normalizeBaseUrl(fluxConfig?.baseUrl, FLUX_VOICE_BASE_URL);
     const url = baseUrl.endsWith('/audio/transcriptions') ? baseUrl : `${baseUrl}/audio/transcriptions`;
 
     const audioBuffer = Buffer.from(normalizeAudioBuffer(request.audioBuffer));
@@ -272,15 +319,15 @@ export class SpeechToTextService {
     formData.append('file', blob, request.fileName);
     formData.append('model', model);
 
-    const language = request.languageHint || config.openai?.language;
+    const language = request.languageHint || fluxConfig?.language;
     if (language) {
       formData.append('language', language.split('-')[0].toLowerCase());
     }
-    if (config.openai?.prompt) {
-      formData.append('prompt', config.openai.prompt);
+    if (fluxConfig?.prompt) {
+      formData.append('prompt', fluxConfig.prompt);
     }
-    if (typeof config.openai?.temperature === 'number') {
-      formData.append('temperature', String(config.openai.temperature));
+    if (typeof fluxConfig?.temperature === 'number') {
+      formData.append('temperature', String(fluxConfig.temperature));
     }
 
     const response = await fetch(url, {
@@ -290,22 +337,7 @@ export class SpeechToTextService {
     });
 
     if (!response.ok) {
-      if (response.status === 402) {
-        const code = await toFluxErrorCode(response);
-        if (code === 'premium_locked') {
-          throw new Error('STT_FLUX_PREMIUM_LOCKED');
-        }
-      }
-      if (response.status === 401) {
-        throw new Error('STT_FLUX_AUTH_ERROR');
-      }
-      if (response.status === 413) {
-        throw new Error('STT_FILE_TOO_LARGE');
-      }
-      if (response.status === 429) {
-        throw new Error('STT_RATE_LIMITED');
-      }
-      throw new Error(`STT_REQUEST_FAILED:${await toErrorMessage(response)}`);
+      throw await toTypedSttError(response);
     }
 
     const payload = (await response.json()) as OpenAITranscriptionResponse;
@@ -351,7 +383,7 @@ export class SpeechToTextService {
     });
 
     if (!response.ok) {
-      throw new Error(`STT_REQUEST_FAILED:${await toErrorMessage(response)}`);
+      throw await toTypedSttError(response);
     }
 
     const payload = (await response.json()) as OpenAITranscriptionResponse;
@@ -378,7 +410,7 @@ export class SpeechToTextService {
     });
 
     if (!response.ok) {
-      throw new Error(`STT_REQUEST_FAILED:${await toErrorMessage(response)}`);
+      throw await toTypedSttError(response);
     }
 
     const payload = (await response.json()) as DeepgramTranscriptionResponse;

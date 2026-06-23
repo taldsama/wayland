@@ -22,16 +22,18 @@ describe('resolveFluxSttDefault', () => {
     });
     expect(result).not.toBeNull();
     expect(result?.provider).toBe('flux-voice');
-    expect(result?.openai?.apiKey).toBe('sk-flux-test');
-    expect(result?.openai?.baseUrl).toBe('https://api.fluxrouter.ai/v1');
-    expect(result?.openai?.model).toBe('flux-voice');
+    expect(result?.fluxVoice?.apiKey).toBe('sk-flux-test');
+    expect(result?.fluxVoice?.baseUrl).toBe('https://api.fluxrouter.ai/v1');
+    expect(result?.fluxVoice?.model).toBe('flux-voice');
+    // Flux creds must NOT leak into the shared openai block (#277).
+    expect(result?.openai).toBeUndefined();
   });
 
   it('seeds Flux Voice when no config exists at all (first boot)', () => {
     const result = resolveFluxSttDefault({ current: undefined, fluxKey: 'sk-flux-test' });
     expect(result).not.toBeNull();
     expect(result?.provider).toBe('flux-voice');
-    expect(result?.openai?.apiKey).toBe('sk-flux-test');
+    expect(result?.fluxVoice?.apiKey).toBe('sk-flux-test');
   });
 
   it('preserves enabled/autoSend from the existing config', () => {

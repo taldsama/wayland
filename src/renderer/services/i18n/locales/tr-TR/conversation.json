@@ -228,6 +228,9 @@
       "permissionDenied": "Mikrofon izni reddedildi",
       "recordingUnsupported": "Bu ortamda doğrudan kayıt desteklenmiyor. Lütfen bir ses dosyası yükleyin",
       "transcriptionFailed": "Ses yazıya dönüştürülemedi",
+      "authError": "Flux anahtarı geçersiz — sesli girişi kullanmak için Flux Router’ı yeniden bağlayın",
+      "premiumLocked": "Flux Voice ücretli bir Flux planı gerektirir — dikte kullanmak için yükseltin",
+      "rateLimited": "Çok fazla istek — lütfen kısa süre sonra tekrar deneyin",
       "genericError": "Sesli giriş başarısız oldu. Lütfen tekrar deneyin"
     }
   },

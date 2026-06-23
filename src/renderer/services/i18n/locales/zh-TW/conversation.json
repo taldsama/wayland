@@ -233,6 +233,9 @@
       "permissionDenied": "麥克風權限被拒絕",
       "recordingUnsupported": "目前環境不支援直接錄音，請改為上傳音訊檔案",
       "transcriptionFailed": "音訊轉寫失敗",
+      "authError": "Flux 金鑰無效 — 請重新連線 Flux Router 以使用語音輸入",
+      "premiumLocked": "Flux Voice 需要付費的 Flux 方案 — 請升級以使用語音聽寫",
+      "rateLimited": "請求過於頻繁 — 請稍後再試",
       "genericError": "語音輸入失敗，請再試一次"
     }
   },
