@@ -470,22 +470,34 @@ export type ActivityNode = {
 };
 
 /**
- * #252 - composite "activity tree" card for one turn. Keyed by `turnId`
- * (stored as msg_id) so streaming node updates merge into one card, exactly
- * like the sub_agent card merges by parentCallId. Additive: never replaces
- * the existing tool_group / thinking / plan rendering, it surfaces the
- * currently-dropped observability stream (tool_chunk, session_cost, etc.).
+ * #252 - composite "activity tree" card for one turn. Streaming node updates
+ * merge into one card by msg_id, exactly like the sub_agent card merges by
+ * parentCallId. The merge key is `activity:${turnId}` (NOT the bare turnId):
+ * the activity events are stamped by wcore with the turn's stream msg_id, the
+ * SAME id the assistant text message carries. Sharing it would make the
+ * activity card collide with the text bubble in the shared msgIdIndex and
+ * fragment the streamed prose into duplicate bubbles. The real turnId lives in
+ * `content.turnId`. Additive: never replaces the existing tool_group /
+ * thinking / plan rendering, it surfaces the currently-dropped observability
+ * stream (tool_chunk, session_cost, etc.).
  */
 export type IMessageActivity = IMessage<
   'activity',
   {
-    /** Turn id - the stable merge key (stored as msg_id). */
+    /** Turn id - the real wcore stream id this card belongs to. */
     turnId: string;
     nodes: ActivityNode[];
     perTurnCost?: ActivityTurnCost[];
     status: 'running' | 'done' | 'failed';
   }
 >;
+
+/**
+ * #252 - the activity card's merge key. Namespaced off the turn's stream
+ * msg_id so it never collides with the assistant text message that shares that
+ * same id (which would fragment streamed text into duplicate bubbles).
+ */
+export const activityMsgId = (turnId: string): string => `activity:${turnId}`;
 
 // eslint-disable-next-line max-len
 export type TMessage =
@@ -759,7 +771,8 @@ export const transformMessage = (message: IResponseMessage): TMessage => {
     // These raw events are already forwarded by wcore/index.ts +
     // WCoreManager but previously hit the default warn arm (tool_chunk was
     // silently dropped). Each builds a single-delta activity card keyed by
-    // turnId (= msg_id); composeMessage merges deltas into one card.
+    // activityMsgId(turnId) (NOT the bare turnId, which the assistant text
+    // message also uses); composeMessage merges deltas into one card.
     case 'tool_chunk': {
       const d = message.data as { callId: string; toolName?: string; chunk: string };
       const turnId = message.msg_id ?? '';
@@ -773,7 +786,7 @@ export const transformMessage = (message: IResponseMessage): TMessage => {
       return {
         id: uuid(),
         type: 'activity',
-        msg_id: turnId,
+        msg_id: activityMsgId(turnId),
         position: 'left',
         conversation_id: message.conversation_id,
         content,
@@ -794,7 +807,7 @@ export const transformMessage = (message: IResponseMessage): TMessage => {
       return {
         id: uuid(),
         type: 'activity',
-        msg_id: turnId,
+        msg_id: activityMsgId(turnId),
         position: 'left',
         conversation_id: message.conversation_id,
         content,
@@ -814,7 +827,7 @@ export const transformMessage = (message: IResponseMessage): TMessage => {
       return {
         id: uuid(),
         type: 'activity',
-        msg_id: turnId,
+        msg_id: activityMsgId(turnId),
         position: 'left',
         conversation_id: message.conversation_id,
         content,
@@ -834,7 +847,7 @@ export const transformMessage = (message: IResponseMessage): TMessage => {
       return {
         id: uuid(),
         type: 'activity',
-        msg_id: turnId,
+        msg_id: activityMsgId(turnId),
         position: 'left',
         conversation_id: message.conversation_id,
         content,
@@ -1038,7 +1051,7 @@ export const composeMessage = (
     return pushMessage(message);
   }
 
-  // #252 activity card: merge by turnId (stored as msg_id). Each incoming
+  // #252 activity card: merge by msg_id (= activity:${turnId}). Each incoming
   // message is a single-event delta; fold its nodes/cost into the existing
   // card. Mirrors the sub_agent branch above.
   if (message.type === 'activity' && message.msg_id) {
@@ -1052,11 +1065,26 @@ export const composeMessage = (
     return pushMessage(message);
   }
 
-  if (last.msg_id !== message.msg_id || last.type !== message.type) {
+  // text deltas: append to the existing text bubble for this msg_id even when
+  // it is not `last` — an activity card / tool_group / sub_agent card emitted
+  // mid-turn can sit between two text deltas of the SAME turn (model emits
+  // prose, runs a streaming tool, emits more prose). Searching back (instead of
+  // only checking `last`) keeps the turn's prose in ONE bubble instead of
+  // fragmenting it. Mirrors composeMessageWithIndex's msgIdIndex text lookup.
+  if (message.type === 'text' && message.msg_id) {
+    for (let i = list.length - 1; i >= 0; i--) {
+      const msg = list[i];
+      if (msg.msg_id === message.msg_id && msg.type === 'text') {
+        const merged = Object.assign({}, msg, message);
+        merged.content = { ...message.content, content: msg.content.content + message.content.content };
+        return updateMessage(i, merged);
+      }
+    }
     return pushMessage(message);
   }
-  if (message.type === 'text' && last.type === 'text') {
-    message.content.content = last.content.content + message.content.content;
+
+  if (last.msg_id !== message.msg_id || last.type !== message.type) {
+    return pushMessage(message);
   }
   return updateMessage(list.length - 1, Object.assign({}, last, message));
 };

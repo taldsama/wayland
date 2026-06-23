@@ -252,7 +252,9 @@ function composeMessageWithIndex(message: TMessage, list: TMessage[], index: Mes
     return list.concat(message);
   }
 
-  // #252 activity card: merge by turnId (stored as msg_id) via msgIdIndex.
+  // #252 activity card: merge by msg_id (= activity:${turnId}) via msgIdIndex.
+  // The namespaced key keeps the card out of the turn's text-message slot in
+  // msgIdIndex, so interleaved text deltas still merge into one bubble.
   // Each incoming message is a single-event delta; fold its nodes/cost into the
   // existing card. Mirrors the sub_agent branch above (index-optimized).
   if (message.type === 'activity' && message.msg_id) {

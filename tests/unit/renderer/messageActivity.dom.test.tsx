@@ -116,4 +116,72 @@ describe('MessageActivity', () => {
     );
     expect(screen.getByTestId('activity-card').getAttribute('data-activity-status')).toBe('failed');
   });
+
+  // #252 cross-audit: the auto-collapse state machine (prevHadRunning ref) is
+  // the trickiest logic in the card. Verify the running -> done transition on
+  // the SAME instance auto-collapses (not just static single-state snapshots).
+  it('auto-collapses when the turn transitions from running to done', () => {
+    const { rerender } = render(
+      <MessageActivity
+        message={make({
+          status: 'running',
+          nodes: [{ id: 'c1', kind: 'tool', callId: 'c1', name: 'Bash', status: 'running', startTime: 1000 }],
+        })}
+      />
+    );
+    // While running: expanded (node body visible, no completed-summary).
+    expect(screen.getByTestId('activity-card').getAttribute('data-activity-status')).toBe('running');
+    expect(screen.getByText('Bash')).toBeTruthy();
+    expect(screen.queryByText(/Completed .* steps/)).toBeNull();
+
+    // Same instance, turn finishes: status done + node flips terminal.
+    rerender(
+      <MessageActivity
+        message={make({
+          status: 'done',
+          nodes: [
+            { id: 'c1', kind: 'tool', callId: 'c1', name: 'Bash', status: 'done', startTime: 1000, endTime: 2000 },
+          ],
+        })}
+      />
+    );
+
+    // Auto-collapsed: the node body is hidden and the completed-summary shows.
+    expect(screen.getByTestId('activity-card').getAttribute('data-activity-status')).toBe('done');
+    expect(screen.queryByText('Bash')).toBeNull();
+    expect(screen.getByText(/Completed .* steps/)).toBeTruthy();
+  });
+
+  // #252 cross-audit: the depth-N drill-down TREE is the Phase-2 headline, but
+  // no DOM test renders a node WITH children. Render a sub_agent node whose
+  // child holds a nested tool, expand it, assert the nested name surfaces in an
+  // indented subtree.
+  it('renders a sub-agent node child subtree on expand (recursive tree)', () => {
+    render(
+      <MessageActivity
+        message={make({
+          status: 'running',
+          nodes: [
+            {
+              id: 'sub:spawn:1',
+              kind: 'sub_agent',
+              callId: 'spawn:1',
+              name: 'worker',
+              status: 'running',
+              startTime: 1,
+              children: [
+                { id: 'child-1', kind: 'tool', callId: 'child-1', name: 'NestedRead', status: 'running', startTime: 2 },
+              ],
+            },
+          ],
+        })}
+      />
+    );
+    // Parent sub-agent node visible (card auto-expanded while running).
+    const parent = screen.getByText('worker');
+    expect(parent).toBeTruthy();
+    // Expand the sub-agent node to reveal its child subtree.
+    fireEvent.click(parent);
+    expect(screen.getByText('NestedRead')).toBeTruthy();
+  });
 });

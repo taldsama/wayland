@@ -485,8 +485,11 @@ describe('transformMessage - activity (#252)', () => {
     } as unknown as IResponseMessage);
     expect(msg).toBeDefined();
     expect(msg!.type).toBe('activity');
-    expect(msg!.msg_id).toBe('turn-1');
+    // #252 fix: merge key is namespaced off the turn id so it cannot collide
+    // with the assistant text message that carries the same raw turn msg_id.
+    expect(msg!.msg_id).toBe('activity:turn-1');
     const content = (msg as Extract<TMessage, { type: 'activity' }>).content;
+    expect(content.turnId).toBe('turn-1');
     expect(content.nodes).toHaveLength(1);
     expect(content.nodes[0].detail).toBe('partial-output');
     expect(content.nodes[0].callId).toBe('call-1');
@@ -548,6 +551,37 @@ describe('composeMessage - activity merge (#252)', () => {
     let list = composeMessage(t1, []);
     list = composeMessage(t2, list);
     expect(list.filter((m) => m.type === 'activity')).toHaveLength(2);
+  });
+
+  // Regression (#252 cross-audit): the activity card must NOT reuse the turn's
+  // stream msg_id, or it collides with the assistant text message that carries
+  // the same id and fragments streamed prose into duplicate bubbles. The common
+  // turn shape is text -> streaming tool (tool_chunk) -> text on ONE turn id.
+  it('does not fragment the turn text when an activity card is interleaved (fail-on-old)', () => {
+    const textDelta = (content: string): IMessageText =>
+      ({
+        id: 'x',
+        type: 'text',
+        msg_id: 'turn-1',
+        position: 'left',
+        conversation_id: 'c1',
+        content: { content },
+      }) as IMessageText;
+    const activity = transformMessage({
+      type: 'tool_chunk',
+      msg_id: 'turn-1',
+      conversation_id: 'c1',
+      data: { callId: 'call-1', toolName: 'Bash', chunk: 'stdout' },
+    } as unknown as IResponseMessage)!;
+
+    let list = composeMessage(textDelta('Hello '), []);
+    list = composeMessage(activity, list);
+    list = composeMessage(textDelta('World'), list);
+
+    const textCards = list.filter((m) => m.type === 'text');
+    expect(textCards).toHaveLength(1);
+    expect((textCards[0] as IMessageText).content.content).toBe('Hello World');
+    expect(list.filter((m) => m.type === 'activity')).toHaveLength(1);
   });
 });
 
