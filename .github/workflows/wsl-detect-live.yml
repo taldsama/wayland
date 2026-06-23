@@ -39,7 +39,10 @@ jobs:
 
       - name: Install deps
         shell: bash
-        run: bun install --frozen-lockfile
+        # --ignore-scripts: this job only needs the AcpDetector module + vitest;
+        # skipping postinstalls avoids the officecli binary-fetch tar failure on
+        # Windows (Git-bash tar misreads the C:\ path) which is irrelevant here.
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Install WSL + Ubuntu
         uses: Vampire/setup-wsl@v3
