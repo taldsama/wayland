@@ -1,0 +1,60 @@
+/* Branded orbit "thinking" footer for the observability rework. Replaces the
+   StatusFooter dot-pulse with the animated OrbitGlyph + endowed-progress line.
+   Colors are tokens only (no hardcoded hex). */
+
+.container {
+  min-height: 44px;
+  padding: 10px 8px;
+  max-width: 780px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: opacity 200ms ease-out;
+}
+
+.fading {
+  opacity: 0;
+}
+
+/* Endowed-progress line: a small green check + "Loaded context". */
+.endowed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.check {
+  flex-shrink: 0;
+  color: var(--success);
+}
+
+.endowedLabel {
+  color: var(--text-muted);
+}
+
+/* Active line: orbit glyph + label + elapsed. */
+.activeStep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.label {
+  color: var(--text-secondary);
+}
+
+/* The real current action reads slightly brighter than the rotating filler. */
+.labelReal {
+  color: var(--text-primary);
+}
+
+.elapsed {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
