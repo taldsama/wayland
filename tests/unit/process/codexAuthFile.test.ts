@@ -33,7 +33,8 @@ describe('codexAuthPath', () => {
   });
 
   it('honors $CODEX_HOME', () => {
-    expect(codexAuthPath({ CODEX_HOME: '/tmp/custom-codex' })).toBe('/tmp/custom-codex/auth.json');
+    const home = path.join('/tmp', 'custom-codex');
+    expect(codexAuthPath({ CODEX_HOME: home })).toBe(path.join(home, 'auth.json'));
   });
 
   it('ignores a blank $CODEX_HOME', () => {
