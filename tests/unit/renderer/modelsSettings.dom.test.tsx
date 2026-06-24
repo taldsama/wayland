@@ -434,6 +434,7 @@ describe('recognizeKey', () => {
     ['deepgram', 'dg_abcdef'],
     ['assemblyai', 'aai_abcdef'],
     ['elevenlabs', 'xi-api-abcdef'],
+    ['sakana', 'fish_f2570dfe4dac266a7ee64b3df6b64b49'],
     // Structural sk- variants - these resolve uniquely despite the bare-sk
     // prefix because their internal shape is distinctive (32-hex for DeepSeek;
     // 48-mixed-alnum minus OpenAI's `T3BlbkFJ` signature for Moonshot).

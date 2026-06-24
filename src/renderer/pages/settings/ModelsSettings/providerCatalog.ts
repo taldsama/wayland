@@ -155,6 +155,7 @@ export const PROVIDER_META: Record<NativeProviderId, ProviderMeta> = {
     group: 'chinese',
   },
   minimax: { id: 'minimax', displayName: 'MiniMax', mono: 'Mm', bg: '#e8472b', darkText: false, group: 'chinese' },
+  sakana: { id: 'sakana', displayName: 'Sakana AI', mono: 'Sa', bg: '#1f6feb', darkText: false, group: 'open' },
   stability: {
     id: 'stability',
     displayName: 'Stability AI',
@@ -349,6 +350,7 @@ export function recognizeKey(raw: string): KeyRecognition {
   if (key.startsWith('dg_')) return { kind: 'recognized', provider: 'deepgram' };
   if (key.startsWith('aai_')) return { kind: 'recognized', provider: 'assemblyai' };
   if (key.startsWith('xi-api-')) return { kind: 'recognized', provider: 'elevenlabs' };
+  if (key.startsWith('fish_')) return { kind: 'recognized', provider: 'sakana' };
 
   // Multi-field cloud provider (priority 90) - needs the credential form, not a
   // bare key.

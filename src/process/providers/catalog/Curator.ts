@@ -349,6 +349,16 @@ function curateOne(model: CatalogModel, rank: number, familyEligible: boolean): 
   if (model.providerId === 'ollama-local') {
     return { ...model, recommended: false, enabled: true };
   }
+  // Sakana AI (fugu / fugu-ultra) is a new provider not yet tracked by models.dev,
+  // so its live `/v1/models` entries are unenriched and would fail the enrichment
+  // gate (Rule 4) → `enabled: false`, hiding every model from the picker even
+  // though the user explicitly connected the provider. Force the set `enabled` so
+  // the models are selectable + searchable; keep `recommended: false` (no
+  // models.dev recency signal to justify a Recommended slot). Same class as the
+  // Ollama / Flux / ChatGPT-subscription unenriched-but-real catalogs above.
+  if (model.providerId === 'sakana') {
+    return { ...model, recommended: false, enabled: true };
+  }
   if (familyEligible && rank === 0 && !isKnownLegacy(model.id)) {
     return { ...model, recommended: true, enabled: true, role: 'flagship' };
   }

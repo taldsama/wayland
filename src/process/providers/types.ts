@@ -31,6 +31,7 @@ export type NativeProviderId =
   | 'lingyiwanwu'
   | 'zhipu-glm'
   | 'minimax'
+  | 'sakana'
   | 'stability'
   | 'deepgram'
   | 'assemblyai'

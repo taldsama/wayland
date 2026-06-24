@@ -1086,6 +1086,7 @@ const CHAT_START_PLATFORM: Partial<Record<ProviderId, string>> = {
   lingyiwanwu: 'openai-compatible',
   'zhipu-glm': 'openai-compatible',
   minimax: 'openai-compatible',
+  sakana: 'openai-compatible',
   stability: 'openai-compatible',
   deepgram: 'openai-compatible',
   assemblyai: 'openai-compatible',
@@ -1145,6 +1146,7 @@ const CHAT_START_BASE_URL: Partial<Record<ProviderId, string>> = {
   // providerEndpoints.ts also uses `.io`), or a key that connects fine then 401s
   // on the first message (#135).
   minimax: 'https://api.minimax.io/v1',
+  sakana: 'https://api.sakana.ai/v1',
   stability: 'https://api.stability.ai/v1',
   deepgram: 'https://api.deepgram.com/v1',
   assemblyai: 'https://api.assemblyai.com/v2',
@@ -1185,6 +1187,7 @@ const CHAT_START_NAME: Partial<Record<ProviderId, string>> = {
   lingyiwanwu: 'Lingyi Wanwu',
   'zhipu-glm': 'Zhipu GLM',
   minimax: 'MiniMax',
+  sakana: 'Sakana AI',
   stability: 'Stability AI',
   deepgram: 'Deepgram',
   assemblyai: 'AssemblyAI',

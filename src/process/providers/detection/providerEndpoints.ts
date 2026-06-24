@@ -35,6 +35,8 @@ export const PROVIDER_ENDPOINTS: Partial<Record<ProviderId, string>> = {
   // probing `.io` matches the global audience (mirrors the Moonshot `.cn`/`.ai`
   // split above). Inference already uses the `.io` host via models.dev.
   minimax: 'https://api.minimax.io/v1/models',
+  // Sakana AI (Japan) - OpenAI-compatible; keys are prefixed `fish_`.
+  sakana: 'https://api.sakana.ai/v1/models',
   deepgram: 'https://api.deepgram.com/v1/models',
   assemblyai: 'https://api.assemblyai.com/v1/models',
   elevenlabs: 'https://api.elevenlabs.io/v1/models',

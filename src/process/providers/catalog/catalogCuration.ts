@@ -52,6 +52,7 @@ const NATIVE_ID_MAP: Record<NativeProviderId, true> = {
   lingyiwanwu: true,
   'zhipu-glm': true,
   minimax: true,
+  sakana: true,
   stability: true,
   deepgram: true,
   assemblyai: true,

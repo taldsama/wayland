@@ -28,6 +28,13 @@ export const PROVIDER_KEY_PATTERNS: PatternRule[] = [
     priority: 100,
   },
   {
+    // Sakana AI ("sakana" = fish): keys are prefixed `fish_`.
+    provider: 'sakana',
+    test: (k) => k.startsWith('fish_'),
+    match: 'unique',
+    priority: 100,
+  },
+  {
     provider: 'openrouter',
     test: (k) => k.startsWith('sk-or-'),
     match: 'unique',

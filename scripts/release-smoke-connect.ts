@@ -45,12 +45,14 @@ const HEADLINE: ProviderId[] = [
   'xai',
   'openrouter',
   'ollama-cloud',
+  'sakana',
 ];
 
 /** Hosts that MUST stay pinned (the regional-host bugs we already fixed). */
 const PINNED_HOSTS: Partial<Record<ProviderId, string>> = {
   minimax: 'api.minimax.io',
   moonshot: 'api.moonshot.ai',
+  sakana: 'api.sakana.ai',
 };
 
 /** Env var carrying a real key for a provider, e.g. SMOKE_KEY_OPENAI. */

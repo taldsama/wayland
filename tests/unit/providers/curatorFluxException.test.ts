@@ -51,6 +51,19 @@ describe('Curator flux hero-exception', () => {
     expect(out.every((m) => m.recommended === false)).toBe(true);
   });
 
+  it('keeps unenriched Sakana models enabled so a connected Sakana provider is usable', () => {
+    // Sakana (fugu/fugu-ultra) is a new provider not yet in models.dev, so its
+    // live `/v1/models` entries are unenriched and would land enabled:false,
+    // hiding the whole provider from the picker. Same class as Ollama/flux.
+    const sakana: CatalogModel[] = [
+      { ...fluxAuto, id: 'fugu', providerId: 'sakana', family: 'fugu', displayName: 'fugu', enriched: false },
+      { ...fluxAuto, id: 'fugu-ultra', providerId: 'sakana', family: 'fugu-ultra', displayName: 'fugu-ultra', enriched: false },
+    ];
+    const out = curator.curate(sakana);
+    expect(out.filter((m) => m.enabled)).toHaveLength(2);
+    expect(out.every((m) => m.recommended === false)).toBe(true);
+  });
+
   it('does NOT force-enable a non-tier flux-router model (only the tier aliases are hero)', () => {
     // The real flux-router catalog returns 40+ branded route models; only the
     // four tier aliases should get the hero exception, the rest follow normal
