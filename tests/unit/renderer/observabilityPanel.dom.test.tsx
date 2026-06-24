@@ -14,7 +14,7 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-import type { IMessageActivity, TMessage } from '@/common/chat/chatLib';
+import type { IMessageActivity, IMessageSubAgent, TMessage } from '@/common/chat/chatLib';
 
 // useMessageList is the only data dependency: the panel filters the live message
 // stream for `activity` turns. Mock it so each test controls the list directly.
@@ -51,6 +51,21 @@ const text = (id: string): TMessage =>
     content: { content: 'hi' },
   }) as unknown as TMessage;
 
+const subAgent = (id: string, agentName: string): IMessageSubAgent => ({
+  id,
+  msg_id: `sub-${id}`,
+  conversation_id: 'c1',
+  type: 'sub_agent',
+  position: 'left',
+  content: {
+    parentCallId: `call-${id}`,
+    agentName,
+    status: 'running',
+    body: '',
+    nodes: [{ id: `n-${id}`, kind: 'tool', callId: `n-${id}`, name: 'Bash', status: 'running', startTime: 1 }],
+  },
+});
+
 describe('ObservabilityPanel', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -64,7 +79,7 @@ describe('ObservabilityPanel', () => {
     expect(screen.queryByTestId('activity-card')).toBeNull();
   });
 
-  it('renders one activity card per activity turn (ignores non-activity messages)', () => {
+  it('renders one activity card per activity turn (ignores plain text/user messages)', () => {
     messageList = [
       text('t1'),
       activity('a1', {
@@ -79,6 +94,21 @@ describe('ObservabilityPanel', () => {
     expect(screen.getAllByTestId('activity-card')).toHaveLength(2);
     expect(screen.getByText('ReadFile')).toBeTruthy();
     expect(screen.getByText('Bash')).toBeTruthy();
+  });
+
+  it('also renders the sub-agent tree (swarm/delegation turns) in the panel', () => {
+    messageList = [
+      text('t1'),
+      activity('a1', {
+        nodes: [{ id: 'n1', kind: 'tool', callId: 'n1', name: 'ReadFile', status: 'running', startTime: 1 }],
+      }),
+      subAgent('s1', 'compute-2plus2'),
+    ];
+    render(<ObservabilityPanel onClose={() => {}} />);
+    // The activity card still renders.
+    expect(screen.getByText('ReadFile')).toBeTruthy();
+    // The sub-agent card is now surfaced in the panel (was previously inline-only).
+    expect(screen.getByText(/compute-2plus2/)).toBeTruthy();
   });
 
   it('fires onClose when the close control is clicked', () => {
