@@ -224,6 +224,7 @@
     "apiErrorNoCli": "API error occurred. No CLI agent available for fallback.",
     "apiErrorSwitchFailed": "Failed to create fallback conversation.",
     "apiErrorSwitched": "API error, auto-switched to {{cli}} CLI",
+    "toolUnsupported": "This model can't use tools (Read/Write/Search), which Wayland needs to do work. Pick a tool-capable model from the model picker and try again.",
     "confirmationLoadError": "Failed to load confirmation dialog",
     "tryAnotherAgent": "Try another agent:",
     "switchedToAgent": "Switched to {{agent}}",

@@ -10,6 +10,15 @@ let streamHandler: ((message: IResponseMessage) => void) | null = null;
 const mockConversationGetInvoke = vi.fn();
 const mockConversationUpdateInvoke = vi.fn();
 
+const TOOL_UNSUPPORTED_MSG =
+  "This model can't use tools (Read/Write/Search), which Wayland needs to do work. Pick a tool-capable model from the model picker and try again.";
+
+vi.mock('@/renderer/services/i18n', () => ({
+  default: {
+    t: (key: string) => (key === 'conversation.chat.toolUnsupported' ? TOOL_UNSUPPORTED_MSG : key),
+  },
+}));
+
 vi.mock('@/common', () => ({
   ipcBridge: {
     conversation: {
@@ -93,6 +102,14 @@ const fatalError = (): IResponseMessage =>
     data: 'Provider error: API error 400: `tool calling` is not supported',
   }) as unknown as IResponseMessage;
 
+const toolUnsupported404 = (): IResponseMessage =>
+  ({
+    type: 'error',
+    conversation_id: CONV,
+    msg_id: ACTIVE_MSG,
+    data: 'API error 404: No endpoints found that support tool use',
+  }) as unknown as IResponseMessage;
+
 describe('useWCoreMessage — transient error tip clearing on finish (#101)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -156,9 +173,10 @@ describe('useWCoreMessage — transient error tip clearing on finish (#101)', ()
         type: string;
         content?: { type?: string; content?: string };
       }>;
-      // The fatal provider error remains visible to the user...
+      // The fatal provider error remains visible to the user, remapped to the
+      // clean actionable tool-unsupported message instead of the raw provider 400.
       expect(
-        list.some((m) => m.type === 'tips' && m.content?.type === 'error' && m.content?.content?.includes('tool calling'))
+        list.some((m) => m.type === 'tips' && m.content?.type === 'error' && m.content?.content === TOOL_UNSUPPORTED_MSG)
       ).toBe(true);
     });
   });
@@ -181,6 +199,29 @@ describe('useWCoreMessage — transient error tip clearing on finish (#101)', ()
       }>;
       expect(list.some((m) => m.type === 'tips' && m.content?.type === 'error')).toBe(true);
     });
+  });
+
+  it('remaps the OpenRouter tool-use 404 to a clean actionable message and ends the turn cleanly', async () => {
+    const { getByTestId } = renderHarness();
+    await waitFor(() => expect(streamHandler).toBeTypeOf('function'));
+
+    // A tool-incapable OpenRouter model hard-fails with the opaque 404.
+    emit(toolUnsupported404());
+    emit(finish());
+
+    await waitFor(() => {
+      const list = JSON.parse(screen.getByTestId('messages').textContent ?? '[]') as Array<{
+        type: string;
+        content?: { type?: string; content?: string };
+      }>;
+      const tip = list.find((m) => m.type === 'tips' && m.content?.type === 'error');
+      // The clean substituted string is shown, not the raw 404.
+      expect(tip?.content?.content).toBe(TOOL_UNSUPPORTED_MSG);
+      expect(tip?.content?.content).not.toContain('404');
+    });
+
+    // The spinner/composer teardown still fired: the turn ends cleanly.
+    expect(getByTestId('running').textContent).toBe('false');
   });
 
   it('still clears a transient error when the turn recovers and finishes with finish_reason stop', async () => {
