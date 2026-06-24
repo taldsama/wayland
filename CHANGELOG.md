@@ -4,6 +4,41 @@ All notable changes to the Wayland Electron app are documented in this file. For
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-06-24
+
+### Wayland Core engine
+
+- Bundled engine updated to v0.12.8: adds the Sakana AI (Fugu) provider and carries forward the full v0.12.7 fix batch — corrected context-window sizing (#255), Windows Bash reliability (#257), Windows MCP and path fixes (#262, #263, #267), an OpenAI image-generation model fix (#265), ChatGPT-subscription auth import (#293), and Core↔Flux routing improvements.
+
+### Models & providers
+
+- Fixed a routing bug where valid keys for OpenAI-compatible providers (Sakana, OpenRouter, and similar) were sent to api.openai.com and rejected — they now route to each provider's own endpoint, so connected keys work (the v2 registry bridge tag is resolved at spawn).
+- Added Sakana AI as a first-class provider, with its Fugu models and brand logo.
+- ChatGPT-subscription, MiniMax, and DashScope now pull their model lists live from each provider instead of a hardcoded catalog, so you see the current lineup.
+- ChatGPT-subscription chats route correctly through the engine's native ChatGPT provider and are selectable without being bounced to Settings (#243).
+- Local Ollama models now appear in the model picker and initialize without a key (#294, #268).
+- A Claude Code chat with no model pinned now defaults to Opus (the Claude Opus default) instead of Sonnet.
+- Models without tool support now show a clear, friendly message instead of a raw provider 404.
+
+### Memory
+
+- Your global Wayland Memory is injected into chat context, so the assistant can recall what you have saved (#256).
+
+### Reliability & fixes
+
+- Approval prompts are processed before the turn proceeds, and non-info approval requests are logged clearly (#264).
+- File-preview crashes are contained so they no longer break the surrounding chat (#253).
+- Back-after-error navigation and Windows npm resolution fixed (#254, #261).
+- WSL-installed CLIs are detected on Windows (#258).
+- MCP OAuth sign-in gained a timeout and a cancel (#242).
+- Onboarding persona styling, workspace/history git-noise filtering, and Doctor per-server diagnostics refined (#249, #251, #274).
+- Flux Voice speech-to-text has its own config block with provider-scoped error handling.
+- Build and typecheck given more heap headroom (#260).
+
+### Observability
+
+- The inline observability panel is simplified to a lightweight processing indicator for this release while a redesigned activity view is in progress.
+
 ## [0.11.2] - 2026-06-22
 
 ### Wayland Core engine
