@@ -531,6 +531,7 @@ export type I18nKey =
   | 'conversation.observability.showCost'
   | 'conversation.observability.showCostHint'
   | 'conversation.observability.summaryDid'
+  | 'conversation.observability.summaryDidShort'
   | 'conversation.observability.title'
   | 'conversation.observability.toggle'
   | 'conversation.routingBadge.flux'

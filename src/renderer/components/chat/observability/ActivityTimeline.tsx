@@ -149,6 +149,13 @@ const ActivityTimeline: React.FC<Props> = ({ steps, defaultExpanded }) => {
 
   const headerStatus = running ? 'processing' : status === 'failed' ? 'error' : 'success';
 
+  // Some sources (grouped tool_group items) carry no timing, so a span duration
+  // isn't always available - drop the "· {{duration}}" suffix when it's empty.
+  const dur = running ? '' : spanDuration(steps);
+  const doneSummary = dur
+    ? t('conversation.observability.summaryDid', { defaultValue: 'Did {{count}} things · {{duration}}', count: doneCount(steps), duration: dur })
+    : t('conversation.observability.summaryDidShort', { defaultValue: 'Did {{count}} things', count: doneCount(steps) });
+
   return (
     <div className={styles.container} data-testid='activity-timeline' data-timeline-status={status}>
       <div
@@ -173,13 +180,7 @@ const ActivityTimeline: React.FC<Props> = ({ steps, defaultExpanded }) => {
         ) : (
           <>
             <Check className={styles.glyphDone} size='15' aria-hidden='true' />
-            <span className={styles.summaryText}>
-              {t('conversation.observability.summaryDid', {
-                defaultValue: 'Did {{count}} things · {{duration}}',
-                count: doneCount(steps),
-                duration: spanDuration(steps),
-              })}
-            </span>
+            <span className={styles.summaryText}>{doneSummary}</span>
           </>
         )}
         <span className={styles.spacer} />

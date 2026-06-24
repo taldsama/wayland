@@ -347,6 +347,7 @@
     "runningHeader": "{{count}} steps",
     "runningCount": "{{count}} running",
     "summaryDid": "Did {{count}} things · {{duration}}",
+    "summaryDidShort": "Did {{count}} things",
     "expandRow": "Toggle step detail"
   },
   "toolbar": {
