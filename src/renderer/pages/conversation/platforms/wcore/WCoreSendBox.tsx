@@ -13,6 +13,7 @@ import CommandQueuePanel from '@/renderer/components/chat/CommandQueuePanel';
 import SendBox from '@/renderer/components/chat/sendbox';
 import ThoughtDisplay from '@/renderer/components/chat/ThoughtDisplay';
 import OrbitThinking from '@/renderer/components/chat/observability/OrbitThinking';
+import { CHAT_RETRY_EVENT, type ChatRetryDetail } from '@/renderer/pages/conversation/Messages/components/MessageActions';
 import FileAttachButton from '@/renderer/components/media/FileAttachButton';
 import FilePreview from '@/renderer/components/media/FilePreview';
 import HorizontalFileList from '@/renderer/components/media/HorizontalFileList';
@@ -358,6 +359,22 @@ const WCoreSendBox: React.FC<{
 
     await executeCommand({ input: message, files: filesToSend });
   };
+
+  // #252 rework: Retry on a message's action row re-sends that turn's prompt.
+  // The active sendbox owns send, so it listens for the window event (scoped to
+  // this conversation so it never fires on another open tab).
+  const onSendRef = useRef(onSendHandler);
+  onSendRef.current = onSendHandler;
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<ChatRetryDetail>).detail;
+      if (!detail?.text) return;
+      if (detail.conversationId && detail.conversationId !== conversation_id) return;
+      void onSendRef.current(detail.text);
+    };
+    window.addEventListener(CHAT_RETRY_EVENT, handler);
+    return () => window.removeEventListener(CHAT_RETRY_EVENT, handler);
+  }, [conversation_id]);
 
   const handleEditQueuedCommand = useCallback(
     (item: ConversationCommandQueueItem) => {

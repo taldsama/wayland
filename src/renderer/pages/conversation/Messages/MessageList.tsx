@@ -33,7 +33,6 @@ import MessageTips from './components/MessageTips';
 import MessageToolCall from './components/MessageToolCall';
 import MessageToolGroup from './components/MessageToolGroup';
 import ActivityTimeline from '@/renderer/components/chat/observability/ActivityTimeline';
-import MessageToolbar from '@/renderer/components/chat/observability/MessageToolbar';
 import { activityToSteps, subAgentToStep, toolSummaryToSteps } from '@/common/chat/activity/projectMessages';
 import MessageCronTrigger from './components/MessageCronTrigger';
 import CronProposeCard from './components/CronProposeCard';
@@ -47,25 +46,6 @@ import SelectionReplyButton from './components/SelectionReplyButton';
 import { computeChatTimeMarkers, splitGap, type ChatTimeMarker } from './utils/chatTimeMarkers';
 
 type TurnDiffContent = Extract<CodexToolCallUpdate, { subtype: 'turn_diff' }>;
-
-/**
- * Assistant text bubble + the per-message action toolbar (copy / feedback). The
- * toolbar reveals on hover/focus of the bubble (driven here since a
- * pointer-events:none toolbar can't reveal on its own hover).
- */
-const AssistantText: React.FC<{ message: Extract<TMessage, { type: 'text' }> }> = ({ message }) => {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <div
-      className='min-w-0 flex-1'
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <MessageText message={message} />
-      <MessageToolbar text={message.content.content} revealed={hovered} />
-    </div>
-  );
-};
 
 type IMessageVO =
   | TMessage
@@ -115,7 +95,7 @@ const getUnhandledMessageType = (_message: never): string => 'unknown';
 // Image preview context
 export const ImagePreviewContext = createContext<{ inPreviewGroup: boolean }>({ inPreviewGroup: false });
 
-const MessageItem: React.FC<{ message: TMessage; highlighted?: boolean }> = React.memo(
+const MessageItem: React.FC<{ message: TMessage; highlighted?: boolean; isLast?: boolean; retryText?: string }> = React.memo(
   HOC((props) => {
     const { message, highlighted } = props as { message: TMessage; highlighted?: boolean };
     return (
@@ -138,15 +118,11 @@ const MessageItem: React.FC<{ message: TMessage; highlighted?: boolean }> = Reac
         {props.children}
       </div>
     );
-  })(({ message }) => {
+  })(({ message, isLast, retryText }: { message: TMessage; highlighted?: boolean; isLast?: boolean; retryText?: string }) => {
     const { t } = useTranslation();
     switch (message.type) {
       case 'text':
-        return message.position === 'left' ? (
-          <AssistantText message={message} />
-        ) : (
-          <MessageText message={message}></MessageText>
-        );
+        return <MessageText message={message} isLast={isLast} retryText={retryText} />;
       case 'tips':
         return <MessageTips message={message}></MessageTips>;
       case 'tool_call':
@@ -193,7 +169,9 @@ const MessageItem: React.FC<{ message: TMessage; highlighted?: boolean }> = Reac
     prev.message.content === next.message.content &&
     prev.message.position === next.message.position &&
     prev.message.type === next.message.type &&
-    prev.highlighted === next.highlighted
+    prev.highlighted === next.highlighted &&
+    prev.isLast === next.isLast &&
+    prev.retryText === next.retryText
 );
 
 /**
@@ -338,6 +316,27 @@ const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.
     return result;
   }, [list]);
 
+  // #252 rework: the per-message action row is always shown on the LAST assistant
+  // bubble (hover-revealed elsewhere), and Retry needs the preceding user prompt.
+  // Compute the last assistant-text id + a map of assistant id -> its prompt.
+  const { lastAssistantId, retryTextById } = useMemo(() => {
+    const map = new Map<string, string>();
+    let lastId: string | undefined;
+    let lastUserText = '';
+    for (const item of processedList) {
+      if ('type' in item && (item.type === 'file_summary' || item.type === 'tool_summary')) continue;
+      const m = item as TMessage;
+      if (m.type !== 'text') continue;
+      if (m.position === 'right') {
+        if (typeof m.content?.content === 'string') lastUserText = m.content.content;
+      } else if (m.position === 'left') {
+        if (lastUserText) map.set(m.id, lastUserText);
+        lastId = m.id;
+      }
+    }
+    return { lastAssistantId: lastId, retryTextById: map };
+  }, [processedList]);
+
   // Per-row time markers for project chats, aligned to processedList indices (#59).
   const timeMarkers = useMemo(() => {
     if (!isProjectChat) return null;
@@ -464,7 +463,13 @@ const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.
       );
     } else {
       body = (
-        <MessageItem message={item as TMessage} key={(item as TMessage).id} highlighted={highlighted}></MessageItem>
+        <MessageItem
+          message={item as TMessage}
+          key={(item as TMessage).id}
+          highlighted={highlighted}
+          isLast={(item as TMessage).id === lastAssistantId}
+          retryText={retryTextById.get((item as TMessage).id)}
+        ></MessageItem>
       );
     }
     if (!marker) return body;

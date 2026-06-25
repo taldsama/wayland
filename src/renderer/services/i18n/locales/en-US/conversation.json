@@ -350,11 +350,10 @@
     "summaryDidShort": "Did {{count}} things",
     "expandRow": "Toggle step detail"
   },
-  "toolbar": {
-    "copy": "Copy",
-    "copied": "Copied",
-    "copyFailed": "Copy failed",
-    "regenerate": "Regenerate",
+  "actions": {
+    "readAloud": "Read aloud",
+    "stopReading": "Stop",
+    "retry": "Retry",
     "thumbsUp": "Good response",
     "thumbsDown": "Bad response"
   },
