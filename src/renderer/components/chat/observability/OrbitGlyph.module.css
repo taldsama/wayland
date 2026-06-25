@@ -31,6 +31,21 @@
   animation: breathe 1.6s ease-in-out infinite;
 }
 
+/* Resting state shown after a turn completes: hold still, slightly dimmed. */
+.paused .arcs,
+.paused .sat,
+.paused .nucleus {
+  animation: none;
+}
+
+.paused .nucleus {
+  opacity: 1;
+}
+
+.paused {
+  opacity: 0.55;
+}
+
 @keyframes spin {
   from {
     transform: rotate(0deg);

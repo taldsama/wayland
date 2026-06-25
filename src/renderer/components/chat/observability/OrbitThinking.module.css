@@ -6,16 +6,13 @@
 
 .container {
   min-height: 28px;
-  padding: 6px 8px;
+  /* Generous bottom padding so the orbit is never crammed/overlapped by the
+     activity badge or the composer (it stays parked under the last block). */
+  padding: 8px 8px 28px;
   max-width: 780px;
   width: 100%;
   margin: 0 auto;
   display: flex;
-  transition: opacity 200ms ease-out;
-}
-
-.fading {
-  opacity: 0;
 }
 
 /* Active line: orbit glyph + label + elapsed. */

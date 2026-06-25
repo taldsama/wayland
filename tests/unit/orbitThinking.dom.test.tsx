@@ -73,21 +73,16 @@ describe('OrbitThinking', () => {
     expect(screen.getByText(/^\d+s$/)).toBeInTheDocument();
   });
 
-  it('fades then renders the 20px spacer when processing stops', () => {
-    const { rerender, container } = render(<OrbitThinking isProcessing />);
-    expect(screen.getByTestId('orbit-thinking')).toBeInTheDocument();
+  it('stays mounted and STATIC (no label) when processing stops', () => {
+    const { rerender } = render(<OrbitThinking isProcessing />);
+    expect(screen.getByTestId('orbit-thinking')).toHaveAttribute('data-processing', 'true');
+    expect(screen.getByTestId('orbit-thinking-label')).toBeInTheDocument();
 
-    // Stop processing -> fading state, still mounted.
+    // Stop processing -> still mounted (always present), now static, no label.
     rerender(<OrbitThinking isProcessing={false} />);
-    expect(screen.getByTestId('orbit-thinking')).toHaveAttribute('data-fading', 'true');
-
-    // After the 200ms fade -> unmounts to the spacer.
-    act(() => {
-      vi.advanceTimersByTime(200);
-    });
-    expect(screen.queryByTestId('orbit-thinking')).toBeNull();
-    const spacer = container.firstChild as HTMLElement;
-    expect(spacer).not.toBeNull();
-    expect(spacer.style.minHeight).toBe('20px');
+    const orbit = screen.getByTestId('orbit-thinking');
+    expect(orbit).toBeInTheDocument();
+    expect(orbit).toHaveAttribute('data-processing', 'false');
+    expect(screen.queryByTestId('orbit-thinking-label')).toBeNull();
   });
 });

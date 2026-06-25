@@ -11,17 +11,20 @@ import styles from './OrbitGlyph.module.css';
 type Props = {
   size?: number;
   className?: string;
+  /** When true the glyph holds still (no animation) - used as the resting "done" state. */
+  paused?: boolean;
 };
 
 /**
- * Animated Wayland orbit-logo "thinking" glyph. Inline SVG clone of the brand
- * mark (WaylandLogoMark) so individual sub-elements can animate: the orbit arcs
- * sweep, the electrons counter-rotate, and the nucleus breathes. Purely
+ * Wayland orbit-logo "thinking" glyph. Inline SVG clone of the brand mark
+ * (WaylandLogoMark) so individual sub-elements can animate: the orbit arcs
+ * sweep, the electrons counter-rotate, and the nucleus breathes. When `paused`
+ * it holds static (the resting state shown after a turn completes). Purely
  * decorative (the textual status label is rendered separately), hence aria-hidden.
  */
-const OrbitGlyph: React.FC<Props> = ({ size = 22, className }) => (
+const OrbitGlyph: React.FC<Props> = ({ size = 22, className, paused }) => (
   <svg
-    className={classNames(styles.orbit, className)}
+    className={classNames(styles.orbit, paused && styles.paused, className)}
     width={size}
     height={size}
     viewBox='0 0 24 24'

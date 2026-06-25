@@ -30,6 +30,13 @@ export type ChatRetryDetail = { conversationId?: string; text: string };
 
 type Feedback = 'up' | 'down';
 
+/**
+ * 'always'  - pinned visible (the last, completed assistant message)
+ * 'hover'   - revealed on hover/focus (older messages)
+ * 'hidden'  - not rendered at all (while the message is still streaming)
+ */
+export type ActionsDisplay = 'always' | 'hover' | 'hidden';
+
 type Props = {
   /** Copy handler from MessageText (rich copy incl. files/json). */
   onCopy: () => void;
@@ -38,8 +45,8 @@ type Props = {
   /** Plain text for read-aloud (markdown stripped by the caller or here). */
   readText: string;
   isUser: boolean;
-  /** Always-visible when this is the last message in the conversation. */
-  isLast: boolean;
+  /** Visibility mode - the tool set only appears once a response is done. */
+  display: ActionsDisplay;
   /** For Retry (assistant only): the preceding user prompt to re-send. */
   retryText?: string;
   conversationId?: string;
@@ -81,7 +88,7 @@ const ActionButton: React.FC<{ label: string; onClick: () => void; active?: bool
   </Tooltip>
 );
 
-const MessageActions: React.FC<Props> = ({ onCopy, messageId, readText, isUser, isLast, retryText, conversationId }) => {
+const MessageActions: React.FC<Props> = ({ onCopy, messageId, readText, isUser, display, retryText, conversationId }) => {
   const { t } = useTranslation();
   const fbKey = `wl:fb:${messageId}`;
   const [feedback, setFeedback] = useState<Feedback | null>(() => {
@@ -137,10 +144,15 @@ const MessageActions: React.FC<Props> = ({ onCopy, messageId, readText, isUser, 
     );
   }, [retryText, conversationId]);
 
-  // Reveal: hover-gated for older messages, always-on for the last one.
-  const revealClass = isLast
-    ? 'opacity-100'
-    : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto';
+  // Hidden while the message is still streaming - the tool set only appears once
+  // the response is done. (Hooks above always run, so this early-return is safe.)
+  if (display === 'hidden') return null;
+
+  // Reveal: pinned for the last completed message, hover-gated for older ones.
+  const revealClass =
+    display === 'always'
+      ? 'opacity-100'
+      : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto';
 
   return (
     <div

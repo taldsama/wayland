@@ -27,7 +27,7 @@ afterEach(() => {
   localStorage.clear();
 });
 
-const base = { onCopy: vi.fn(), messageId: 'm1', readText: 'hello world', isLast: false };
+const base = { onCopy: vi.fn(), messageId: 'm1', readText: 'hello world', display: 'always' as const };
 
 describe('MessageActions', () => {
   it('assistant: renders copy + read-aloud + retry + 2 thumbs', () => {
@@ -37,6 +37,11 @@ describe('MessageActions', () => {
     expect(screen.getByLabelText('Retry')).toBeTruthy();
     expect(screen.getByLabelText('Good response')).toBeTruthy();
     expect(screen.getByLabelText('Bad response')).toBeTruthy();
+  });
+
+  it('renders NOTHING when display is hidden (still streaming)', () => {
+    const { container } = render(<MessageActions {...base} isUser={false} display='hidden' />);
+    expect(container.firstChild).toBeNull();
   });
 
   it('user: renders only copy', () => {

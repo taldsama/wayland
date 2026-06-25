@@ -39,6 +39,7 @@ import MessageCronTrigger from './components/MessageCronTrigger';
 import CronProposeCard from './components/CronProposeCard';
 import MessageSkillSuggest from './components/MessageSkillSuggest';
 import MessageText from './components/MessageText';
+import type { ActionsDisplay } from './components/MessageActions';
 import MessageThinking from './components/MessageThinking';
 import type { WriteFileResult } from './types';
 import { useAutoScroll } from './useAutoScroll';
@@ -96,7 +97,7 @@ const getUnhandledMessageType = (_message: never): string => 'unknown';
 // Image preview context
 export const ImagePreviewContext = createContext<{ inPreviewGroup: boolean }>({ inPreviewGroup: false });
 
-const MessageItem: React.FC<{ message: TMessage; highlighted?: boolean; isLast?: boolean; retryText?: string }> = React.memo(
+const MessageItem: React.FC<{ message: TMessage; highlighted?: boolean; toolbarMode?: ActionsDisplay; retryText?: string }> = React.memo(
   HOC((props) => {
     const { message, highlighted } = props as { message: TMessage; highlighted?: boolean };
     return (
@@ -119,11 +120,11 @@ const MessageItem: React.FC<{ message: TMessage; highlighted?: boolean; isLast?:
         {props.children}
       </div>
     );
-  })(({ message, isLast, retryText }: { message: TMessage; highlighted?: boolean; isLast?: boolean; retryText?: string }) => {
+  })(({ message, toolbarMode, retryText }: { message: TMessage; highlighted?: boolean; toolbarMode?: ActionsDisplay; retryText?: string }) => {
     const { t } = useTranslation();
     switch (message.type) {
       case 'text':
-        return <MessageText message={message} isLast={isLast} retryText={retryText} />;
+        return <MessageText message={message} toolbarMode={toolbarMode} retryText={retryText} />;
       case 'tips':
         return <MessageTips message={message}></MessageTips>;
       case 'tool_call':
@@ -171,7 +172,7 @@ const MessageItem: React.FC<{ message: TMessage; highlighted?: boolean; isLast?:
     prev.message.position === next.message.position &&
     prev.message.type === next.message.type &&
     prev.highlighted === next.highlighted &&
-    prev.isLast === next.isLast &&
+    prev.toolbarMode === next.toolbarMode &&
     prev.retryText === next.retryText
 );
 
@@ -204,6 +205,17 @@ const ChatTimeMarkerRow: React.FC<{ marker: ChatTimeMarker }> = ({ marker }) => 
     </div>
   );
 };
+
+// Stable Virtuoso list components (module-level so they are NEVER recreated on
+// render). This is what keeps the orbit indicator MOUNTED across re-renders, so
+// its CSS animation runs continuously instead of restarting (= flashing) every
+// streamed token. The processing state reaches the footer via Virtuoso `context`.
+type MessageListContext = { isProcessing?: boolean };
+const ListHeader: React.FC = () => <div className='h-10px' />;
+const ListFooter: React.FC<{ context?: MessageListContext }> = ({ context }) => (
+  <OrbitThinking isProcessing={!!context?.isProcessing} />
+);
+const LIST_COMPONENTS = { Header: ListHeader, Footer: ListFooter } as const;
 
 const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode; isProcessing?: boolean }> = ({
   emptySlot,
@@ -466,13 +478,23 @@ const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.
         </div>
       );
     } else {
+      const tm = item as TMessage;
+      const isLastAssistant = tm.type === 'text' && tm.id === lastAssistantId;
+      // The tool set only appears once a response is DONE: the last assistant
+      // message is 'hidden' while it is the last item AND still streaming, then
+      // 'always' once complete; older messages reveal on hover.
+      const toolbarMode: ActionsDisplay = isLastAssistant
+        ? _index === processedList.length - 1 && isProcessing
+          ? 'hidden'
+          : 'always'
+        : 'hover';
       body = (
         <MessageItem
-          message={item as TMessage}
-          key={(item as TMessage).id}
+          message={tm}
+          key={tm.id}
           highlighted={highlighted}
-          isLast={(item as TMessage).id === lastAssistantId}
-          retryText={retryTextById.get((item as TMessage).id)}
+          toolbarMode={toolbarMode}
+          retryText={retryTextById.get(tm.id)}
         ></MessageItem>
       );
     }
@@ -507,13 +529,12 @@ const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.
             followOutput={handleFollowOutput}
             onScroll={handleScroll}
             atBottomStateChange={handleAtBottomStateChange}
-            components={{
-              Header: () => <div className='h-10px' />,
-              // #252 rework: the orbit "thinking" indicator lives here (inline,
-              // under the last block, Claude-style) - shows immediately on submit,
-              // and renders a small spacer when idle so the layout never jumps.
-              Footer: () => <OrbitThinking isProcessing={!!isProcessing} />,
-            }}
+            // #252 rework: the orbit "thinking" indicator is the (stable) footer -
+            // always parked under the last block, animating while processing and
+            // resting static when done. Stable components + context avoid remounts
+            // (= flashing). See LIST_COMPONENTS above.
+            components={LIST_COMPONENTS}
+            context={{ isProcessing }}
           />
         </ImagePreviewContext.Provider>
       </Image.PreviewGroup>

@@ -8,7 +8,7 @@ import type { IMessageText } from '@/common/chat/chatLib';
 import { WAYLAND_FILES_MARKER } from '@/common/config/constants';
 import { useConversationContextSafe } from '@/renderer/hooks/context/ConversationContext';
 import { Alert, Message } from '@arco-design/web-react';
-import MessageActions from './MessageActions';
+import MessageActions, { type ActionsDisplay } from './MessageActions';
 import classNames from 'classnames';
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -123,9 +123,9 @@ const useFormatContent = (content: string) => {
   }, [content]);
 };
 
-const MessageText: React.FC<{ message: IMessageText; isLast?: boolean; retryText?: string }> = ({
+const MessageText: React.FC<{ message: IMessageText; toolbarMode?: ActionsDisplay; retryText?: string }> = ({
   message,
-  isLast = false,
+  toolbarMode = 'hover',
   retryText,
 }) => {
   // Filter think tags from content before rendering
@@ -200,7 +200,7 @@ const MessageText: React.FC<{ message: IMessageText; isLast?: boolean; retryText
       messageId={message.id}
       readText={text}
       isUser={isUserMessage}
-      isLast={isLast}
+      display={toolbarMode}
       retryText={!isUserMessage ? retryText : undefined}
       conversationId={conversationContext?.conversationId}
     />
