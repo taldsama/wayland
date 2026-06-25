@@ -343,7 +343,6 @@
     "empty": "Activity from this conversation will appear here.",
     "showCost": "Show cost",
     "showCostHint": "off by default",
-    "contextLoaded": "Loaded context",
     "runningHeader": "{{count}} steps",
     "runningCount": "{{count}} running",
     "summaryDid": "Did {{count}} things · {{duration}}",

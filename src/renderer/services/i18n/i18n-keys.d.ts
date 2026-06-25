@@ -528,7 +528,6 @@ export type I18nKey =
   | 'conversation.noModelCta.sendTooltip'
   | 'conversation.noModelCta.title'
   | 'conversation.observability.close'
-  | 'conversation.observability.contextLoaded'
   | 'conversation.observability.empty'
   | 'conversation.observability.expandRow'
   | 'conversation.observability.runningCount'

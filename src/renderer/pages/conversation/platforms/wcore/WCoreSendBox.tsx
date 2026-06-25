@@ -12,7 +12,6 @@ import ContextUsageIndicator from '@/renderer/components/agent/ContextUsageIndic
 import CommandQueuePanel from '@/renderer/components/chat/CommandQueuePanel';
 import SendBox from '@/renderer/components/chat/sendbox';
 import ThoughtDisplay from '@/renderer/components/chat/ThoughtDisplay';
-import OrbitThinking from '@/renderer/components/chat/observability/OrbitThinking';
 import { CHAT_RETRY_EVENT, type ChatRetryDetail } from '@/renderer/pages/conversation/Messages/components/MessageActions';
 import FileAttachButton from '@/renderer/components/media/FileAttachButton';
 import FilePreview from '@/renderer/components/media/FilePreview';
@@ -98,7 +97,9 @@ const WCoreSendBox: React.FC<{
   teamId?: string;
   agentSlotId?: string;
   sessionMode?: string;
-}> = ({ conversation_id, modelSelection, teamId, agentSlotId, sessionMode }) => {
+  /** Report the turn-running state up so the inline orbit indicator can render in the message list. */
+  onRunningChange?: (running: boolean) => void;
+}> = ({ conversation_id, modelSelection, teamId, agentSlotId, sessionMode, onRunningChange }) => {
   const [workspacePath, setWorkspacePath] = useState('');
   const [dynamicModes, setDynamicModes] = useState<AgentModeOption[]>([]);
   // The most recent turn dispatched, kept so the Flux failover can replay it.
@@ -376,6 +377,13 @@ const WCoreSendBox: React.FC<{
     return () => window.removeEventListener(CHAT_RETRY_EVENT, handler);
   }, [conversation_id]);
 
+  // Report the turn-running state up so the inline orbit "thinking" indicator
+  // (rendered in the message list, under the last block) shows the moment a turn
+  // starts and hides when it completes.
+  useEffect(() => {
+    onRunningChange?.(running);
+  }, [running, onRunningChange]);
+
   const handleEditQueuedCommand = useCallback(
     (item: ConversationCommandQueueItem) => {
       remove(item.id);
@@ -444,11 +452,10 @@ const WCoreSendBox: React.FC<{
         onRemove={remove}
         onClear={clear}
       />
-      {/* #252 rework: the animated orbit-glyph thinking cue (branded mark +
-          endowed progress + rotating phrases + elapsed) for the whole turn.
-          ThoughtDisplay is kept (without `running`) only for the thought-subject
-          hint path (e.g. "Awaiting Confirmation"), which renders null otherwise. */}
-      <OrbitThinking isProcessing={running} />
+      {/* #252 rework: the orbit "thinking" indicator moved INTO the message list
+          (inline, under the last block - Claude-style), driven by onRunningChange.
+          ThoughtDisplay is kept for the thought-subject hint path (e.g.
+          "Awaiting Confirmation"), which renders null otherwise. */}
       <ThoughtDisplay thought={thought} onStop={handleStop} />
 
       <SendBox

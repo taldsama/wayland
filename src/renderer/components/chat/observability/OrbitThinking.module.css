@@ -1,38 +1,21 @@
-/* Branded orbit "thinking" footer for the observability rework. Replaces the
-   StatusFooter dot-pulse with the animated OrbitGlyph + endowed-progress line.
-   Colors are tokens only (no hardcoded hex). */
+/* Branded orbit "thinking" indicator for the observability rework. Rendered
+   inline as the message-list footer (under the last block, Claude-style). One
+   line: animated OrbitGlyph + label + elapsed. Tokens only (no hardcoded hex).
+   Aligned to the message column (max-width 780, centered, 8px gutter) so the
+   glyph lines up with the message text. */
 
 .container {
-  min-height: 44px;
-  padding: 10px 8px;
+  min-height: 28px;
+  padding: 6px 8px;
   max-width: 780px;
+  width: 100%;
   margin: 0 auto;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
   transition: opacity 200ms ease-out;
 }
 
 .fading {
   opacity: 0;
-}
-
-/* Endowed-progress line: a small green check + "Loaded context". */
-.endowed {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.check {
-  flex-shrink: 0;
-  color: var(--success);
-}
-
-.endowedLabel {
-  color: var(--text-muted);
 }
 
 /* Active line: orbit glyph + label + elapsed. */
@@ -53,7 +36,6 @@
 }
 
 .elapsed {
-  margin-left: auto;
   font-size: 12px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;

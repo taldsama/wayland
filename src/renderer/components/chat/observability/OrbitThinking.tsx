@@ -10,24 +10,18 @@ import OrbitGlyph from './OrbitGlyph';
 import styles from './OrbitThinking.module.css';
 
 /**
- * Branded "thinking" footer for the observability rework. Replaces the weak
- * StatusFooter dot-pulse with the animated orbit glyph and narrates the REAL
- * current action when one is known (`currentLabel`), falling back to the
- * rotating themed phrases otherwise.
+ * Branded "thinking" footer for the observability rework. Rendered inline as the
+ * message-list footer (Claude-style): the orbit glyph appears under the last
+ * block the instant a turn is submitted, and disappears when it completes.
  *
- * Layout (centered column, like StatusFooter):
- *   1. Endowed-progress line ("Loaded context") - a psychological head-start so
- *      the user begins one step in.
- *   2. Active line - orbit glyph + label (real action or rotating phrase) +
- *      elapsed timer (appears at >= 2s).
+ * One line: the animated orbit glyph + a label (the REAL current action when
+ * known via `currentLabel`, else a rotating themed phrase) + an elapsed timer
+ * (appears at >= 2s).
  *
- * Lifecycle mirrors StatusFooter: visible immediately while processing, 200ms
- * opacity fade on stop then unmount, and a fixed-height spacer when idle so the
- * Virtuoso layout does not jump.
- *
- * The rotating phrases are brand/personality copy and intentionally
- * English-only (matches the StatusFooter precedent); the endowed-progress label
- * + elapsed unit go through i18n with inline defaults.
+ * Lifecycle: visible immediately while processing, 200ms opacity fade on stop
+ * then unmount, and a fixed-height spacer when idle so the Virtuoso layout does
+ * not jump. The rotating phrases are brand/personality copy, intentionally
+ * English-only; the elapsed unit goes through i18n with an inline default.
  */
 
 // Wayland-voiced status phrases - personality copy, intentionally English-only.
@@ -111,27 +105,6 @@ const OrbitThinking: React.FC<Props> = ({ isProcessing, currentLabel }) => {
       data-testid='orbit-thinking'
       data-fading={fading ? 'true' : 'false'}
     >
-      <div className={styles.endowed}>
-        <svg
-          className={styles.check}
-          width='14'
-          height='14'
-          viewBox='0 0 24 24'
-          fill='none'
-          stroke='currentColor'
-          strokeWidth='3'
-          strokeLinecap='round'
-          strokeLinejoin='round'
-          aria-hidden='true'
-          focusable='false'
-        >
-          <polyline points='5 12 10 17 19 7' />
-        </svg>
-        <span className={styles.endowedLabel}>
-          {t('conversation.observability.contextLoaded', { defaultValue: 'Loaded context' })}
-        </span>
-      </div>
-
       <div className={styles.activeStep}>
         <OrbitGlyph size={22} />
         <span

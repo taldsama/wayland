@@ -33,19 +33,19 @@ describe('OrbitThinking', () => {
     vi.useRealTimers();
   });
 
-  it('renders a rotating phrase, the orbit glyph and the endowed-progress line when processing with no label', () => {
+  it('renders a rotating phrase and the orbit glyph when processing with no label', () => {
     const { container } = render(<OrbitThinking isProcessing />);
 
-    // Endowed-progress line (psychological head-start).
-    expect(screen.getByText('Loaded context')).toBeInTheDocument();
+    // No "Loaded context" line - it was removed per feedback.
+    expect(screen.queryByText('Loaded context')).toBeNull();
 
     // Active label is one of the rotating phrases (no currentLabel).
     const label = screen.getByTestId('orbit-thinking-label');
     expect(PHRASES).toContain(label.textContent);
 
-    // OrbitGlyph renders an aria-hidden svg with orbit elements.
+    // OrbitGlyph renders an aria-hidden svg with orbit elements (no extra check svg now).
     const svgs = container.querySelectorAll('svg');
-    expect(svgs.length).toBeGreaterThanOrEqual(2);
+    expect(svgs.length).toBeGreaterThanOrEqual(1);
     expect(container.querySelector('circle')).not.toBeNull();
   });
 

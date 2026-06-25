@@ -33,6 +33,7 @@ import MessageTips from './components/MessageTips';
 import MessageToolCall from './components/MessageToolCall';
 import MessageToolGroup from './components/MessageToolGroup';
 import ActivityTimeline from '@/renderer/components/chat/observability/ActivityTimeline';
+import OrbitThinking from '@/renderer/components/chat/observability/OrbitThinking';
 import { activityToSteps, subAgentToStep, toolSummaryToSteps } from '@/common/chat/activity/projectMessages';
 import MessageCronTrigger from './components/MessageCronTrigger';
 import CronProposeCard from './components/CronProposeCard';
@@ -204,7 +205,10 @@ const ChatTimeMarkerRow: React.FC<{ marker: ChatTimeMarker }> = ({ marker }) => 
   );
 };
 
-const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }> = ({ emptySlot }) => {
+const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode; isProcessing?: boolean }> = ({
+  emptySlot,
+  isProcessing,
+}) => {
   const list = useMessageList();
   const conversationContext = useConversationContextSafe();
   useAutoPreviewOfficeFiles(conversationContext);
@@ -505,7 +509,10 @@ const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.
             atBottomStateChange={handleAtBottomStateChange}
             components={{
               Header: () => <div className='h-10px' />,
-              Footer: () => <div className='h-20px' />,
+              // #252 rework: the orbit "thinking" indicator lives here (inline,
+              // under the last block, Claude-style) - shows immediately on submit,
+              // and renders a small spacer when idle so the layout never jumps.
+              Footer: () => <OrbitThinking isProcessing={!!isProcessing} />,
             }}
           />
         </ImagePreviewContext.Provider>
@@ -540,7 +547,7 @@ const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.
  * hooks) so toggling views mounts/unmounts a whole child component instead of
  * changing the hook count inside one component (which React forbids).
  */
-const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }> = (props) => {
+const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode; isProcessing?: boolean }> = (props) => {
   const conversationContext = useConversationContextSafe();
   const wf = useWorkflowViewMode();
   const workflowSessionId = conversationContext?.workflowSessionId;
