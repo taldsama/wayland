@@ -450,15 +450,16 @@ jobs:
         run: |
           set -ex
           install_electron() {
-            # Use a fresh, EXPLICIT cache each attempt. @electron/get honors
-            # ELECTRON_CACHE above $XDG_CACHE_HOME — GitHub runners set
-            # XDG_CACHE_HOME, so the previous `rm -rf ~/.cache/electron` missed
-            # the real cache and a corrupt npmmirror zip survived into the
-            # "official host" fallback (which then re-extracted it in <1s,
-            # yielding an incomplete dist with no path.txt). A per-attempt
-            # mktemp cache defeats both the poisoned zip and the path mismatch.
-            export ELECTRON_CACHE="$(mktemp -d)/electron"
-            rm -rf node_modules/electron/dist node_modules/electron/path.txt "$ELECTRON_CACHE"
+            # install.js downloads via @electron/get with
+            # `cacheRoot: process.env.electron_config_cache` — so THAT is the var
+            # that controls the cache dir (NOT ELECTRON_CACHE, and NOT the
+            # ~/.cache/electron the old code rm'd, which missed the runner's real
+            # $XDG_CACHE_HOME/electron). A per-attempt fresh mktemp cacheRoot
+            # guarantees the official-host retry can't reuse the corrupt npmmirror
+            # zip (which previously got re-extracted in <1s into an incomplete
+            # dist with no path.txt). force_no_cache=true also passes force:true.
+            export electron_config_cache="$(mktemp -d)"
+            rm -rf node_modules/electron/dist node_modules/electron/path.txt
             force_no_cache=true node node_modules/electron/install.js
           }
           # A complete install has BOTH path.txt and the executable it points at.
