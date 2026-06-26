@@ -133,20 +133,14 @@ export function DetailPage() {
     syncMcpToAgents,
     removeMcpFromAgents,
     checkSingleServerInstallStatus,
-    setAgentInstallStatus,
+    setAgentInstallStatus
   );
   const conn = useMcpConnection(mcpServers, saveMcpServers, message);
 
   const entry = useMemo(() => library.getEntry(id), [library, id]);
-  const guide = useMemo(
-    () => (entry?.['x-wayland'].setupGuide ? library.getGuide(id) : null),
-    [library, id, entry],
-  );
+  const guide = useMemo(() => (entry?.['x-wayland'].setupGuide ? library.getGuide(id) : null), [library, id, entry]);
   const installed = mcpServers.some((s) => s.libraryEntryId === id);
-  const installedServer = useMemo(
-    () => mcpServers.find((s) => s.libraryEntryId === id),
-    [mcpServers, id],
-  );
+  const installedServer = useMemo(() => mcpServers.find((s) => s.libraryEntryId === id), [mcpServers, id]);
 
   const [tab, setTab] = useState<Tab | null>(null);
   const [env, setEnv] = useState<Record<string, string>>({});
@@ -213,21 +207,19 @@ export function DetailPage() {
         message.error(
           t('mcpLibrary.install.errorFailed', 'Install failed: {{error}}', {
             error: 'unknown',
-          }),
+          })
         );
         return null;
       }
       message.success(
         t('mcpLibrary.install.successAdded', '{{name}} added to library.', {
           name: entry.title,
-        }),
+        })
       );
       return newServer;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      message.error(
-        t('mcpLibrary.install.errorFailed', 'Install failed: {{error}}', { error: msg }),
-      );
+      message.error(t('mcpLibrary.install.errorFailed', 'Install failed: {{error}}', { error: msg }));
       return null;
     } finally {
       setInstalling(false);
@@ -252,13 +244,21 @@ export function DetailPage() {
   };
 
   /**
-   * api-key save+connect: persist the installed server with the user's token
-   * (now embedded as a Bearer header by entryToServerData), run a REAL
-   * connection test that reaches the server and lists tools, and only enable
-   * the server when that test passes. This replaces the prior decorative token
-   * field whose value went nowhere and the false-positive "connected" banner.
+   * Save + connect a credential-bearing server: persist the installed server
+   * with the user's env-supplied credentials, run a REAL connection test that
+   * reaches the server and lists tools, and only enable the server when that
+   * test passes. Replaces the prior decorative token field whose value went
+   * nowhere and the false-positive "connected" banner.
+   *
+   * Shared by two auth models that connect identically — by starting the server
+   * with credentials already on it, NOT via the HTTP loopback OAuth path:
+   *  - api-key connectors (token embedded as a Bearer header by entryToServerData)
+   *  - stdio oauth2-byo connectors (#306): they carry their OAuth client creds on
+   *    transport.env (e.g. GOOGLE_OAUTH_CLIENT_ID/SECRET) and run their OWN OAuth
+   *    inside the spawned subprocess, so login() (which rejects non-HTTP
+   *    transports) must never be called for them.
    */
-  const saveAndConnectApiKey = async () => {
+  const saveAndConnect = async () => {
     const hasToken = Object.values(env).some((v) => typeof v === 'string' && v.trim().length > 0);
     // Some api-key connectors take an OPTIONAL key (Context7's free tier works
     // without one) - their guide has no token input. Only block on a missing
@@ -288,13 +288,13 @@ export function DetailPage() {
         t('mcpLibrary.install.connected', 'Connected to {{name}} ({{count}} tools).', {
           name: entry.title,
           count: res.data?.tools?.length ?? 0,
-        }),
+        })
       );
     } catch (err) {
       message.error(
         t('mcpLibrary.install.connectFailed', 'Could not connect: {{error}}', {
           error: err instanceof Error ? err.message : String(err),
-        }),
+        })
       );
     } finally {
       setInstalling(false);
@@ -304,12 +304,24 @@ export function DetailPage() {
   const onPrimary = async (action: string) => {
     // api-key hosted MCP: persist token + test + enable on success.
     if (action === 'api-key-save') {
-      await saveAndConnectApiKey();
+      await saveAndConnect();
       return;
     }
     // Install first (or reuse the existing server if already installed), then
     // trigger OAuth for entries whose setup guide emits an 'oauth-flow' action.
     if (action !== 'oauth-flow') return;
+
+    // #306: An oauth2-byo connector on a STDIO transport (Google Workspace,
+    // gcloud, Teams, MS365, Xero) does its OWN OAuth inside the spawned
+    // subprocess using env credentials — it is NOT HTTP-family, so the desktop
+    // loopback OAuth path (login()) hard-rejects it ("OAuth requires an
+    // HTTP-family transport, got 'stdio'"). Route it to the env-install path:
+    // persist the creds and start + test the server so it self-authenticates.
+    const transport = installedServer?.transport.type ?? entry.packages[0]?.transport.type ?? entry.remotes?.[0]?.type;
+    if (transport === 'stdio') {
+      await saveAndConnect();
+      return;
+    }
 
     let server: IMcpServer | null = installedServer ?? null;
     if (!server) {
@@ -343,7 +355,7 @@ export function DetailPage() {
     message.error(
       t('mcpLibrary.install.oauthFailed', 'Authorization failed: {{error}}', {
         error: (result.success === false && result.error) || 'unknown',
-      }),
+      })
     );
   };
 
@@ -360,8 +372,8 @@ export function DetailPage() {
       message.error(
         t(
           'mcpLibrary.install.oauthTimeout',
-          'Sign-in timed out. Check the client ID/secret and redirect URI, then try again.',
-        ),
+          'Sign-in timed out. Check the client ID/secret and redirect URI, then try again.'
+        )
       );
       return true;
     }
@@ -380,7 +392,7 @@ export function DetailPage() {
       message.error(
         t('mcpLibrary.byo.saveFailed', 'Failed to save credentials: {{error}}', {
           error: saveResult.error ?? 'unknown',
-        }),
+        })
       );
       return;
     }
@@ -388,9 +400,7 @@ export function DetailPage() {
 
     // Persist via the renderer cache too so the next pageload sees byoOAuth
     // without waiting for a useMcpServers re-mount.
-    await saveMcpServers((prev) =>
-      prev.map((s) => (s.id === saveResult.server!.id ? saveResult.server! : s)),
-    );
+    await saveMcpServers((prev) => prev.map((s) => (s.id === saveResult.server!.id ? saveResult.server! : s)));
 
     const controller = new AbortController();
     oauthAbortRef.current = controller;
@@ -404,7 +414,7 @@ export function DetailPage() {
     message.error(
       t('mcpLibrary.install.oauthFailed', 'Authorization failed: {{error}}', {
         error: (retryResult.success === false && retryResult.error) || 'unknown',
-      }),
+      })
     );
   };
 
@@ -499,7 +509,7 @@ export function DetailPage() {
       title: t('mcpLibrary.detail.removeTitle', 'Remove {{name}}?', { name: entry.title }),
       content: t(
         'mcpLibrary.detail.removeBody',
-        'This deletes the connector and its sign-in. You can reinstall it any time.',
+        'This deletes the connector and its sign-in. You can reinstall it any time.'
       ),
       okText: t('mcpLibrary.detail.removeConfirm', 'Remove'),
       cancelText: t('mcpLibrary.detail.cancel', 'Cancel'),
@@ -520,8 +530,7 @@ export function DetailPage() {
   const maintainerLabel =
     w.maintainerType === 'official' ? 'Official' : w.maintainerType === 'wayland' ? 'Wayland' : 'Community';
   const primaryCategory = w.categories?.[0] ? titleCase(w.categories[0]) : undefined;
-  const transportType =
-    entry.packages[0]?.transport.type ?? entry.remotes?.[0]?.type ?? 'hosted';
+  const transportType = entry.packages[0]?.transport.type ?? entry.remotes?.[0]?.type ?? 'hosted';
 
   const toolCount = installedServer?.tools?.length ?? 0;
   const syncedAt = formatRelativeTime(installedServer?.lastConnected);
@@ -554,25 +563,18 @@ export function DetailPage() {
           <div className={styles.statusMeta}>
             {w.auth.method === 'none'
               ? t('mcpLibrary.detail.notInstalledKeyless', 'No account needed. Install and it works.')
-              : t(
-                  'mcpLibrary.detail.notInstalledAuth',
-                  'Install, then sign in or add a token to connect.',
-                )}
+              : t('mcpLibrary.detail.notInstalledAuth', 'Install, then sign in or add a token to connect.')}
           </div>
           <button
-            type="button"
+            type='button'
             className={styles.btnPrimary}
             onClick={() =>
-              w.auth.method === 'none'
-                ? void install()
-                : void onPrimary(isApiKey ? 'api-key-save' : 'oauth-flow')
+              w.auth.method === 'none' ? void install() : void onPrimary(isApiKey ? 'api-key-save' : 'oauth-flow')
             }
             disabled={installing || oauthInFlight}
           >
             <Plus size={16} />
-            {installing
-              ? t('mcpLibrary.install.installing', 'Installing…')
-              : t('mcpLibrary.install.button', 'Install')}
+            {installing ? t('mcpLibrary.install.installing', 'Installing…') : t('mcpLibrary.install.button', 'Install')}
           </button>
           {w.auth.method !== 'none' && (
             <div className={styles.note}>
@@ -596,27 +598,21 @@ export function DetailPage() {
             {t('mcpLibrary.detail.needsSignInMeta', 'Installed, but not connected yet.')}
           </div>
           <button
-            type="button"
+            type='button'
             className={`${styles.btnPrimary} ${styles.btnWarn}`}
             onClick={() => void onPrimary('oauth-flow')}
             disabled={oauthInFlight}
           >
             <LogIn size={16} />
-            {oauthInFlight
-              ? t('mcpLibrary.detail.signingIn', 'Signing in…')
-              : t('mcpLibrary.detail.signIn', 'Sign in')}
+            {oauthInFlight ? t('mcpLibrary.detail.signingIn', 'Signing in…') : t('mcpLibrary.detail.signIn', 'Sign in')}
           </button>
           {oauthInFlight && installedServer && (
-            <button
-              type="button"
-              className={styles.btn2}
-              onClick={() => cancelOAuth(installedServer)}
-            >
+            <button type='button' className={styles.btn2} onClick={() => cancelOAuth(installedServer)}>
               {t('mcpLibrary.detail.cancelSignIn', 'Cancel sign-in')}
             </button>
           )}
           <div className={styles.lifecycle}>
-            <button type="button" className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
+            <button type='button' className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
               <Trash2 size={14} />
               {t('mcpLibrary.detail.remove', 'Remove connector')}
             </button>
@@ -634,17 +630,16 @@ export function DetailPage() {
             {t('mcpLibrary.detail.needsAttention', 'Needs attention')}
           </div>
           <div className={styles.statusMeta}>
-            {installedServer.lastError ??
-              t('mcpLibrary.detail.errorMeta', 'The last connection attempt failed.')}
+            {installedServer.lastError ?? t('mcpLibrary.detail.errorMeta', 'The last connection attempt failed.')}
           </div>
-          <button type="button" className={styles.btnPrimary} onClick={reconnect} disabled={reconnecting}>
+          <button type='button' className={styles.btnPrimary} onClick={reconnect} disabled={reconnecting}>
             <RefreshCw size={16} />
             {reconnecting
               ? t('mcpLibrary.detail.reconnecting', 'Reconnecting…')
               : t('mcpLibrary.detail.reconnect', 'Reconnect')}
           </button>
           <div className={styles.lifecycle}>
-            <button type="button" className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
+            <button type='button' className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
               <Trash2 size={14} />
               {t('mcpLibrary.detail.remove', 'Remove connector')}
             </button>
@@ -670,7 +665,7 @@ export function DetailPage() {
               : t('mcpLibrary.detail.notConnectedKey', 'Installed. Add your token to connect it.')}
           </div>
           <button
-            type="button"
+            type='button'
             className={`${styles.btnPrimary} ${styles.btnWarn}`}
             onClick={() => (isOauth ? void onPrimary('oauth-flow') : setTab('setup-guide'))}
             disabled={oauthInFlight}
@@ -683,16 +678,12 @@ export function DetailPage() {
               : t('mcpLibrary.detail.addToken', 'Add token')}
           </button>
           {isOauth && oauthInFlight && installedServer && (
-            <button
-              type="button"
-              className={styles.btn2}
-              onClick={() => cancelOAuth(installedServer)}
-            >
+            <button type='button' className={styles.btn2} onClick={() => cancelOAuth(installedServer)}>
               {t('mcpLibrary.detail.cancelSignIn', 'Cancel sign-in')}
             </button>
           )}
           <div className={styles.lifecycle}>
-            <button type="button" className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
+            <button type='button' className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
               <Trash2 size={14} />
               {t('mcpLibrary.detail.remove', 'Remove connector')}
             </button>
@@ -710,7 +701,7 @@ export function DetailPage() {
             {t('mcpLibrary.detail.off', 'Off')}
           </div>
         ) : (
-          <StatusChip status="running" />
+          <StatusChip status='running' />
         )}
         <div className={styles.statusMeta} style={{ marginTop: 8 }}>
           {t('mcpLibrary.detail.connectedMeta', '{{count}} tools', { count: toolCount })}
@@ -724,7 +715,7 @@ export function DetailPage() {
           />
         </div>
         <div className={styles.lifecycle}>
-          <button type="button" className={styles.btn2} onClick={reconnect} disabled={reconnecting}>
+          <button type='button' className={styles.btn2} onClick={reconnect} disabled={reconnecting}>
             <RefreshCw size={14} />
             {reconnecting
               ? t('mcpLibrary.detail.reconnecting', 'Reconnecting…')
@@ -732,7 +723,7 @@ export function DetailPage() {
           </button>
         </div>
         <div className={styles.lifecycle}>
-          <button type="button" className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
+          <button type='button' className={`${styles.btn2} ${styles.btn2Danger}`} onClick={confirmRemove}>
             <Trash2 size={14} />
             {t('mcpLibrary.detail.remove', 'Remove connector')}
           </button>
@@ -782,7 +773,7 @@ export function DetailPage() {
   return (
     <div className={styles.page}>
       {contextHolder}
-      <button type="button" className={styles.back} onClick={() => navigate('/settings/mcp-library/browse')}>
+      <button type='button' className={styles.back} onClick={() => navigate('/settings/mcp-library/browse')}>
         <ArrowLeft size={15} /> {t('mcpLibrary.detail.back', 'MCP Library')}
       </button>
 
@@ -792,7 +783,7 @@ export function DetailPage() {
           {safeUrl(w.iconUrl) ? (
             <img
               src={safeUrl(w.iconUrl)}
-              alt=""
+              alt=''
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = 'none';
                 const parent = e.currentTarget.parentElement;
@@ -829,7 +820,7 @@ export function DetailPage() {
         {tabs.map((tb) => (
           <button
             key={tb.key}
-            type="button"
+            type='button'
             className={`${styles.tab} ${activeTab === tb.key ? styles.tabActive : ''}`}
             onClick={() => setTab(tb.key)}
           >
@@ -890,14 +881,12 @@ export function DetailPage() {
             <>
               <h2 className={styles.hSec}>{t('mcpLibrary.detail.setupHeading', 'Setup guide')}</h2>
               {isReady && (
-                <div className={styles.setupSuccess} role="status">
+                <div className={styles.setupSuccess} role='status'>
                   <Check size={16} />
                   <span>
-                    {t(
-                      'mcpLibrary.install.setupComplete',
-                      '{{name}} is connected and ready. Ask any chat to use it.',
-                      { name: entry.title },
-                    )}
+                    {t('mcpLibrary.install.setupComplete', '{{name}} is connected and ready. Ask any chat to use it.', {
+                      name: entry.title,
+                    })}
                   </span>
                 </div>
               )}
@@ -918,7 +907,7 @@ export function DetailPage() {
               {showFallbackConnect && (
                 <div className={styles.connectBar}>
                   <button
-                    type="button"
+                    type='button'
                     className={styles.btnPrimary}
                     onClick={() => void onPrimary(isApiKey ? 'api-key-save' : 'oauth-flow')}
                     disabled={installing || oauthInFlight}
@@ -935,11 +924,7 @@ export function DetailPage() {
                           })}
                   </button>
                   {!isApiKey && oauthInFlight && installedServer && (
-                    <button
-                      type="button"
-                      className={styles.btn2}
-                      onClick={() => void cancelOAuth(installedServer)}
-                    >
+                    <button type='button' className={styles.btn2} onClick={() => void cancelOAuth(installedServer)}>
                       {t('mcpLibrary.detail.cancelSignIn', 'Cancel')}
                     </button>
                   )}
@@ -1011,10 +996,7 @@ export function DetailPage() {
                 </p>
               )}
               <p className={styles.availableNote}>
-                {t(
-                  'mcpLibrary.detail.availableNote',
-                  'Connectors are available to all your agents while enabled.',
-                )}
+                {t('mcpLibrary.detail.availableNote', 'Connectors are available to all your agents while enabled.')}
               </p>
             </div>
           )}
@@ -1023,19 +1005,19 @@ export function DetailPage() {
             <div className={styles.panel}>
               <h3>{t('mcpLibrary.detail.links', 'Links')}</h3>
               {safeUrl(entry.websiteUrl) && (
-                <button type="button" className={styles.link} onClick={() => openUrl(entry.websiteUrl)}>
+                <button type='button' className={styles.link} onClick={() => openUrl(entry.websiteUrl)}>
                   <ExternalLink size={14} />
                   {t('mcpLibrary.detail.linkWebsite', 'Website')}
                 </button>
               )}
               {safeUrl(entry.repository?.url) && (
-                <button type="button" className={styles.link} onClick={() => openUrl(entry.repository?.url)}>
+                <button type='button' className={styles.link} onClick={() => openUrl(entry.repository?.url)}>
                   <ExternalLink size={14} />
                   {t('mcpLibrary.detail.linkSource', 'Source repository')}
                 </button>
               )}
               {safeUrl(w.auth.providerSignupUrl) && (
-                <button type="button" className={styles.link} onClick={() => openUrl(w.auth.providerSignupUrl)}>
+                <button type='button' className={styles.link} onClick={() => openUrl(w.auth.providerSignupUrl)}>
                   <Shield size={14} />
                   {t('mcpLibrary.detail.linkSignup', 'Create an account')}
                 </button>
