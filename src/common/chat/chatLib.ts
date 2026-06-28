@@ -467,6 +467,8 @@ export type ActivityNode = {
   /** Accumulated streamed detail (tool_chunk stdout / thinking text / op trail). */
   detail?: string;
   children?: ActivityNode[];
+  /** Parsed search result sources (web_search tool only). */
+  sources?: import('./activity/sources').Source[];
 };
 
 /**
@@ -1032,9 +1034,7 @@ export const composeMessage = (
         const prevContent = msg.content;
         const nextContent = message.content;
         const mergedStatus =
-          nextContent.status === 'done' || nextContent.status === 'failed'
-            ? nextContent.status
-            : prevContent.status;
+          nextContent.status === 'done' || nextContent.status === 'failed' ? nextContent.status : prevContent.status;
         const mergedBody = prevContent.body + nextContent.body;
         // #252 Phase 2: fold the sub-agent's streamed child subtree (its tools /
         // thinking / nested sub-agents) by node id; recurses for nested agents.

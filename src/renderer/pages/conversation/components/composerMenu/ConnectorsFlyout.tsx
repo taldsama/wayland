@@ -5,33 +5,52 @@
  */
 
 import { Switch } from '@arco-design/web-react';
-import { ChevronRight, LayoutGrid, Plus, Settings } from 'lucide-react';
+import { AlertTriangle, ChevronRight, LayoutGrid, Plus, Settings } from 'lucide-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { iconColors } from '@/renderer/styles/colors';
 import type { IMcpServer } from '@/common/config/storage';
 import styles from './ComposerAddMenu.module.css';
+import { countEnabledMcpTools, nextActiveSelection, toolBudgetStatus } from './toolBudget';
 
 type Props = {
   /** Installed MCP servers (user-configured + extension-contributed). */
   servers: IMcpServer[];
   /**
-   * Toggle a connector. NOTE: this flips the server's GLOBAL `enabled` flag -
-   * MCP enablement is not yet per-conversation, so toggling here affects the
-   * connector everywhere. True per-chat connector scoping is a follow-up.
+   * Toggle a connector's GLOBAL `enabled` flag. Used in staged (home) mode where
+   * there is no conversation to scope. In live mode `onScopeChange` takes over
+   * and the toggle becomes per-conversation.
    */
   onToggle: (id: string, enabled: boolean) => void;
   /** Open the MCP Library to add a new connector. */
   onAddConnector: () => void;
   /** Open the MCP Library to manage connectors. */
   onManageConnectors: () => void;
+  /**
+   * The target model's tool-array cap (#348). When provided and the live tool
+   * count is near/over it, a count-vs-cap nudge is shown so the user can scope
+   * servers or switch models. Absent (no known cap / staged composer) hides it.
+   */
+  modelCap?: number;
+  /** Display name of the target model, used in the nudge text. */
+  modelLabel?: string;
+  /**
+   * Per-conversation scoping (#348). When provided (live mode), the toggle
+   * controls whether each server is active for THIS chat (not the global
+   * `enabled` flag). `activeServerIds === undefined` ⇒ all enabled servers
+   * active. The flyout writes the next selection back through this callback.
+   */
+  onScopeChange?: (ids: string[] | undefined) => void;
+  /** Current per-conversation selection (undefined = all enabled active). */
+  activeServerIds?: string[];
 };
 
-const ConnectorRow: React.FC<{ server: IMcpServer; onToggle: Props['onToggle']; toolsLabel: string }> = ({
-  server,
-  onToggle,
-  toolsLabel,
-}) => {
+const ConnectorRow: React.FC<{
+  server: IMcpServer;
+  checked: boolean;
+  onChange: (on: boolean) => void;
+  toolsLabel: string;
+}> = ({ server, checked, onChange, toolsLabel }) => {
   const connected = server.status === 'connected';
   return (
     <div className={styles.row}>
@@ -43,18 +62,41 @@ const ConnectorRow: React.FC<{ server: IMcpServer; onToggle: Props['onToggle']; 
         </div>
         <div className={styles.desc}>{server.description || toolsLabel}</div>
       </div>
-      <Switch
-        size='small'
-        checked={server.enabled !== false}
-        onChange={(v) => onToggle(server.id, v)}
-        aria-label={server.name}
-      />
+      <Switch size='small' checked={checked} onChange={onChange} aria-label={server.name} />
     </div>
   );
 };
 
-const ConnectorsFlyout: React.FC<Props> = ({ servers, onToggle, onAddConnector, onManageConnectors }) => {
+const ConnectorsFlyout: React.FC<Props> = ({
+  servers,
+  onToggle,
+  onAddConnector,
+  onManageConnectors,
+  modelCap,
+  modelLabel,
+  onScopeChange,
+  activeServerIds,
+}) => {
   const { t } = useTranslation();
+
+  // Count-vs-cap nudge (#348): only when a cap is known and the live tool count
+  // is approaching/over it. `ok` stays silent to avoid noise.
+  const toolCount = countEnabledMcpTools(servers);
+  const budget = modelCap ? toolBudgetStatus(toolCount, modelCap) : 'ok';
+  const showNudge = modelCap !== undefined && budget !== 'ok';
+
+  // Per-conversation scoping (#348): in live mode (onScopeChange given) the
+  // toggle reflects "active for THIS chat" over the enabled servers; in staged
+  // mode it flips the global `enabled` flag (legacy behaviour).
+  const scoping = onScopeChange !== undefined;
+  const candidates = scoping ? servers.filter((s) => s.enabled !== false) : servers;
+  const enabledIds = candidates.map((s) => s.id);
+  const isActiveForChat = (id: string) => activeServerIds === undefined || activeServerIds.includes(id);
+  const rowChecked = (server: IMcpServer) => (scoping ? isActiveForChat(server.id) : server.enabled !== false);
+  const rowOnChange = (server: IMcpServer) => (on: boolean) =>
+    scoping
+      ? onScopeChange?.(nextActiveSelection(activeServerIds, enabledIds, server.id, on))
+      : onToggle(server.id, on);
 
   return (
     <div className={styles.flyout}>
@@ -71,16 +113,45 @@ const ConnectorsFlyout: React.FC<Props> = ({ servers, onToggle, onAddConnector, 
       </div>
 
       <div className={styles.flyoutScroll}>
-        {servers.length > 0 ? (
+        {showNudge && (
+          <div className={`${styles.toolNudge} ${budget === 'over' ? styles.toolNudgeOver : ''}`} role='status'>
+            <AlertTriangle size={14} strokeWidth={2} className={styles.toolNudgeIc} />
+            <span>
+              {budget === 'over'
+                ? t('conversation.composerMenu.toolNudgeOver', {
+                    defaultValue:
+                      '{{count}} tools enabled · {{model}} caps at {{cap}}. Scope servers for this chat or switch models.',
+                    count: toolCount,
+                    cap: modelCap,
+                    model:
+                      modelLabel ??
+                      t('conversation.composerMenu.toolNudgeModelFallback', { defaultValue: 'this model' }),
+                  })
+                : t('conversation.composerMenu.toolNudgeNear', {
+                    defaultValue:
+                      '{{count}} of {{cap}} tools · {{model}}. Near the limit — scope servers or switch models before adding more.',
+                    count: toolCount,
+                    cap: modelCap,
+                    model:
+                      modelLabel ??
+                      t('conversation.composerMenu.toolNudgeModelFallback', { defaultValue: 'this model' }),
+                  })}
+            </span>
+          </div>
+        )}
+        {candidates.length > 0 ? (
           <>
             <div className={styles.sectionLabel}>
-              {t('conversation.composerMenu.connectorsConnected', { defaultValue: 'Connected' })}
+              {scoping
+                ? t('conversation.composerMenu.connectorsForChat', { defaultValue: 'Active in this chat' })
+                : t('conversation.composerMenu.connectorsConnected', { defaultValue: 'Connected' })}
             </div>
-            {servers.map((server) => (
+            {candidates.map((server) => (
               <ConnectorRow
                 key={server.id}
                 server={server}
-                onToggle={onToggle}
+                checked={rowChecked(server)}
+                onChange={rowOnChange(server)}
                 toolsLabel={
                   server.tools && server.tools.length > 0
                     ? t('conversation.composerMenu.toolCount', {

@@ -64,6 +64,9 @@ const AcpChat: React.FC<{
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [authRemedy, setAuthRemedy] = useState<AcpAuthRemedy | null>(null);
+  // Drives the shared inline orbit (MessageList footer) so it animates while the
+  // ACP agent is working, mirroring the wcore/Flux path. Fed by AcpSendBox.
+  const [isProcessing, setIsProcessing] = useState(false);
   // The turn that triggered the auth-failure card, captured so the Flux failover
   // can replay it after the backend reconnects.
   const pendingTurnRef = useRef<FluxFailoverTurn | null>(null);
@@ -99,8 +102,7 @@ const AcpChat: React.FC<{
     await routeThroughFluxAndReplay({
       conversationId: conversation_id,
       pendingTurn: pendingTurnRef.current,
-      connectFlux: () =>
-        fluxConnected ? Promise.resolve({ ok: true }) : ipcBridge.onboarding.connectFlux.invoke(),
+      connectFlux: () => (fluxConnected ? Promise.resolve({ ok: true }) : ipcBridge.onboarding.connectFlux.invoke()),
       switchToFlux: async (cid) => {
         const res = await ipcBridge.acpConversation.setModel.invoke({ conversationId: cid, modelId: FLUX_AUTO_MODEL });
         return res.success === true;
@@ -134,7 +136,7 @@ const AcpChat: React.FC<{
     >
       <div className='flex-1 flex flex-col px-20px min-h-0'>
         <FlexFullContainer>
-          <MessageList className='flex-1' emptySlot={emptySlot} />
+          <MessageList className='flex-1' emptySlot={emptySlot} isProcessing={isProcessing} />
         </FlexFullContainer>
         {!hideSendBox && authRemedy && (
           <div className='max-w-800px w-full mx-auto mb-12px'>
@@ -158,6 +160,7 @@ const AcpChat: React.FC<{
               workspacePath={workspace}
               teamId={teamId}
               agentSlotId={agentSlotId}
+              onRunningChange={setIsProcessing}
             ></AcpSendBox>
           </ConversationChatConfirm>
         )}

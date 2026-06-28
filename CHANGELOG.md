@@ -4,6 +4,33 @@ All notable changes to the Wayland Electron app are documented in this file. For
 
 ## [Unreleased]
 
+## [0.11.4] - 2026-06-28
+
+### Wayland Core engine
+
+- Bundled engine updated to v0.12.13. Local models that don't support function calling now just work: Wayland detects tool support up front (an Ollama capability probe) and, for any backend that still rejects a tools request, automatically retries without tools and remembers the result — so Ollama and llama.cpp models answer instead of erroring (#389).
+- Billing errors are classified more accurately, so a transient or unrelated provider error is no longer reported as "out of credit" (#329).
+- Tighter control over which environment variables and secrets reach sandboxed subprocesses, with a fail-closed sandbox toggle (#325–#327).
+
+### Thinking & reasoning
+
+- Reasoning models now show a short, live summary of what they're working through as the heading of the thinking block, updated turn by turn (#318).
+
+### Models & providers
+
+- The model picker shows a curated, accurate catalog for each connected provider, sourced live, and the Codex, Grok, and OpenCode pickers populate correctly instead of flashing "no models" (#374).
+- Assistants now run on Wayland Core by default rather than defaulting to a specific cloud model (#380).
+- Grok "Sign in with X" now bridges into the engine so Grok chats stop returning 403 after sign-in (#379).
+
+### Assistants & workspace
+
+- Each assistant shows a grid of suggested starting prompts so you can launch into a task in one click (#375).
+- Assistant send, model selection, and team multi-model setup were tightened end to end so the assistant you pick is the one that responds.
+
+### Reliability & fixes
+
+- Model-picker catalog, assistant surface, and workflow-launcher model selection hardened against empty or "no models" states.
+
 ## [0.11.3] - 2026-06-24
 
 ### Wayland Core engine

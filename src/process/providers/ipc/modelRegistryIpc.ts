@@ -121,11 +121,45 @@ const CLOUD_REQUIRED_FIELDS: Record<string, readonly string[]> = {
 /** The CLI agent keys, mirrored from `CliAgentSource`. */
 const CLI_AGENT_KEYS: ReadonlySet<string> = new Set<CliAgentKey>(['claude', 'codex', 'gemini']);
 
-/** The provider each CLI agent runs (used for the non-enumerable fallback). */
+/** The provider each CLI agent runs (used for the not-connected models.dev
+ * fallback - must be a models.dev-keyed provider). */
 const CLI_UNDERLYING_PROVIDER: Record<CliAgentKey, ProviderId> = {
   claude: 'anthropic',
   codex: 'openai',
   gemini: 'google-gemini',
+};
+
+/**
+ * OAuth/subscription providers a CLI may be authenticated through, BEYOND its
+ * primary `CLI_UNDERLYING_PROVIDER` API-key provider (#374). Codex authenticates
+ * via a ChatGPT subscription (`chatgpt-subscription`, OAuth) far more often than
+ * an `openai` API key, and that connection persists its OWN live Codex-backend
+ * catalog (`buildChatGptSubscriptionCatalogLive`). When one of these is
+ * connected the home picker must use its real catalog instead of synthesizing
+ * the (unconnected, therefore empty) API-key provider - the gap #377 missed,
+ * which made the Codex picker fall back to Flux-only for subscription users.
+ */
+const CLI_OAUTH_PROVIDERS: Record<CliAgentKey, ProviderId[]> = {
+  claude: [],
+  codex: [CHATGPT_SUBSCRIPTION_PROVIDER_ID],
+  gemini: [],
+};
+
+/**
+ * Vendor-locked ACP backends (#374): single-provider CLIs whose home-picker
+ * catalog is synthesized from the models.dev registry, exactly like a
+ * non-enumerable CLI. Each maps to the one provider it runs, so the picker
+ * surfaces real models BEFORE the first connection instead of dead-ending on
+ * the "available after first connection" tooltip. Multi-provider CLIs
+ * (opencode, goose, droid, auggie, cursor, …) are intentionally absent: they
+ * have no single underlying provider, so they keep returning an empty curated
+ * set (the picker then offers Flux Auto when the backend is Flux-routable).
+ */
+const ACP_BACKEND_UNDERLYING_PROVIDER: Record<string, ProviderId> = {
+  grok: 'xai',
+  kimi: 'moonshot',
+  qwen: 'qwen',
+  vibe: 'mistral',
 };
 
 // ─── Injectable dependencies ──────────────────────────────────────────────────
@@ -645,9 +679,27 @@ export function createModelRegistryHandlers(deps: ModelRegistryDeps): ModelRegis
     // it honestly (the UI renders that as "Action needed - Fix"). An empty
     // catalog where at least one source errored is also a degraded connect.
     const built = await buildAndPersistCatalog(providerId, resolved);
-    if (!built.ok || (built.models === 0 && built.sourceErrors > 0)) {
+    if (!built.ok) {
       repo.updateRegistryProviderState(providerId, 'error', 'unknown');
       return { ok: false, error: 'unknown' };
+    }
+    if (built.models === 0 && built.sourceErrors > 0) {
+      // The catalog build could list nothing. For a canonical provider that is a
+      // false green (reject). But a user-supplied custom base that ALREADY passed
+      // the auth probe is a legitimately listing-less gateway - e.g. Cloudflare
+      // Workers AI authenticates but exposes /chat/completions with no /models
+      // (#339). `ConnectionTester` proved auth via the chat fallback, so hard-
+      // failing here would block a working endpoint. Land it connected with an
+      // empty catalog + a `no-models` warning so the user can add a model id,
+      // rather than rejecting. A wrong base URL never reaches here: its auth
+      // probe already failed and the connect was rejected above.
+      const isCustomBase = 'key' in resolved && typeof resolved.baseUrl === 'string' && resolved.baseUrl.length > 0;
+      if (!isCustomBase) {
+        repo.updateRegistryProviderState(providerId, 'error', 'unknown');
+        return { ok: false, error: 'unknown' };
+      }
+      repo.updateRegistryProviderConnectedVia(providerId, connectedViaLabel(creds, providerId));
+      return { ok: true, warning: 'no-models' };
     }
 
     if (noCredit) {
@@ -725,7 +777,11 @@ export function createModelRegistryHandlers(deps: ModelRegistryDeps): ModelRegis
         // A no-credit key is still authenticated - keep the provider Connected
         // (it sits switched-off via disabled models), consistent with connect (#100).
         const established = result.ok || result.error === 'no-credit';
-        repo.updateRegistryProviderState(providerId, established ? 'connected' : 'error', established ? undefined : result.error);
+        repo.updateRegistryProviderState(
+          providerId,
+          established ? 'connected' : 'error',
+          established ? undefined : result.error
+        );
         return result.ok ? { ok: true } : { ok: false, error: result.error ?? 'unknown' };
       } catch {
         return { ok: false, error: 'unknown' };
@@ -787,6 +843,26 @@ export function createModelRegistryHandlers(deps: ModelRegistryDeps): ModelRegis
         }
         // `not-found` - nothing to refresh.
         if (stored.status !== 'ok') return { ok: false };
+
+        // The keyless `ollama-local` provider's catalog is the live `/api/tags`
+        // daemon listing, NOT a `buildAndPersistCatalog` assembly: assembling
+        // against an empty key builds zero models and WIPES the catalog every
+        // tick (Finding 1). `refreshAllOnce` guards this; the per-provider
+        // Refresh button must too, or each click empties the catalog (#314).
+        // Re-probe the daemon instead - an unreachable daemon leaves the
+        // existing catalog untouched (never replaced with []). The exemption is
+        // scoped to a loopback baseUrl (Finding 5) so a row whose stored host is
+        // not loopback is treated like any other custom provider and the
+        // keyless allowance can never be hijacked onto a remote host.
+        const storedBaseUrl = stored.creds.baseUrl;
+        if (
+          providerId === OLLAMA_LOCAL_ID &&
+          isLoopbackBaseUrl(typeof storedBaseUrl === 'string' ? storedBaseUrl : '')
+        ) {
+          const outcome = await refreshOllamaLocal();
+          return { ok: outcome === 'ok' };
+        }
+
         const creds = toTestCreds(stored.creds);
         const built = await buildAndPersistCatalog(providerId, creds);
         return { ok: built.ok };
@@ -983,29 +1059,62 @@ export function createModelRegistryHandlers(deps: ModelRegistryDeps): ModelRegis
           return all;
         }
 
-        if (CLI_AGENT_KEYS.has(agentKey)) {
-          const cliKey = agentKey as CliAgentKey;
-          if (isEnumerableCliAgent(cliKey)) {
-            // Enumerable CLI (Codex) - build straight from its CLI source.
-            const source = deps.makeCliSource(cliKey);
-            const registry = await modelsDevClient.getRegistry().catch(() => ({}) as ModelsDevRegistry);
-            const { models } = await assembler.assemble([source], registry);
-            return curator.curate(models);
-          }
-          // Non-enumerable CLI (e.g. Claude Code). When the underlying provider
-          // is connected with its own API key, use the persisted, override-aware
-          // catalog. When it is NOT connected - the common case for a CLI-login
-          // user (a Claude Pro/Max subscription, no Anthropic API key) - the
-          // picker used to come back EMPTY (#125). Synthesize the underlying
-          // provider's model families straight from the models.dev registry (the
-          // same keyless path cloud providers use), so Claude shows real models.
-          const underlying = CLI_UNDERLYING_PROVIDER[cliKey];
+        // Synthesize a provider's curated catalog from the persisted registry
+        // (connected, override-aware) or straight from models.dev (not
+        // connected) - the same keyless path cloud providers use. Lets a vendor
+        // CLI show real models before its first connection instead of an empty
+        // picker (#125 for Claude, #374 for Codex/Grok/…).
+        const synthesizeProvider = async (underlying: ProviderId): Promise<CuratedModel[]> => {
           if (repo.getRegistryProvider(underlying)) {
             return applyOverrides(underlying, curator.curate(repo.getRegistryCatalog(underlying)));
           }
           const registry = await modelsDevClient.getRegistry().catch(() => ({}) as ModelsDevRegistry);
           const { models } = await assembler.assemble([new CloudRegistrySource(underlying, registry)], registry);
           return curator.curate(models);
+        };
+
+        if (CLI_AGENT_KEYS.has(agentKey)) {
+          const cliKey = agentKey as CliAgentKey;
+
+          // A CLI may be authenticated via an OAuth subscription rather than an
+          // API key (Codex via a ChatGPT subscription -> `chatgpt-subscription`).
+          // That connection persists its own real, live-fetched catalog, so when
+          // it is connected prefer it over CLI enumeration / models.dev synthesis
+          // -> the subscription user sees their actual GPT models. This is the
+          // path #377 missed: a ChatGPT-subscription user has no `openai`
+          // provider connected, so synthesizing `openai` came back empty and the
+          // picker fell to Flux-only (#374 reopen).
+          for (const providerId of CLI_OAUTH_PROVIDERS[cliKey]) {
+            if (!repo.getRegistryProvider(providerId)) continue;
+            const connected = applyOverrides(providerId, curator.curate(repo.getRegistryCatalog(providerId)));
+            if (connected.length > 0) return connected;
+          }
+
+          if (isEnumerableCliAgent(cliKey)) {
+            // Enumerable CLI (Codex) - prefer its live CLI source. In a fresh
+            // profile with no CLI installed / no cache this yields nothing; fall
+            // through to models.dev synthesis of the underlying provider (openai)
+            // so the picker still surfaces real GPT models instead of Flux-only
+            // (#374). A non-empty CLI enumeration always wins (it is the source
+            // of truth for the exact model ids that CLI accepts).
+            const source = deps.makeCliSource(cliKey);
+            const registry = await modelsDevClient.getRegistry().catch(() => ({}) as ModelsDevRegistry);
+            const { models } = await assembler.assemble([source], registry);
+            const enumerated = curator.curate(models);
+            if (enumerated.length > 0) return enumerated;
+          }
+          // Non-enumerable CLI (e.g. Claude Code), or an enumerable CLI whose
+          // source came back empty: synthesize from the underlying provider.
+          return synthesizeProvider(CLI_UNDERLYING_PROVIDER[cliKey]);
+        }
+
+        // Vendor-locked ACP backends (grok→xai, kimi→moonshot, …): synthesize
+        // their single provider's catalog so the home picker is never empty
+        // before first connection (#374). Unknown / multi-provider backends fall
+        // through to an empty set (the picker then offers Flux Auto if routable).
+        const acpUnderlying = ACP_BACKEND_UNDERLYING_PROVIDER[agentKey];
+        if (acpUnderlying) {
+          return synthesizeProvider(acpUnderlying);
         }
 
         return [];
@@ -1730,8 +1839,7 @@ function scheduleStartupMigration(): void {
   // is no `whenReady` gate to wait on there - storage is already initialized
   // before the registry IPC is wired - so resolve immediately. The Electron
   // path keeps deferring to `app.whenReady()` exactly as before.
-  const ready: Promise<unknown> =
-    typeof app?.whenReady === 'function' ? app.whenReady() : Promise.resolve();
+  const ready: Promise<unknown> = typeof app?.whenReady === 'function' ? app.whenReady() : Promise.resolve();
   ready
     .then(async () => {
       if (!_repo) return;
@@ -2005,9 +2113,7 @@ export async function connectModelRegistryProvider(
  * so the status is sourced from exactly one place. Returns `null` if called
  * before `initModelRegistryIpc` has captured the production handlers.
  */
-export async function getModelRegistryProviderView(
-  providerId: ProviderId
-): Promise<IModelRegistryProviderView | null> {
+export async function getModelRegistryProviderView(providerId: ProviderId): Promise<IModelRegistryProviderView | null> {
   if (!_handlers) return null;
   const list = await _handlers.list();
   return list.find((p) => p.providerId === providerId) ?? null;

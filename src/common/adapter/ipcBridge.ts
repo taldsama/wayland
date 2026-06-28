@@ -50,7 +50,7 @@ import type { SpeechToTextRequest, SpeechToTextResult } from '../types/speech';
 import type { DownloadResult, VoiceAsset } from '../types/voiceAsset';
 import type { SkillSecurityReport, SkillIndexEntry, SkillSource, SkillVerdict } from '../types/skillTypes';
 import type { ImportResult } from '../../process/services/skills/SkillImport';
-import type { KickoffResult, KickoffTelemetryEvent } from '../../process/services/kickoff/types';
+import type { KickoffGridResult, KickoffResult, KickoffTelemetryEvent } from '../../process/services/kickoff/types';
 import type {
   AskRecord,
   ResolvedSkill,
@@ -156,6 +156,10 @@ export const conversation = {
       config: { model?: string; thinking?: string; thinking_budget?: number; effort?: string };
     }
   >('conversation.set-config'),
+  deleteMessagesAfter: buildProvider<
+    IBridgeResponse<{ deleted: number }>,
+    { conversation_id: string; afterTimestamp: number }
+  >('conversation.delete-messages-after'),
   confirmation: {
     add: buildEmitter<IConfirmation<any> & { conversation_id: string }>('confirmation.add'),
     update: buildEmitter<IConfirmation<any> & { conversation_id: string }>('confirmation.update'),
@@ -814,10 +818,14 @@ export const acpConversation = {
   getMode: buildProvider<IBridgeResponse<{ mode: string; initialized: boolean }>, { conversationId: string }>(
     'acp.get-mode'
   ),
-  // Get model info for ACP agents (model name and available models)
-  getModelInfo: buildProvider<IBridgeResponse<{ modelInfo: AcpModelInfo | null }>, { conversationId: string }>(
-    'acp.get-model-info'
-  ),
+  // Get model info for ACP agents (model name and available models).
+  // `backend` is optional and only consulted before a task exists, so the
+  // process can derive a backend's cold-start catalog (e.g. Claude Code's
+  // cc-switch model list) instead of returning null.
+  getModelInfo: buildProvider<
+    IBridgeResponse<{ modelInfo: AcpModelInfo | null }>,
+    { conversationId: string; backend?: string }
+  >('acp.get-model-info'),
   // Set model for ACP agents
   setModel: buildProvider<
     IBridgeResponse<{ modelInfo: AcpModelInfo | null }>,
@@ -1822,6 +1830,10 @@ export type IModelRegistryConnectResult = {
    * Non-fatal advisory on an otherwise successful connect. `'no-credit'` means
    * the key authenticated but has no usable credit yet, so the provider was
    * added connected-but-switched-off (#100); the panel surfaces a soft notice.
+   * `'no-models'` means a custom OpenAI-compatible base authenticated but exposes
+   * no model listing (e.g. Cloudflare Workers AI has no `/models`, #339), so the
+   * provider was added connected with an empty catalog - the user supplies a
+   * model id manually.
    */
   warning?: ConnectError;
 };
@@ -2297,6 +2309,11 @@ export const storage = {
 // (e.g. `extensions.list`) instead of the early `:` form.
 export const kickoff = {
   suggest: buildProvider<KickoffResult, { assistantId: string }>('kickoff.suggest'),
+  // #375 - per-assistant suggested-prompts grid (assistant detail view). Returns
+  // up to `max` ranked starters; `locale` selects the promptsI18n fallback.
+  suggestMany: buildProvider<KickoffGridResult, { assistantId: string; max?: number; locale?: string }>(
+    'kickoff.suggestMany'
+  ),
   telemetry: buildProvider<void, KickoffTelemetryEvent>('kickoff.telemetry'),
 };
 

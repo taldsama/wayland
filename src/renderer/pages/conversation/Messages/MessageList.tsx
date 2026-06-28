@@ -32,24 +32,20 @@ import MessagePlan from './components/MessagePlan';
 import MessageTips from './components/MessageTips';
 import MessageToolCall from './components/MessageToolCall';
 import MessageToolGroup from './components/MessageToolGroup';
-import MessageToolGroupSummary from './components/MessageToolGroupSummary';
+import ActivityTimeline from '@/renderer/components/chat/observability/ActivityTimeline';
+import OrbitThinking from '@/renderer/components/chat/observability/OrbitThinking';
+import { activityToSteps, subAgentToStep, toolSummaryToSteps } from '@/common/chat/activity/projectMessages';
 import MessageCronTrigger from './components/MessageCronTrigger';
 import CronProposeCard from './components/CronProposeCard';
 import MessageSkillSuggest from './components/MessageSkillSuggest';
 import MessageText from './components/MessageText';
+import type { ActionsDisplay } from './components/MessageActions';
 import MessageThinking from './components/MessageThinking';
 import type { WriteFileResult } from './types';
 import { useAutoScroll } from './useAutoScroll';
 import { useAutoPreviewOfficeFiles } from '@/renderer/hooks/file/useAutoPreviewOfficeFiles';
 import SelectionReplyButton from './components/SelectionReplyButton';
 import { computeChatTimeMarkers, splitGap, type ChatTimeMarker } from './utils/chatTimeMarkers';
-
-// 0.11.3: the inline observability UI (activity tree, sub-agent cards, "View Steps"
-// tool summary) is temporarily disabled pending the rework — see
-// app/.planning/handoffs/SESSION-HANDOFF-2026-06-24-OBSERVABILITY-REWORK-AND-JSON-STREAM.md.
-// The StatusFooter "processing" cue stays. Flip to true (and restore the sub_agent
-// case) to re-enable.
-const SHOW_OBSERVABILITY_INLINE = false;
 
 type TurnDiffContent = Extract<CodexToolCallUpdate, { subtype: 'turn_diff' }>;
 
@@ -101,7 +97,12 @@ const getUnhandledMessageType = (_message: never): string => 'unknown';
 // Image preview context
 export const ImagePreviewContext = createContext<{ inPreviewGroup: boolean }>({ inPreviewGroup: false });
 
-const MessageItem: React.FC<{ message: TMessage; highlighted?: boolean }> = React.memo(
+const MessageItem: React.FC<{
+  message: TMessage;
+  highlighted?: boolean;
+  toolbarMode?: ActionsDisplay;
+  retryText?: string;
+}> = React.memo(
   HOC((props) => {
     const { message, highlighted } = props as { message: TMessage; highlighted?: boolean };
     return (
@@ -124,60 +125,71 @@ const MessageItem: React.FC<{ message: TMessage; highlighted?: boolean }> = Reac
         {props.children}
       </div>
     );
-  })(({ message }) => {
-    const { t } = useTranslation();
-    switch (message.type) {
-      case 'text':
-        return <MessageText message={message}></MessageText>;
-      case 'tips':
-        return <MessageTips message={message}></MessageTips>;
-      case 'tool_call':
-        return <MessageToolCall message={message}></MessageToolCall>;
-      case 'tool_group':
-        return <MessageToolGroup message={message}></MessageToolGroup>;
-      case 'agent_status':
-        return <MessageAgentStatus message={message}></MessageAgentStatus>;
-      case 'acp_permission':
-        return <MessageAcpPermission message={message}></MessageAcpPermission>;
-      case 'acp_tool_call':
-        return <MessageAcpToolCall message={message}></MessageAcpToolCall>;
-      case 'codex_permission':
-        // Permission UI is now handled by ConversationChatConfirm component
-        return null;
-      case 'codex_tool_call':
-        return <MessageCodexToolCall message={message}></MessageCodexToolCall>;
-      case 'plan':
-        return <MessagePlan message={message}></MessagePlan>;
-      case 'thinking':
-        return <MessageThinking message={message}></MessageThinking>;
-      case 'skill_suggest':
-        return <MessageSkillSuggest message={message} />;
-      case 'cron_trigger':
-        return <MessageCronTrigger message={message} />;
-      case 'cron_propose':
-        return <CronProposeCard message={message} />;
-      case 'sub_agent':
-        // 0.11.3: observability inline cards disabled pending the rework; the
-        // StatusFooter "processing" cue is the live indicator. (Re-enabled by the
-        // observability rework — see the 2026-06-24 handoff.)
-        return null;
-      case 'activity':
-        // #252 reframe: the activity tree moved to the opt-in ObservabilityPanel.
-        // The chat center stays calm - the inline StatusFooter pulse is the only
-        // cue here. The message still lives in the list so the panel can read it.
-        return null;
-      case 'available_commands':
-        return null;
-      default:
-        return <div>{t('messages.unknownMessageType', { type: getUnhandledMessageType(message) })}</div>;
+  })(
+    ({
+      message,
+      toolbarMode,
+      retryText,
+    }: {
+      message: TMessage;
+      highlighted?: boolean;
+      toolbarMode?: ActionsDisplay;
+      retryText?: string;
+    }) => {
+      const { t } = useTranslation();
+      switch (message.type) {
+        case 'text':
+          return <MessageText message={message} toolbarMode={toolbarMode} retryText={retryText} />;
+        case 'tips':
+          return <MessageTips message={message}></MessageTips>;
+        case 'tool_call':
+          return <MessageToolCall message={message}></MessageToolCall>;
+        case 'tool_group':
+          return <MessageToolGroup message={message}></MessageToolGroup>;
+        case 'agent_status':
+          return <MessageAgentStatus message={message}></MessageAgentStatus>;
+        case 'acp_permission':
+          return <MessageAcpPermission message={message}></MessageAcpPermission>;
+        case 'acp_tool_call':
+          return <MessageAcpToolCall message={message}></MessageAcpToolCall>;
+        case 'codex_permission':
+          // Permission UI is now handled by ConversationChatConfirm component
+          return null;
+        case 'codex_tool_call':
+          return <MessageCodexToolCall message={message}></MessageCodexToolCall>;
+        case 'plan':
+          return <MessagePlan message={message}></MessagePlan>;
+        case 'thinking':
+          return <MessageThinking message={message}></MessageThinking>;
+        case 'skill_suggest':
+          return <MessageSkillSuggest message={message} />;
+        case 'cron_trigger':
+          return <MessageCronTrigger message={message} />;
+        case 'cron_propose':
+          return <CronProposeCard message={message} />;
+        case 'sub_agent':
+          // #252 rework: a spawned sub-agent renders as one collapsible timeline
+          // step carrying its parsed inner subtree (tools / thinking / nested agents).
+          return <ActivityTimeline steps={[subAgentToStep(message.content)]} />;
+        case 'activity':
+          // #252 rework: the live activity tree (tool lifecycle, chunks, cost,
+          // circuit/browser/cua) renders inline as the unified timeline.
+          return <ActivityTimeline steps={activityToSteps(message.content)} />;
+        case 'available_commands':
+          return null;
+        default:
+          return <div>{t('messages.unknownMessageType', { type: getUnhandledMessageType(message) })}</div>;
+      }
     }
-  }),
+  ),
   (prev, next) =>
     prev.message.id === next.message.id &&
     prev.message.content === next.message.content &&
     prev.message.position === next.message.position &&
     prev.message.type === next.message.type &&
-    prev.highlighted === next.highlighted
+    prev.highlighted === next.highlighted &&
+    prev.toolbarMode === next.toolbarMode &&
+    prev.retryText === next.retryText
 );
 
 /**
@@ -210,7 +222,26 @@ const ChatTimeMarkerRow: React.FC<{ marker: ChatTimeMarker }> = ({ marker }) => 
   );
 };
 
-const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }> = ({ emptySlot }) => {
+// Stable Virtuoso list components (module-level so they are NEVER recreated on
+// render). This is what keeps the orbit indicator MOUNTED across re-renders, so
+// its CSS animation runs continuously instead of restarting (= flashing) every
+// streamed token. The processing state reaches the footer via Virtuoso `context`.
+type MessageListContext = { isProcessing?: boolean; currentLabel?: string; turnStartTime?: number };
+const ListHeader: React.FC = () => <div className='h-10px' />;
+const ListFooter: React.FC<{ context?: MessageListContext }> = ({ context }) => (
+  <OrbitThinking
+    isProcessing={!!context?.isProcessing}
+    currentLabel={context?.currentLabel}
+    startTime={context?.turnStartTime}
+  />
+);
+const LIST_COMPONENTS = { Header: ListHeader, Footer: ListFooter } as const;
+
+const ConversationMessageList: React.FC<{
+  className?: string;
+  emptySlot?: React.ReactNode;
+  isProcessing?: boolean;
+}> = ({ emptySlot, isProcessing }) => {
   const list = useMessageList();
   const conversationContext = useConversationContextSafe();
   useAutoPreviewOfficeFiles(conversationContext);
@@ -322,6 +353,27 @@ const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.
     return result;
   }, [list]);
 
+  // #252 rework: the per-message action row is always shown on the LAST assistant
+  // bubble (hover-revealed elsewhere), and Retry needs the preceding user prompt.
+  // Compute the last assistant-text id + a map of assistant id -> its prompt.
+  const { lastAssistantId, retryTextById } = useMemo(() => {
+    const map = new Map<string, string>();
+    let lastId: string | undefined;
+    let lastUserText = '';
+    for (const item of processedList) {
+      if ('type' in item && (item.type === 'file_summary' || item.type === 'tool_summary')) continue;
+      const m = item as TMessage;
+      if (m.type !== 'text') continue;
+      if (m.position === 'right') {
+        if (typeof m.content?.content === 'string') lastUserText = m.content.content;
+      } else if (m.position === 'left') {
+        if (lastUserText) map.set(m.id, lastUserText);
+        lastId = m.id;
+      }
+    }
+    return { lastAssistantId: lastId, retryTextById: map };
+  }, [processedList]);
+
   // Per-row time markers for project chats, aligned to processedList indices (#59).
   const timeMarkers = useMemo(() => {
     if (!isProjectChat) return null;
@@ -428,6 +480,43 @@ const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.
     scrollToBottom('smooth');
   };
 
+  // The orbit's live label = the real current action (the last running tool
+  // step), so the indicator reads "Searching the web…" / "Running a command…"
+  // instead of a generic phrase. Undefined while there is no active tool (the
+  // orbit then falls back to a calm reasoning phrase), and only while processing.
+  const currentLabel = useMemo<string | undefined>(() => {
+    if (!isProcessing) return undefined;
+    for (let i = processedList.length - 1; i >= 0; i--) {
+      const item = processedList[i];
+      if ('type' in item && item.type === 'tool_summary') {
+        const steps = toolSummaryToSteps(item.messages);
+        return [...steps].reverse().find((s) => s.status === 'running')?.label;
+      }
+      // #318: during the live reasoning phase (no tool activity yet) prefer the
+      // engine's own per-turn reasoning subject for the orbit footer; PHRASES stays
+      // the fallback for reasoning turns the engine gives no subject for.
+      if ('type' in item && item.type === 'thinking') {
+        const c = (item as TMessage & { type: 'thinking' }).content;
+        if (c.status !== 'done' && c.subject) return c.subject;
+      }
+    }
+    return undefined;
+  }, [processedList, isProcessing]);
+
+  // #288: the orbit's elapsed timer is anchored to the turn's actual start - the
+  // last user submission (createdAt is epoch-ms). This makes elapsed = TOTAL
+  // running time that survives chat switches (the timer no longer resets to 0 on
+  // remount), and it is undefined while idle so the timer never ticks with no
+  // task running.
+  const turnStartTime = useMemo<number | undefined>(() => {
+    if (!isProcessing) return undefined;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const m = list[i];
+      if (m.position === 'right' && typeof m.createdAt === 'number') return m.createdAt;
+    }
+    return undefined;
+  }, [list, isProcessing]);
+
   const renderItem = (_index: number, item: (typeof processedList)[0]) => {
     const highlighted = matchesTargetMessage(item, highlightedMessageId);
     const marker = timeMarkers?.[_index] ?? null;
@@ -441,14 +530,30 @@ const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.
           style={highlighted ? highlightStyle : undefined}
         >
           {item.type === 'file_summary' && <MessageFileChanges diffsChanges={item.diffs} />}
-          {/* 0.11.3: the "View Steps" tool summary is disabled with the rest of the
-              observability UI pending the rework; the StatusFooter is the live cue. */}
-          {SHOW_OBSERVABILITY_INLINE && item.type === 'tool_summary' && <MessageToolGroupSummary messages={item.messages}></MessageToolGroupSummary>}
+          {/* #252 rework: grouped tool calls render as the unified collapsible
+              activity timeline (replaces the old raw "View Steps" list). */}
+          {item.type === 'tool_summary' && <ActivityTimeline steps={toolSummaryToSteps(item.messages)} />}
         </div>
       );
     } else {
+      const tm = item as TMessage;
+      const isLastAssistant = tm.type === 'text' && tm.id === lastAssistantId;
+      // The tool set only appears once a response is DONE: the last assistant
+      // message is 'hidden' while it is the last item AND still streaming, then
+      // 'always' once complete; older messages reveal on hover.
+      const toolbarMode: ActionsDisplay = isLastAssistant
+        ? _index === processedList.length - 1 && isProcessing
+          ? 'hidden'
+          : 'always'
+        : 'hover';
       body = (
-        <MessageItem message={item as TMessage} key={(item as TMessage).id} highlighted={highlighted}></MessageItem>
+        <MessageItem
+          message={tm}
+          key={tm.id}
+          highlighted={highlighted}
+          toolbarMode={toolbarMode}
+          retryText={retryTextById.get(tm.id)}
+        ></MessageItem>
       );
     }
     if (!marker) return body;
@@ -482,10 +587,12 @@ const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.
             followOutput={handleFollowOutput}
             onScroll={handleScroll}
             atBottomStateChange={handleAtBottomStateChange}
-            components={{
-              Header: () => <div className='h-10px' />,
-              Footer: () => <div className='h-20px' />,
-            }}
+            // #252 rework: the orbit "thinking" indicator is the (stable) footer -
+            // always parked under the last block, animating while processing and
+            // resting static when done. Stable components + context avoid remounts
+            // (= flashing). See LIST_COMPONENTS above.
+            components={LIST_COMPONENTS}
+            context={{ isProcessing, currentLabel, turnStartTime }}
           />
         </ImagePreviewContext.Provider>
       </Image.PreviewGroup>
@@ -519,7 +626,7 @@ const ConversationMessageList: React.FC<{ className?: string; emptySlot?: React.
  * hooks) so toggling views mounts/unmounts a whole child component instead of
  * changing the hook count inside one component (which React forbids).
  */
-const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }> = (props) => {
+const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode; isProcessing?: boolean }> = (props) => {
   const conversationContext = useConversationContextSafe();
   const wf = useWorkflowViewMode();
   const workflowSessionId = conversationContext?.workflowSessionId;

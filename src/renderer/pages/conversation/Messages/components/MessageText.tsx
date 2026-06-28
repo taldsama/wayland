@@ -4,14 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Copy } from 'lucide-react';
 import type { IMessageText } from '@/common/chat/chatLib';
 import { WAYLAND_FILES_MARKER } from '@/common/config/constants';
 import { useConversationContextSafe } from '@/renderer/hooks/context/ConversationContext';
-import { iconColors } from '@/renderer/styles/colors';
-import { Alert, Message, Tooltip } from '@arco-design/web-react';
+import { Alert, Button, Input, Message } from '@arco-design/web-react';
+import MessageActions, { EDIT_AND_RERUN_EVENT, type ActionsDisplay, type ChatEditRerunDetail } from './MessageActions';
 import classNames from 'classnames';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import CollapsibleContent from '@renderer/components/chat/CollapsibleContent';
@@ -124,7 +123,11 @@ const useFormatContent = (content: string) => {
   }, [content]);
 };
 
-const MessageText: React.FC<{ message: IMessageText }> = ({ message }) => {
+const MessageText: React.FC<{ message: IMessageText; toolbarMode?: ActionsDisplay; retryText?: string }> = ({
+  message,
+  toolbarMode = 'hover',
+  retryText,
+}) => {
   // Filter think tags from content before rendering
   const contentToRender = useMemo(() => {
     let content = message.content.content;
@@ -156,6 +159,33 @@ const MessageText: React.FC<{ message: IMessageText }> = ({ message }) => {
   );
 
   const workflowSessionId = conversationContext?.workflowSessionId;
+  const conversationId = conversationContext?.conversationId;
+
+  // Inline edit state — user messages only.
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+
+  const handleEditStart = useCallback(() => {
+    setEditValue(text);
+    setEditing(true);
+  }, [text]);
+
+  const handleEditSave = useCallback(() => {
+    const trimmed = editValue.trim();
+    if (!trimmed || !conversationId || !message.createdAt) return;
+    window.dispatchEvent(
+      new CustomEvent<ChatEditRerunDetail>(EDIT_AND_RERUN_EVENT, {
+        // Truncate from the edited message INCLUSIVE (delete is `created_at > ?`),
+        // so the resend REPLACES the original instead of appending a duplicate.
+        detail: { conversationId, afterTimestamp: message.createdAt - 1, text: trimmed },
+      })
+    );
+    setEditing(false);
+  }, [editValue, conversationId, message.createdAt]);
+
+  const handleEditCancel = useCallback(() => {
+    setEditing(false);
+  }, []);
 
   const hasVisibleContent =
     !!message.content.content && (typeof message.content.content !== 'string' || !!message.content.content.trim());
@@ -191,16 +221,17 @@ const MessageText: React.FC<{ message: IMessageText }> = ({ message }) => {
       });
   };
 
-  const copyButton = (
-    <Tooltip content={t('common.copy', { defaultValue: 'Copy' })}>
-      <div
-        className='p-4px rd-4px cursor-pointer hover:bg-3 transition-colors opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'
-        onClick={handleCopy}
-        style={{ lineHeight: 0 }}
-      >
-        <Copy size={16} color={iconColors.secondary} />
-      </div>
-    </Tooltip>
+  const actionRow = (
+    <MessageActions
+      onCopy={handleCopy}
+      messageId={message.id}
+      readText={text}
+      isUser={isUserMessage}
+      display={toolbarMode}
+      retryText={!isUserMessage ? retryText : undefined}
+      conversationId={conversationId}
+      onEdit={isUserMessage && message.createdAt && conversationId ? handleEditStart : undefined}
+    />
   );
 
   const cronMeta = message.content.cronMeta;
@@ -257,8 +288,29 @@ const MessageText: React.FC<{ message: IMessageText }> = ({ message }) => {
                 : undefined),
           }}
         >
+          {/* Inline edit mode for user messages */}
+          {editing && (
+            <div className='flex flex-col gap-8px'>
+              <Input.TextArea
+                value={editValue}
+                onChange={setEditValue}
+                autoSize={{ minRows: 2, maxRows: 12 }}
+                autoFocus
+                aria-label={t('conversation.actions.edit', { defaultValue: 'Edit' })}
+              />
+              <div className='flex gap-8px justify-end'>
+                <Button size='small' onClick={handleEditCancel}>
+                  {t('conversation.actions.cancel', { defaultValue: 'Cancel' })}
+                </Button>
+                <Button size='small' type='primary' onClick={handleEditSave}>
+                  {t('conversation.actions.save', { defaultValue: 'Save' })}
+                </Button>
+              </div>
+            </div>
+          )}
           {/* Use CollapsibleContent for JSON content */}
-          {hasVisibleContent &&
+          {!editing &&
+            hasVisibleContent &&
             (shouldRenderPlainText ? (
               <div className='whitespace-pre-wrap break-words' data-testid='message-text-content'>
                 {workflowSessionId ? stripWorkflowEnvelopes(text) : text}
@@ -296,7 +348,7 @@ const MessageText: React.FC<{ message: IMessageText }> = ({ message }) => {
             'flex-row-reverse': isUserMessage,
           })}
         >
-          {copyButton}
+          {actionRow}
           {message.createdAt && (
             <span className='text-12px text-t-secondary opacity-0 group-hover:opacity-100 transition-opacity select-none'>
               {formatMessageTime(message.createdAt)}

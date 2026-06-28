@@ -18,6 +18,7 @@ import { describe, it, expect } from 'vitest';
 import { entryToServerData } from '@/renderer/pages/settings/McpLibrary/entryToServerData';
 import type { CatalogEntry } from '@/renderer/pages/settings/McpLibrary/types';
 import exaEntry from '@/renderer/mcp-catalog/entries/com.exa-exa-mcp.json';
+import googleWorkspaceEntry from '@/renderer/mcp-catalog/entries/io.github.taylorwilsdon-google-workspace-mcp.json';
 
 function baseEntry(overrides: Partial<CatalogEntry>): CatalogEntry {
   return {
@@ -76,5 +77,120 @@ describe('entryToServerData query-param api-key auth (#130)', () => {
 
     const data = entryToServerData(exaEntry as unknown as CatalogEntry, { EXA_API_KEY: 'live-key' });
     expect(data.transport.url).toBe('https://mcp.exa.ai/mcp?exaApiKey=live-key');
+  });
+});
+
+describe('entryToServerData stdio credential trimming (#306)', () => {
+  const stdioEntry = baseEntry({
+    packages: [{ runtimeHint: 'uvx', identifier: 'workspace-mcp', runtimeArguments: [] }],
+    'x-wayland': {
+      tier: 'builder',
+      categories: ['productivity'],
+      maintainerType: 'community',
+      iconUrl: 'icons/test.svg',
+      auth: { method: 'oauth2-byo' },
+    },
+  } as unknown as Partial<CatalogEntry>);
+
+  it('strips stray whitespace off pasted env credentials before persisting (invalid_client guard)', () => {
+    const data = entryToServerData(stdioEntry, {
+      GOOGLE_OAUTH_CLIENT_ID: '  1012723604691-abc.apps.googleusercontent.com\n',
+      GOOGLE_OAUTH_CLIENT_SECRET: 'GOCSPX-realsecret \t',
+    });
+
+    expect(data.transport.type).toBe('stdio');
+    expect(data.transport.env).toEqual({
+      GOOGLE_OAUTH_CLIENT_ID: '1012723604691-abc.apps.googleusercontent.com',
+      GOOGLE_OAUTH_CLIENT_SECRET: 'GOCSPX-realsecret',
+    });
+  });
+
+  it('substitutes the trimmed value into a {{VAR}} runtime arg', () => {
+    const entry = baseEntry({
+      packages: [{ runtimeHint: 'npx', identifier: 'svc', runtimeArguments: ['--token', '{{TOKEN}}'] }],
+      'x-wayland': {
+        tier: 'builder',
+        categories: ['developer'],
+        maintainerType: 'community',
+        iconUrl: 'icons/test.svg',
+        auth: { method: 'oauth2-byo' },
+      },
+    } as unknown as Partial<CatalogEntry>);
+
+    const data = entryToServerData(entry, { TOKEN: '  abc123  ' });
+    expect(data.transport.args).toEqual(['svc', '--token', 'abc123']);
+  });
+
+  it('keeps an empty optional env var (preserved as empty, not dropped) after trimming', () => {
+    const data = entryToServerData(stdioEntry, { GOOGLE_OAUTH_CLIENT_ID: 'cid', OPTIONAL: '   ' });
+    expect(data.transport.env).toEqual({ GOOGLE_OAUTH_CLIENT_ID: 'cid', OPTIONAL: '' });
+  });
+});
+
+describe('entryToServerData pins BYO package versions (#343)', () => {
+  const byoAuth = {
+    tier: 'builder',
+    categories: ['productivity'],
+    maintainerType: 'community',
+    iconUrl: 'icons/test.svg',
+    auth: { method: 'oauth2-byo' },
+  };
+
+  it('pins a pypi/uvx package to its exact version with ==', () => {
+    const entry = baseEntry({
+      packages: [
+        {
+          registryType: 'pypi',
+          runtimeHint: 'uvx',
+          identifier: 'workspace-mcp',
+          version: '1.4.2',
+          runtimeArguments: [],
+        },
+      ],
+      'x-wayland': byoAuth,
+    } as unknown as Partial<CatalogEntry>);
+    const data = entryToServerData(entry, {});
+    expect(data.transport.args).toEqual(['workspace-mcp==1.4.2']);
+  });
+
+  it('pins an npm/npx package to its exact version with @, preserving runtime args', () => {
+    const entry = baseEntry({
+      packages: [
+        {
+          registryType: 'npm',
+          runtimeHint: 'npx',
+          identifier: 'xero-mcp',
+          version: '0.0.17',
+          runtimeArguments: ['--mode', 'stdio'],
+        },
+      ],
+      'x-wayland': byoAuth,
+    } as unknown as Partial<CatalogEntry>);
+    const data = entryToServerData(entry, {});
+    expect(data.transport.args).toEqual(['xero-mcp@0.0.17', '--mode', 'stdio']);
+  });
+
+  it('leaves a "latest" version unpinned so floating entries are unchanged', () => {
+    const entry = baseEntry({
+      packages: [
+        {
+          registryType: 'pypi',
+          runtimeHint: 'uvx',
+          identifier: 'mcp-server-qdrant',
+          version: 'latest',
+          runtimeArguments: [],
+        },
+      ],
+      'x-wayland': byoAuth,
+    } as unknown as Partial<CatalogEntry>);
+    const data = entryToServerData(entry, {});
+    expect(data.transport.args).toEqual(['mcp-server-qdrant']);
+  });
+
+  it('pins the shipped Google Workspace (workspace-mcp) entry to its exact version', () => {
+    const pkg = googleWorkspaceEntry.packages[0];
+    expect(pkg.version).not.toBe('latest');
+    const data = entryToServerData(googleWorkspaceEntry as unknown as CatalogEntry, {});
+    expect(data.transport.args?.[0]).toBe(`workspace-mcp==${pkg.version}`);
   });
 });

@@ -229,8 +229,7 @@ function composeMessageWithIndex(message: TMessage, list: TMessage[], index: Mes
       if (existingMsg.type === 'sub_agent') {
         const prev = existingMsg.content;
         const next = message.content;
-        const mergedStatus =
-          next.status === 'done' || next.status === 'failed' ? next.status : prev.status;
+        const mergedStatus = next.status === 'done' || next.status === 'failed' ? next.status : prev.status;
         // #252 Phase 2: fold the sub-agent's streamed child subtree by node id
         // (recurses for nested sub-agents). Mirrors composeMessage.
         const mergedNodes = mergeNodeList(prev.nodes, next.nodes);
@@ -400,6 +399,22 @@ export const useRemoveMessageByMsgId = () => {
   return useCallback(
     (msgId: string) => {
       update((list) => list.filter((message) => message.msg_id !== msgId));
+    },
+    [update]
+  );
+};
+
+/**
+ * Returns a callback that drops all messages with createdAt > timestamp from
+ * the live list. Used by the edit-and-rerun flow to truncate the tape after
+ * the edited user message before re-sending.
+ */
+export const useTruncateMessagesAfter = () => {
+  const update = useUpdateMessageList();
+
+  return useCallback(
+    (timestamp: number) => {
+      update((list) => list.filter((message) => !message.createdAt || message.createdAt <= timestamp));
     },
     [update]
   );

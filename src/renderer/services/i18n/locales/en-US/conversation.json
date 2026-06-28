@@ -9,6 +9,7 @@
     "selectModel": "Select Model",
     "useCliModel": "Select Model",
     "modelSwitchNotSupported": "Model list will be available after first connection. Send a message to connect and load available models.",
+    "modelLoading": "Loading models…",
     "fluxGroupLabel": "Flux",
     "nativeModelsGroupLabel": "Agent models",
     "specifyWorkspace": "Chat in Folder",
@@ -314,6 +315,7 @@
   },
   "thinking": {
     "complete": "Thought complete",
+    "thoughtFor": "Thought for {{duration}}",
     "label": "Thinking..."
   },
   "subAgent": {
@@ -342,7 +344,24 @@
     "close": "Close panel",
     "empty": "Activity from this conversation will appear here.",
     "showCost": "Show cost",
-    "showCostHint": "off by default"
+    "showCostHint": "off by default",
+    "runningHeader": "{{count}} steps",
+    "runningCount": "{{count}} running",
+    "summaryDid": "Did {{count}} things · {{duration}}",
+    "summaryDidShort": "Did {{count}} things",
+    "summaryDidMore": "{{steps}} · +{{count}} more",
+    "expandRow": "Toggle step detail",
+    "sourcesCount": "{{count}} sources"
+  },
+  "actions": {
+    "readAloud": "Read aloud",
+    "stopReading": "Stop",
+    "retry": "Retry",
+    "thumbsUp": "Good response",
+    "thumbsDown": "Bad response",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel"
   },
   "skills": {
     "loaded": "Loaded Skills"
@@ -417,10 +436,14 @@
     "connectorsTitle": "Connectors",
     "connectorsSub": "Turn a connected MCP server on or off.",
     "connectorsConnected": "Connected",
+    "connectorsForChat": "Active in this chat",
     "toolCount": "{{count}} tools",
     "noConnectors": "No connectors installed yet.",
     "addConnector": "Add a connector",
-    "manageConnectors": "Manage connectors"
+    "manageConnectors": "Manage connectors",
+    "toolNudgeOver": "{{count}} tools enabled · {{model}} caps at {{cap}}. Scope servers for this chat or switch models.",
+    "toolNudgeNear": "{{count}} of {{cap}} tools · {{model}}. Near the limit — scope servers or switch models before adding more.",
+    "toolNudgeModelFallback": "this model"
   },
   "modelSelector": {
     "title": "Model",
@@ -448,6 +471,7 @@
     "emptyBody": "No models yet. Connect a provider or sign in to a CLI.",
     "emptyFlux": "Tip: connect Flux Router for one-tap auto-routing across every model you add.",
     "connectProvider": "Connect a provider",
-    "manageModels": "Manage models"
+    "manageModels": "Manage models",
+    "claudeSubscriptionNotice": "Claude Code already runs on your Claude subscription — pick it from the agent selector. Choosing Claude models for direct chat here needs an Anthropic API key; using your subscription as chat models isn’t supported yet."
   }
 }

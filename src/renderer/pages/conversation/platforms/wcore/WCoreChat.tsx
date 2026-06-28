@@ -62,6 +62,10 @@ const WCoreChat: React.FC<{
   useMessageLstCache(conversation_id);
   const navigate = useNavigate();
   const readiness = useProviderReadiness();
+  // #252 rework: the orbit "thinking" indicator renders inline at the END of the
+  // message list (under the last block). The sendbox owns the `running` signal,
+  // so it reports it up here and we pass it to MessageList.
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Auth-failure remedy card: shown above the send box when the engine reports a
   // provider key rejection (401). Built from the failing provider's label so the
@@ -109,17 +113,14 @@ const WCoreChat: React.FC<{
     await routeThroughFluxAndReplay({
       conversationId: conversation_id,
       pendingTurn: pendingTurnRef.current,
-      connectFlux: () =>
-        fluxConnected ? Promise.resolve({ ok: true }) : ipcBridge.onboarding.connectFlux.invoke(),
+      connectFlux: () => (fluxConnected ? Promise.resolve({ ok: true }) : ipcBridge.onboarding.connectFlux.invoke()),
       switchToFlux: async (cid) => {
         // The Flux provider in model.config carries an opaque id, so match it by
         // its flux-* model catalog, not a fixed id. Persisting this provider with
         // useModel=flux-auto is the same shape getDefaultWCoreModel produces; the
         // main process resolves the Flux base URL + key at spawn.
         const cfg = await ipcBridge.mode.getModelConfig.invoke();
-        const fluxProvider = (Array.isArray(cfg) ? cfg : []).find((p) =>
-          (p.model ?? []).some((m) => isFluxModelId(m))
-        );
+        const fluxProvider = (Array.isArray(cfg) ? cfg : []).find((p) => (p.model ?? []).some((m) => isFluxModelId(m)));
         if (!fluxProvider) return false;
         const fluxModel = { ...fluxProvider, useModel: FLUX_AUTO_MODEL } as TProviderWithModel;
         // Mirror the model picker: stop the running engine, then persist the Flux
@@ -170,7 +171,7 @@ const WCoreChat: React.FC<{
           style={obs.panelOpen ? { width: `${splitRatio}%`, minWidth: 0 } : { flex: 1, minWidth: 0 }}
         >
           <FlexFullContainer>
-            <MessageList className='flex-1' emptySlot={emptySlot} />
+            <MessageList className='flex-1' emptySlot={emptySlot} isProcessing={isProcessing} />
           </FlexFullContainer>
           {engineAsleep && (
             <div className='max-w-800px w-full mx-auto mb-8px'>
@@ -194,6 +195,7 @@ const WCoreChat: React.FC<{
               teamId={teamId}
               agentSlotId={agentSlotId}
               sessionMode={sessionMode}
+              onRunningChange={setIsProcessing}
             />
           </ConversationChatConfirm>
         </div>

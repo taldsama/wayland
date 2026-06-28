@@ -5,7 +5,24 @@
  */
 
 import type { IMcpServer, IMcpServerTransport } from '@/common/config/storage';
-import type { CatalogEntry } from './types';
+import type { CatalogEntry, PackageRef } from './types';
+
+/**
+ * Pin a spawned BYO MCP package to the catalog's exact version so an
+ * auth-critical connector (e.g. workspace-mcp in the Google OAuth path) can't
+ * silently float to a malicious or broken upstream `latest` release (#343).
+ * Only registry packages with a concrete version are pinned — `latest`/empty
+ * is left bare so floating entries keep their current behavior, and non-registry
+ * runtimes (docker image, native bundle) are untouched.
+ */
+function pinnedIdentifier(pkg: PackageRef): string {
+  const id = pkg.identifier;
+  const version = pkg.version?.trim();
+  if (!version || version === 'latest') return id;
+  if (pkg.registryType === 'npm') return `${id}@${version}`;
+  if (pkg.registryType === 'pypi') return `${id}==${version}`;
+  return id;
+}
 
 // Catalog uses hyphenated transport types ('streamable-http'); storage uses
 // underscored ('streamable_http'). Normalize between them to avoid invalid
@@ -29,7 +46,7 @@ function appendQueryParam(url: string, name: string, value: string): string {
  */
 export function entryToServerData(
   entry: CatalogEntry,
-  envValues: Record<string, string>,
+  envValues: Record<string, string>
 ): Omit<IMcpServer, 'id' | 'createdAt' | 'updatedAt'> {
   const pkg = entry.packages.length > 0 ? entry.packages[0] : undefined;
   const remote = entry.remotes && entry.remotes.length > 0 ? entry.remotes[0] : undefined;
@@ -37,6 +54,16 @@ export function entryToServerData(
   if (!pkg && !remote) {
     throw new Error(`Catalog entry ${entry.name} has no installable target.`);
   }
+
+  // Trim user-entered credential values. A stray space/newline picked up when
+  // pasting (e.g. a Google OAuth client secret) would otherwise be persisted
+  // verbatim onto transport.env and silently break the subprocess's own auth
+  // with `invalid_client` - the visible characters look correct, so it's a
+  // brutal one to diagnose. Empty values are preserved so an unset optional var
+  // still round-trips.
+  const cleanEnv: Record<string, string> = Object.fromEntries(
+    Object.entries(envValues).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])
+  );
 
   // Prefer remote (hosted MCP) if both are present - no local spawn required.
   // For an api-key hosted server the user's token is sent as a Bearer
@@ -70,7 +97,7 @@ export function entryToServerData(
   // with `{{VAR}}` substituted from the user's setup-guide inputs. Empty args
   // (an unfilled optional `{{VAR}}`) are dropped so we never pass a bare flag value.
   const runtimeArgs = (pkg?.runtimeArguments ?? [])
-    .map((a) => a.replace(/\{\{(\w+)\}\}/g, (_m, k) => envValues[k] ?? ''))
+    .map((a) => a.replace(/\{\{(\w+)\}\}/g, (_m, k) => cleanEnv[k] ?? ''))
     .filter((a) => a.length > 0);
   const transport: IMcpServerTransport = remote
     ? {
@@ -87,13 +114,13 @@ export function entryToServerData(
           type: 'stdio',
           command: 'node',
           args: [pkg!.identifier, ...runtimeArgs],
-          env: envValues,
+          env: cleanEnv,
         }
       : {
           type: 'stdio',
           command: pkg!.runtimeHint,
-          args: [...(pkg!.identifier ? [pkg!.identifier] : []), ...runtimeArgs],
-          env: envValues,
+          args: [...(pkg!.identifier ? [pinnedIdentifier(pkg!)] : []), ...runtimeArgs],
+          env: cleanEnv,
         };
 
   // The catalog id is reverse-DNS with a slash (com.vendor/name), but an MCP

@@ -5,7 +5,6 @@
  */
 
 import { ipcBridge } from '@/common';
-import { DEFAULT_CODEX_MODELS } from '@/common/types/codex/codexModels';
 import type { IProvider } from '@/common/config/storage';
 import { ConfigStorage } from '@/common/config/storage';
 import type { AcpBackendAll, AcpSessionConfigOption } from '@/common/types/acpTypes';
@@ -174,19 +173,48 @@ export const useGuidAgentSelection = ({
   const findAgentByKey = (key: string): AvailableAgent | undefined => {
     if (key.startsWith('custom:')) {
       const customAgentId = key.slice(7);
-      const foundInAvailable = availableAgents?.find((a) => a.customAgentId === customAgentId);
+      // Built-in/specialist assistants carry a `builtin-` prefix on some surfaces
+      // (the selection key) but not others (the registry record id), e.g. the key
+      // `custom:builtin-book-copy-editor` vs the record id `book-copy-editor`. Match
+      // all three forms - the same prefix-tolerant resolution used in GuidPage
+      // (601/627) and AssistantSelectionArea (57). An exact-only match here left
+      // `selectedAgentInfo` undefined, which flipped the agent to a bare `custom`
+      // backend and died on spawn with "No CLI path for backend 'custom'".
+      const stripped = customAgentId.replace(/^builtin-/, '');
+      const idCandidates = new Set([customAgentId, `builtin-${stripped}`, stripped]);
+      const foundInAvailable = availableAgents?.find(
+        (a) => a.customAgentId != null && idCandidates.has(a.customAgentId)
+      );
       if (foundInAvailable) return foundInAvailable;
 
-      const assistant = customAgents.find((a) => a.id === customAgentId);
+      const assistant = customAgents.find((a) => idCandidates.has(a.id));
       if (assistant) {
         return {
-          backend: assistant.presetAgentType || 'gemini',
+          // #380: an assistant with no preset type runs on the bundled WCore
+          // engine, not Gemini CLI.
+          backend: assistant.presetAgentType || 'wcore',
           name: assistant.name,
           customAgentId: assistant.id,
           isPreset: true,
           context: '',
           avatar: assistant.avatar,
           presetAgentType: assistant.presetAgentType,
+        };
+      }
+      // Defensive (#380): a `custom:` key that resolves to no known record must
+      // still run on the bundled WCore engine - never fall through to a bare
+      // `custom` ACP backend, which dies on spawn with "No CLI path for backend
+      // 'custom'". Only synthesize once a registry has actually loaded, so a
+      // transient empty list during boot doesn't strip a real assistant's
+      // persona (this memo re-runs when availableAgents/customAgents arrive).
+      if ((availableAgents?.length ?? 0) > 0 || customAgents.length > 0) {
+        return {
+          backend: 'wcore',
+          name: stripped,
+          customAgentId,
+          isPreset: true,
+          context: '',
+          presetAgentType: 'wcore',
         };
       }
     }
@@ -487,6 +515,33 @@ export const useGuidAgentSelection = ({
     };
   }, [selectedAgent, isPresetAgent, currentEffectiveAgentInfo.agentType]);
 
+  // Eagerly resolve a missing per-backend model catalog (Claude Code has no
+  // acp.cachedModels entry until a session connects) via getModelInfo, which
+  // falls back to local config (~/.claude / cc-switch) with no live task. Without
+  // this the LAUNCH picker shows "Default Model" until the first message is sent.
+  useEffect(() => {
+    const backend = isPresetAgent
+      ? currentEffectiveAgentInfo.agentType
+      : selectedAgentKey.startsWith('custom:')
+        ? 'custom'
+        : selectedAgentKey;
+    if (!backend || acpCachedModels[backend]?.availableModels?.length) return;
+    let active = true;
+    ipcBridge.acpConversation.getModelInfo
+      .invoke({ conversationId: '', backend })
+      .then((res) => {
+        const info = res?.success ? res.data?.modelInfo : null;
+        if (!active || !info?.availableModels?.length) return;
+        setAcpCachedModels((prev) => (prev[backend]?.availableModels?.length ? prev : { ...prev, [backend]: info }));
+      })
+      .catch(() => {
+        // Offline resolve is best-effort; the picker keeps its default until connect.
+      });
+    return () => {
+      active = false;
+    };
+  }, [isPresetAgent, currentEffectiveAgentInfo.agentType, selectedAgentKey, acpCachedModels]);
+
   const currentAcpCachedModelInfo = useMemo(() => {
     // For preset agents, resolve to the actual backend type for model list lookup
     const backend = isPresetAgent
@@ -497,18 +552,10 @@ export const useGuidAgentSelection = ({
     const cached = acpCachedModels[backend];
     if (cached) return cached;
 
-    // Fallback: when no cached models exist for codex (e.g., first launch or stale cache),
-    // use the hardcoded default list so the Guid page shows a model selector immediately.
-    if (backend === 'codex' && DEFAULT_CODEX_MODELS.length > 0) {
-      return {
-        source: 'models' as const,
-        currentModelId: DEFAULT_CODEX_MODELS[0].id,
-        currentModelLabel: DEFAULT_CODEX_MODELS[0].label,
-        availableModels: DEFAULT_CODEX_MODELS.map((m) => ({ id: m.id, label: m.label })),
-        canSwitch: true,
-      } satisfies AcpModelInfo;
-    }
-
+    // No cached catalog for this backend yet. Return null (no hardcoded list):
+    // GuidModelSelector then sources its unified model list from the live curated
+    // catalog (`curatedForAgent`), so an enumerable CLI like Codex surfaces live
+    // GPT models instead of a stale fallback.
     return null;
   }, [selectedAgentKey, acpCachedModels, isPresetAgent, currentEffectiveAgentInfo.agentType]);
 
@@ -532,7 +579,8 @@ export const useGuidAgentSelection = ({
    */
   const selectPresetAssistant = useCallback(
     (preset: { id: string; presetAgentType?: string }) => {
-      const backend = (preset.presetAgentType ?? 'gemini') as AcpBackend;
+      // #380: default a typeless preset onto the bundled WCore engine, not Gemini.
+      const backend = (preset.presetAgentType ?? 'wcore') as AcpBackend;
       const key = getAgentKey({ backend, customAgentId: preset.id });
       setSelectedAgentKey(key);
     },

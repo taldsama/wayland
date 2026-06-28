@@ -277,6 +277,39 @@ describe('modelRegistry IPC - connect', () => {
     expect(repo.getRegistryCatalog('openai').map((m) => m.id)).toEqual(['gpt-4o']);
   });
 
+  it('lands an auth-OK custom base with no /models listing as connected-but-empty, not error (#339)', async () => {
+    // Cloudflare Workers AI authenticates (ConnectionTester proved it via the
+    // chat fallback) but exposes no /models, so the catalog build lists nothing
+    // (the /models GET throws -> sourceErrors > 0). The connect must land the
+    // provider connected with a `no-models` warning instead of flipping it to
+    // error/rejecting - otherwise a working endpoint can never be added.
+    const { deps, repo, apiListModels } = makeFakes();
+    apiListModels.mockRejectedValue(new Error('404 no /models on this gateway'));
+    const h = createModelRegistryHandlers(deps);
+
+    const result = await h.connect({
+      providerId: 'openai-compatible',
+      creds: { key: 'cf-token', baseUrl: 'https://api.cloudflare.com/client/v4/accounts/abc/ai/v1' },
+    });
+
+    expect(result).toEqual({ ok: true, warning: 'no-models' });
+    expect(repo.getRegistryProvider('openai-compatible')?.state).toBe('connected');
+    expect(repo.getRegistryCatalog('openai-compatible')).toEqual([]);
+  });
+
+  it('still rejects a CANONICAL provider whose catalog build lists nothing (no false green)', async () => {
+    // The custom-base exemption must NOT leak to canonical providers: an openai
+    // connect whose catalog build errors to empty is still a hard failure.
+    const { deps, repo, apiListModels } = makeFakes();
+    apiListModels.mockRejectedValue(new Error('listing failed'));
+    const h = createModelRegistryHandlers(deps);
+
+    const result = await h.connect({ providerId: 'openai', creds: { key: 'sk-test' } });
+
+    expect(result).toEqual({ ok: false, error: 'unknown' });
+    expect(repo.getRegistryProvider('openai')?.state).toBe('error');
+  });
+
   it('threads the catalog baseUrl when a catalog provider has no hardcoded endpoint (#63)', async () => {
     const { deps, test } = makeFakes();
     const h = createModelRegistryHandlers(deps);
@@ -803,7 +836,10 @@ describe('modelRegistry IPC - refresh', () => {
     const result = await h.refresh({ providerId: 'xai' });
 
     expect(result).toEqual({ ok: true });
-    const ids = repo.getRegistryCatalog('xai').map((m) => m.id).toSorted();
+    const ids = repo
+      .getRegistryCatalog('xai')
+      .map((m) => m.id)
+      .toSorted();
     expect(ids).toContain('grok-4');
     expect(ids).toContain('grok-3');
   });
@@ -1288,6 +1324,176 @@ describe('modelRegistry IPC - curatedForAgent', () => {
   });
 });
 
+describe('modelRegistry IPC - curatedForAgent ACP backends (#374)', () => {
+  it('synthesizes xAI models for the grok backend before first connection (cut blocker)', async () => {
+    // Grok Build is vendor-locked (grok.com) and not connected as an API
+    // provider, so the home picker used to dead-end on the "available after
+    // first connection" tooltip. It must instead synthesize xAI's catalog.
+    const { deps, getRegistry } = makeFakes();
+    getRegistry.mockResolvedValue({
+      xai: { models: { 'grok-4': { name: 'Grok 4' }, 'grok-3-mini': { name: 'Grok 3 Mini' } } },
+    });
+    const h = createModelRegistryHandlers(deps);
+
+    const ids = (await h.curatedForAgent({ agentKey: 'grok' })).map((m) => m.id).toSorted();
+
+    expect(ids).toEqual(['grok-3-mini', 'grok-4']);
+  });
+
+  it('prefers the connected xAI catalog for grok when the provider is connected', async () => {
+    const { deps, repo } = makeFakes();
+    repo.upsertRegistryProvider({
+      providerId: 'xai',
+      connectedVia: 'api-key',
+      state: 'connected',
+      creds: { key: 'k' },
+    });
+    repo.replaceRegistryCatalog('xai', [catalogModel({ id: 'grok-4', providerId: 'xai' })]);
+    const h = createModelRegistryHandlers(deps);
+
+    const curated = await h.curatedForAgent({ agentKey: 'grok' });
+
+    expect(curated.map((m) => m.id)).toEqual(['grok-4']);
+  });
+
+  it('falls back to openai synthesis for codex when the CLI enumerates nothing (Flux-only fix)', async () => {
+    // Fresh profile: codex CLI not installed -> enumeration is empty. The picker
+    // must still surface GPT models from models.dev instead of Flux-only.
+    const { deps, cliListModels, getRegistry } = makeFakes();
+    cliListModels.mockResolvedValue([]);
+    getRegistry.mockResolvedValue({ openai: { models: { 'gpt-5.5-codex': { name: 'GPT-5.5 Codex' } } } });
+    const h = createModelRegistryHandlers(deps);
+
+    const ids = (await h.curatedForAgent({ agentKey: 'codex' })).map((m) => m.id);
+
+    expect(ids).toEqual(['gpt-5.5-codex']);
+  });
+
+  it('keeps the live CLI enumeration for codex when it is non-empty (no synthesis override)', async () => {
+    const { deps, cliListModels, getRegistry } = makeFakes();
+    cliListModels.mockResolvedValue([{ id: 'gpt-5-codex', providerId: 'openai' }]);
+    // If synthesis wrongly ran it would surface this id instead - it must NOT.
+    getRegistry.mockResolvedValue({ openai: { models: { 'should-not-appear': {} } } });
+    const h = createModelRegistryHandlers(deps);
+
+    const ids = (await h.curatedForAgent({ agentKey: 'codex' })).map((m) => m.id);
+
+    expect(ids).toEqual(['gpt-5-codex']);
+  });
+
+  it('synthesizes moonshot models for the kimi backend', async () => {
+    const { deps, getRegistry } = makeFakes();
+    getRegistry.mockResolvedValue({ moonshotai: { models: { 'kimi-k2': { name: 'Kimi K2' } } } });
+    const h = createModelRegistryHandlers(deps);
+
+    const ids = (await h.curatedForAgent({ agentKey: 'kimi' })).map((m) => m.id);
+
+    expect(ids).toEqual(['kimi-k2']);
+  });
+
+  it('returns [] for a multi-provider ACP backend with no single underlying provider (goose)', async () => {
+    // goose/opencode/droid/… run any connected provider, so there is no single
+    // catalog to synthesize - the picker offers Flux Auto (when routable) rather
+    // than a misleading vendor catalog.
+    const { deps, getRegistry } = makeFakes();
+    getRegistry.mockResolvedValue({ xai: { models: { 'grok-4': {} } } });
+    const h = createModelRegistryHandlers(deps);
+
+    expect(await h.curatedForAgent({ agentKey: 'goose' })).toEqual([]);
+  });
+});
+
+describe('modelRegistry IPC - curatedForAgent codex via ChatGPT subscription (#374 reopen)', () => {
+  it('uses the connected chatgpt-subscription catalog for codex (not the empty openai synth)', async () => {
+    // The #377 gap: a ChatGPT-subscription user has no `openai` provider, so
+    // synthesizing `openai` returned empty and the picker fell to Flux-only.
+    const { deps, repo, cliListModels } = makeFakes();
+    cliListModels.mockResolvedValue([]); // no codex CLI installed
+    repo.upsertRegistryProvider({
+      providerId: 'chatgpt-subscription',
+      connectedVia: 'oauth',
+      state: 'connected',
+      creds: { key: 'tok' },
+    });
+    repo.replaceRegistryCatalog('chatgpt-subscription', [
+      catalogModel({ id: 'gpt-5.5', providerId: 'chatgpt-subscription' }),
+      catalogModel({ id: 'gpt-5.4', providerId: 'chatgpt-subscription' }),
+    ]);
+    const h = createModelRegistryHandlers(deps);
+
+    const ids = (await h.curatedForAgent({ agentKey: 'codex' })).map((m) => m.id).toSorted();
+
+    expect(ids).toEqual(['gpt-5.4', 'gpt-5.5']);
+  });
+
+  it('prefers the chatgpt-subscription catalog over codex CLI enumeration', async () => {
+    const { deps, repo, cliListModels } = makeFakes();
+    cliListModels.mockResolvedValue([{ id: 'gpt-5-codex', providerId: 'openai' }]); // CLI present
+    repo.upsertRegistryProvider({
+      providerId: 'chatgpt-subscription',
+      connectedVia: 'oauth',
+      state: 'connected',
+      creds: { key: 'tok' },
+    });
+    repo.replaceRegistryCatalog('chatgpt-subscription', [
+      catalogModel({ id: 'gpt-5.5', providerId: 'chatgpt-subscription' }),
+    ]);
+    const h = createModelRegistryHandlers(deps);
+
+    const ids = (await h.curatedForAgent({ agentKey: 'codex' })).map((m) => m.id);
+
+    expect(ids).toEqual(['gpt-5.5']);
+  });
+
+  it('falls through to CLI enumeration when chatgpt-subscription is connected but its catalog is empty', async () => {
+    const { deps, repo, cliListModels } = makeFakes();
+    cliListModels.mockResolvedValue([{ id: 'gpt-5-codex', providerId: 'openai' }]);
+    repo.upsertRegistryProvider({
+      providerId: 'chatgpt-subscription',
+      connectedVia: 'oauth',
+      state: 'connected',
+      creds: { key: 'tok' },
+    });
+    repo.replaceRegistryCatalog('chatgpt-subscription', []); // connected but no models persisted
+    const h = createModelRegistryHandlers(deps);
+
+    const ids = (await h.curatedForAgent({ agentKey: 'codex' })).map((m) => m.id);
+
+    expect(ids).toEqual(['gpt-5-codex']);
+  });
+
+  it('still serves the openai API-key catalog for codex when no subscription is connected (#377 path intact)', async () => {
+    const { deps, repo, cliListModels } = makeFakes();
+    cliListModels.mockResolvedValue([]); // no CLI
+    repo.upsertRegistryProvider({
+      providerId: 'openai',
+      connectedVia: 'api-key',
+      state: 'connected',
+      creds: { key: 'sk' },
+    });
+    repo.replaceRegistryCatalog('openai', [catalogModel({ id: 'gpt-4o', providerId: 'openai' })]);
+    const h = createModelRegistryHandlers(deps);
+
+    const ids = (await h.curatedForAgent({ agentKey: 'codex' })).map((m) => m.id);
+
+    expect(ids).toEqual(['gpt-4o']);
+  });
+
+  it('leaves claude unaffected by the codex OAuth-provider preference (empty OAuth list)', async () => {
+    const { deps, repo } = makeFakes();
+    repo.upsertRegistryProvider({
+      providerId: 'anthropic',
+      connectedVia: 'api-key',
+      state: 'connected',
+      creds: { key: 'k' },
+    });
+    repo.replaceRegistryCatalog('anthropic', [catalogModel({ id: 'claude-3-5', providerId: 'anthropic' })]);
+    const h = createModelRegistryHandlers(deps);
+
+    expect((await h.curatedForAgent({ agentKey: 'claude' })).map((m) => m.id)).toEqual(['claude-3-5']);
+  });
+});
+
 describe('modelRegistry IPC - defensive behavior', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -1751,6 +1957,90 @@ describe('modelRegistry IPC - refreshAllOnce SSRF gate (ollama-local exemption)'
     expect(probeOllama).not.toHaveBeenCalled();
     expect(summary.failed).toContain('ollama-local');
     expect(summary.succeeded).not.toContain('ollama-local');
+  });
+});
+
+describe('modelRegistry IPC - per-provider refresh (ollama-local guard, #314)', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+  });
+
+  it('re-probes the daemon instead of wiping the catalog when Refresh is clicked for loopback ollama-local (#314)', async () => {
+    // The per-provider Refresh button used buildAndPersistCatalog for every
+    // provider; for keyless ollama-local that assembles zero models and empties
+    // the catalog (Finding 1) - the daemon is up but the picker drops to 0. The
+    // guard must route a loopback ollama-local row to a live daemon re-probe
+    // instead, the same exemption refreshAllOnce already has.
+    process.env.NODE_ENV = 'production';
+
+    const { deps, repo } = makeFakes();
+    const probeOllama = vi.fn().mockResolvedValue({ running: true, models: ['llama3.2:3b'] });
+    deps.probeOllama = probeOllama;
+
+    repo.upsertRegistryProvider({
+      providerId: 'ollama-local',
+      connectedVia: 'auto-local',
+      state: 'connected',
+      creds: { key: '', baseUrl: 'http://127.0.0.1:11434/v1' },
+    });
+    // A previously-populated catalog that the buggy path would wipe to [].
+    repo.replaceRegistryCatalog('ollama-local', [catalogModel({ id: 'llama3.2:3b', providerId: 'ollama-local' })]);
+
+    const h = createModelRegistryHandlers(deps);
+    const result = await h.refresh({ providerId: 'ollama-local' });
+
+    expect(result).toEqual({ ok: true });
+    // Routed to the live re-probe, NOT buildAndPersistCatalog.
+    expect(probeOllama).toHaveBeenCalledTimes(1);
+    // Catalog refreshed from the daemon listing - never emptied.
+    expect(repo.getRegistryCatalog('ollama-local').map((m) => m.id)).toEqual(['llama3.2:3b']);
+  });
+
+  it('leaves the existing catalog untouched when the daemon is unreachable (never wipes to [])', async () => {
+    process.env.NODE_ENV = 'production';
+    const { deps, repo } = makeFakes();
+    const probeOllama = vi.fn().mockResolvedValue({ running: false, models: [] });
+    deps.probeOllama = probeOllama;
+
+    repo.upsertRegistryProvider({
+      providerId: 'ollama-local',
+      connectedVia: 'auto-local',
+      state: 'connected',
+      creds: { key: '', baseUrl: 'http://127.0.0.1:11434/v1' },
+    });
+    repo.replaceRegistryCatalog('ollama-local', [catalogModel({ id: 'llama3.2:3b', providerId: 'ollama-local' })]);
+
+    const h = createModelRegistryHandlers(deps);
+    const result = await h.refresh({ providerId: 'ollama-local' });
+
+    // A transient daemon-down reports not-ok but must keep the last-known models
+    // - the picker survives an Ollama restart instead of blanking.
+    expect(result).toEqual({ ok: false });
+    expect(repo.getRegistryCatalog('ollama-local').map((m) => m.id)).toEqual(['llama3.2:3b']);
+    expect(probeOllama).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT take the keyless re-probe path for a non-loopback ollama-local row (Finding 5)', async () => {
+    process.env.NODE_ENV = 'production';
+    const { deps, repo } = makeFakes();
+    const probeOllama = vi.fn().mockResolvedValue({ running: true, models: ['x'] });
+    deps.probeOllama = probeOllama;
+
+    // A row claiming to be ollama-local but pointing off-loopback (link-local
+    // cloud-metadata) must NOT get the keyless re-probe exemption.
+    repo.upsertRegistryProvider({
+      providerId: 'ollama-local',
+      connectedVia: 'auto-local',
+      state: 'connected',
+      creds: { key: '', baseUrl: 'http://169.254.169.254/v1' },
+    });
+
+    const h = createModelRegistryHandlers(deps);
+    await h.refresh({ providerId: 'ollama-local' });
+
+    // Off-loopback is treated like any other provider - no keyless exemption.
+    expect(probeOllama).not.toHaveBeenCalled();
   });
 });
 

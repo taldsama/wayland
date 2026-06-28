@@ -192,6 +192,9 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
    *  sending the full content every tick re-appended it and doubled the stored
    *  thought ("LetLet me think…"). */
   private lastFlushedThinkingLen = 0;
+  /** Per-turn reasoning subject (a short gerund phrase from the engine, #318).
+   *  Emitted once per reasoning turn; first one wins. Absent for non-reasoning turns. */
+  private thinkingSubject: string | undefined = undefined;
   private thinkingDbFlushTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly streamDbFlushIntervalMs: number = 120;
 
@@ -547,12 +550,20 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
     });
   }
 
-  private emitThinkingMessage(content: string, status: 'thinking' | 'done' = 'thinking'): void {
+  private emitThinkingMessage(content: string, status: 'thinking' | 'done' = 'thinking', subject?: string): void {
     if (!this.thinkingMsgId) {
       this.thinkingMsgId = uuid();
       this.thinkingStartTime = Date.now();
       this.thinkingContent = '';
       this.lastFlushedThinkingLen = 0;
+      this.thinkingSubject = undefined;
+    }
+
+    // Latest subject wins (#318 v2): Flux emits a generic header (Frame A) then a
+    // request-specific refinement (Frame B) within the same turn; replace in place
+    // so the refined subject upgrades the placeholder. Reset per turn (above).
+    if (subject) {
+      this.thinkingSubject = subject;
     }
 
     // The engine re-streams reasoning as cumulative restates, so emit/persist only
@@ -572,6 +583,7 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
       msg_id: this.thinkingMsgId,
       data: {
         content: delta,
+        subject: this.thinkingSubject,
         duration,
         status,
       },
@@ -603,6 +615,7 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
       conversation_id: this.conversation_id,
       content: {
         content: tail,
+        subject: this.thinkingSubject,
         duration,
         status,
       },
@@ -616,6 +629,7 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
     this.thinkingStartTime = null;
     this.thinkingContent = '';
     this.lastFlushedThinkingLen = 0;
+    this.thinkingSubject = undefined;
   }
 
   private queueBufferedStreamText(message: Extract<TMessage, { type: 'text' }>): void {
@@ -973,24 +987,49 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
         return;
       }
 
-      // W7 S4 HITL: wcore forwards `approval_required` typed (index.ts) so a
-      // future renderer can show an approval modal. There is no such UI nor any
-      // `approval_resume` sender yet, so consume it here to avoid the
-      // "Unsupported message type" warning in transformMessage (chatLib has no
-      // `approval_required` case → default branch). Mirrors config_changed /
-      // sub_agent_event pre-processing above.
-      //
-      // `reason` is an opaque engine string. In auto-approve (yolo) runs it is
-      // an info signal and dropping it is correct. A non-'info' reason means the
-      // engine is genuinely gated on a resume the app cannot send — log loudly
-      // so a hung turn is diagnosable rather than silent. Renderer wiring +
-      // approval_resume are out of scope (tracked separately).
+      // W7 S4 HITL: the engine suspended the turn waiting on `approval_required`
+      // (resume_token based — distinct from tool_group confirmations). The engine
+      // self-resolves this under --auto-approve, but that path can fail on some
+      // provider routes (notably Anthropic-format `toolu_` tool ids routed via
+      // Flux), leaving the turn wedged forever with no host response. There is no
+      // renderer UI for this HITL path yet, so in an auto mode (Autopilot/Auto
+      // Edit) — and for informational (`reason:'info'`, e.g. the internal todo
+      // tool) approvals in any mode — send an explicit, idempotent
+      // `approval_resume` so the turn can never hang. (A stale/duplicate token is
+      // safely ignored engine-side.)
       if (data.type === 'approval_required') {
-        const reason = (data.data as { reason?: string } | undefined)?.reason;
-        if (reason && reason !== 'info') {
-          mainError('[WCoreManager]', `approval_required reason='${reason}' but no approval UI; dropping`, data.data);
-        } else {
-          mainLog('[WCoreManager]', 'approval_required (auto-approve info)', data.data);
+        const appr = (data.data ?? {}) as { resumeToken?: string; reason?: string };
+        const autoMode = this.currentMode === 'yolo' || this.currentMode === 'auto_edit';
+        if (appr.resumeToken && (autoMode || appr.reason === 'info')) {
+          this.agent?.resumeApproval(appr.resumeToken, true);
+        } else if (appr.reason && appr.reason !== 'info') {
+          // A non-info approval we did not auto-resume. Whether that is a problem
+          // depends on the mode:
+          //
+          // - Interactive (non-auto) mode: EXPECTED. The renderer tool-confirmation
+          //   gate (the `Confirming` tool_group path above) prompts the user and
+          //   drives the resume; this `approval_required` is the engine's parallel
+          //   signal, not a dropped approval. A normal exec/mcp approval legitimately
+          //   carries no resume token here, so the old error (and a resume-token
+          //   check) fired on every exec approval and falsely read as a failure
+          //   (#390). Keep only a quiet trace for diagnosability.
+          //
+          // - Auto mode (Autopilot/Auto Edit): the engine was supposed to
+          //   self-resolve but we could not (no resume token, or a non-info reason
+          //   the auto path can't satisfy) and there is no HITL UI to fall back on,
+          //   so the turn can genuinely wedge (#264). That is the real error.
+          if (autoMode) {
+            mainError(
+              '[WCoreManager]',
+              `approval_required reason='${appr.reason}' in auto mode could not self-resume and has no HITL UI; turn may wedge`,
+              data.data
+            );
+          } else {
+            mainLog(
+              '[WCoreManager]',
+              `approval_required reason='${appr.reason}': renderer confirmation gate owns this approval`
+            );
+          }
         }
         return;
       }
@@ -1019,9 +1058,7 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
       // Wayland Core has no subscription/OAuth fallback, so a dead key is fatal
       // for the turn and the provider must be marked unhealthy.
       if (data.type === 'error') {
-        this.maybeInvalidateProviderKeyOnAuthError(
-          typeof data.data === 'string' ? data.data : String(data.data ?? '')
-        );
+        this.maybeInvalidateProviderKeyOnAuthError(typeof data.data === 'string' ? data.data : String(data.data ?? ''));
       }
 
       // System-level events (empty msg_id) are not part of a conversation turn.
@@ -1069,12 +1106,16 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
         return;
       }
 
-      // Handle thought events - convert to thinking messages
+      // Handle thought events - convert to thinking messages.
+      // The engine emits an optional per-turn reasoning `subject` (a short gerund
+      // phrase) once, immediately before the first reasoning text. Thread it through
+      // so the live "Thinking" block header shows the model's own summary (#318).
       if (data.type === 'thought') {
         data.conversation_id = this.conversation_id;
         const content = typeof data.data === 'string' ? data.data : '';
-        if (content) {
-          this.emitThinkingMessage(content, 'thinking');
+        const subject = typeof data.subject === 'string' ? data.subject : undefined;
+        if (content || subject) {
+          this.emitThinkingMessage(content, 'thinking', subject);
         }
         return;
       }

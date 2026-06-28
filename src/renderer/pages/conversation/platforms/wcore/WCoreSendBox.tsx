@@ -12,7 +12,12 @@ import ContextUsageIndicator from '@/renderer/components/agent/ContextUsageIndic
 import CommandQueuePanel from '@/renderer/components/chat/CommandQueuePanel';
 import SendBox from '@/renderer/components/chat/sendbox';
 import ThoughtDisplay from '@/renderer/components/chat/ThoughtDisplay';
-import StatusFooter from '@/renderer/components/chat/StatusFooter';
+import {
+  CHAT_RETRY_EVENT,
+  EDIT_AND_RERUN_EVENT,
+  type ChatRetryDetail,
+  type ChatEditRerunDetail,
+} from '@/renderer/pages/conversation/Messages/components/MessageActions';
 import FileAttachButton from '@/renderer/components/media/FileAttachButton';
 import FilePreview from '@/renderer/components/media/FilePreview';
 import HorizontalFileList from '@/renderer/components/media/HorizontalFileList';
@@ -24,7 +29,11 @@ import { usePendingSendOnWake } from '@/renderer/hooks/chat/usePendingSendOnWake
 import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
 import { useProviderReadiness } from '@/renderer/hooks/useProviderReadiness';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
-import { useAddOrUpdateMessage, useRemoveMessageByMsgId } from '@/renderer/pages/conversation/Messages/hooks';
+import {
+  useAddOrUpdateMessage,
+  useRemoveMessageByMsgId,
+  useTruncateMessagesAfter,
+} from '@/renderer/pages/conversation/Messages/hooks';
 import { assertBridgeSuccess } from '@/renderer/pages/conversation/platforms/assertBridgeSuccess';
 import {
   shouldEnqueueConversationCommand,
@@ -97,7 +106,9 @@ const WCoreSendBox: React.FC<{
   teamId?: string;
   agentSlotId?: string;
   sessionMode?: string;
-}> = ({ conversation_id, modelSelection, teamId, agentSlotId, sessionMode }) => {
+  /** Report the turn-running state up so the inline orbit indicator can render in the message list. */
+  onRunningChange?: (running: boolean) => void;
+}> = ({ conversation_id, modelSelection, teamId, agentSlotId, sessionMode, onRunningChange }) => {
   const [workspacePath, setWorkspacePath] = useState('');
   const [dynamicModes, setDynamicModes] = useState<AgentModeOption[]>([]);
   // The most recent turn dispatched, kept so the Flux failover can replay it.
@@ -156,6 +167,7 @@ const WCoreSendBox: React.FC<{
 
   const addOrUpdateMessage = useAddOrUpdateMessage();
   const removeMessageByMsgId = useRemoveMessageByMsgId();
+  const truncateMessagesAfter = useTruncateMessagesAfter();
   const { setSendBoxHandler } = usePreviewContext();
   const isBusy = running;
 
@@ -359,6 +371,51 @@ const WCoreSendBox: React.FC<{
     await executeCommand({ input: message, files: filesToSend });
   };
 
+  // #252 rework: Retry on a message's action row re-sends that turn's prompt.
+  // The active sendbox owns send, so it listens for the window event (scoped to
+  // this conversation so it never fires on another open tab).
+  const onSendRef = useRef(onSendHandler);
+  onSendRef.current = onSendHandler;
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<ChatRetryDetail>).detail;
+      if (!detail?.text) return;
+      if (detail.conversationId && detail.conversationId !== conversation_id) return;
+      void onSendRef.current(detail.text);
+    };
+    window.addEventListener(CHAT_RETRY_EVENT, handler);
+    return () => window.removeEventListener(CHAT_RETRY_EVENT, handler);
+  }, [conversation_id]);
+
+  // Edit-and-rerun: truncate messages after the edited user message, then re-send.
+  const truncateRef = useRef(truncateMessagesAfter);
+  truncateRef.current = truncateMessagesAfter;
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const detail = (e as CustomEvent<ChatEditRerunDetail>).detail;
+      if (!detail?.text || !detail.conversationId || detail.afterTimestamp == null) return;
+      if (detail.conversationId !== conversation_id) return;
+      const result = await ipcBridge.conversation.deleteMessagesAfter.invoke({
+        conversation_id: detail.conversationId,
+        afterTimestamp: detail.afterTimestamp,
+      });
+      if (!result?.success) {
+        console.error('[WCoreSendBox] deleteMessagesAfter failed', result);
+      }
+      truncateRef.current(detail.afterTimestamp);
+      void onSendRef.current(detail.text);
+    };
+    window.addEventListener(EDIT_AND_RERUN_EVENT, handler);
+    return () => window.removeEventListener(EDIT_AND_RERUN_EVENT, handler);
+  }, [conversation_id]);
+
+  // Report the turn-running state up so the inline orbit "thinking" indicator
+  // (rendered in the message list, under the last block) shows the moment a turn
+  // starts and hides when it completes.
+  useEffect(() => {
+    onRunningChange?.(running);
+  }, [running, onRunningChange]);
+
   const handleEditQueuedCommand = useCallback(
     (item: ConversationCommandQueueItem) => {
       remove(item.id);
@@ -427,12 +484,10 @@ const WCoreSendBox: React.FC<{
         onRemove={remove}
         onClear={clear}
       />
-      {/* #252: StatusFooter gives a persistent live cue (elapsed + rotating
-          phrases + dot-pulse) for the whole turn, replacing ThoughtDisplay's
-          running-only spinner that vanished the instant any message arrived.
-          ThoughtDisplay is kept (without `running`) only for the thought-subject
-          hint path (e.g. "Awaiting Confirmation"), which renders null otherwise. */}
-      <StatusFooter isProcessing={running} />
+      {/* #252 rework: the orbit "thinking" indicator moved INTO the message list
+          (inline, under the last block - Claude-style), driven by onRunningChange.
+          ThoughtDisplay is kept for the thought-subject hint path (e.g.
+          "Awaiting Confirmation"), which renders null otherwise. */}
       <ThoughtDisplay thought={thought} onStop={handleStop} />
 
       <SendBox

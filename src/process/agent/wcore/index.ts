@@ -20,7 +20,7 @@ import type { WCoreEvent, WCoreCommand, WCoreCapabilities } from './protocol';
 
 const WCORE_PROJECT_CONFIG = '.wcore.toml';
 
-type StreamEventHandler = (event: { type: string; data: unknown; msg_id: string }) => void;
+type StreamEventHandler = (event: { type: string; data: unknown; msg_id: string; subject?: string }) => void;
 
 /**
  * Sanitize an existing `.wcore.toml` body and merge in the app's own provider
@@ -191,9 +191,7 @@ export class WCoreAgent {
     // and is never persisted. Per-call resolution keeps concurrent chats on
     // different accounts isolated (audit C6); raw-engine mode ignores the model
     // (it uses the engine's own config.toml), so skip the lookup there.
-    const spawnModel = this.options.rawEngineMode
-      ? this.options.model
-      : await hydrateModelForSpawn(this.options.model);
+    const spawnModel = this.options.rawEngineMode ? this.options.model : await hydrateModelForSpawn(this.options.model);
 
     const { args, env, projectConfig, resolvedMaxTokens } = buildSpawnConfig(spawnModel, {
       workspace: this.options.workspace,
@@ -341,7 +339,7 @@ export class WCoreAgent {
         break;
 
       case 'thinking':
-        this.onStreamEvent({ type: 'thought', data: event.text, msg_id: event.msg_id });
+        this.onStreamEvent({ type: 'thought', data: event.text, msg_id: event.msg_id, subject: event.subject });
         break;
 
       case 'tool_request':
@@ -803,6 +801,15 @@ export class WCoreAgent {
 
   denyTool(callId: string, reason = ''): void {
     this.sendCommand({ type: 'tool_deny', call_id: callId, reason });
+  }
+
+  // W7 S4 HITL: resume a turn the engine suspended with `approval_required`.
+  // The engine normally self-resolves this under --auto-approve, but that path
+  // can silently fail on some provider routes (e.g. Anthropic-format `toolu_`
+  // tool ids via Flux), leaving the turn wedged. Sending an explicit resume is
+  // a safe, idempotent unblock (a stale/duplicate token is ignored engine-side).
+  resumeApproval(resumeToken: string, approved: boolean): void {
+    this.sendCommand({ type: 'approval_resume', resume_token: resumeToken, approved });
   }
 
   setConfig(config: { model?: string; thinking?: string; thinking_budget?: number; effort?: string }): void {
