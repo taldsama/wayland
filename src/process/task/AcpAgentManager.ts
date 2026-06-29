@@ -56,6 +56,7 @@ import { app } from 'electron';
 import BaseAgentManager from './BaseAgentManager';
 import { IpcAgentEventEmitter } from './IpcAgentEventEmitter';
 import { hasCronCommands } from './CronCommandDetector';
+import { hasConciergeProposals } from './ConciergeProposeDetector';
 import { skillSuggestWatcher } from '@process/services/cron/SkillSuggestWatcher';
 import { getCostRecorder } from '@process/services/cost/CostRecorder';
 import { extractAndStripThinkTags } from './ThinkTagDetector';
@@ -66,6 +67,9 @@ import {
   buildTurnSkillContext,
   mergeLoadedSkillsExtra,
   consumePendingSessionSkills,
+  resolveCapabilitiesManifest,
+  CAPABILITIES_MANIFEST_HEADER,
+  isConciergeAssistant,
 } from '@process/task/agentUtils';
 import { composePrompt } from '@process/services/constitution/composePrompt';
 import { shouldInjectTeamGuideMcp } from '@process/team/prompts/teamGuideCapability.ts';
@@ -370,7 +374,10 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
 
     skillSuggestWatcher.onFinish(this.conversation_id);
 
-    if (this.currentMsgContent && hasCronCommands(this.currentMsgContent)) {
+    if (
+      this.currentMsgContent &&
+      (hasCronCommands(this.currentMsgContent) || hasConciergeProposals(this.currentMsgContent))
+    ) {
       const cronMessage: TMessage = {
         id: this.currentMsgId || uuid(),
         msg_id: this.currentMsgId || uuid(),
@@ -1350,6 +1357,11 @@ ${collectedResponses.join('\n')}`;
           pendingConfigOptions: data.pendingConfigOptions,
           // Per-conversation MCP scoping (#348): forward to loadBuiltinSessionMcpServers.
           activeMcpServers: data.activeMcpServers,
+          // The read-only concierge diagnostics MCP server is Concierge-only.
+          // Forward whether THIS assistant is Concierge so loadBuiltinSessionMcpServers
+          // can gate the diag server (it's a builtin and would otherwise inject for
+          // every assistant). Mirrors the Gemini path in GeminiAgentManager.
+          allowConciergeDiag: isConciergeAssistant(data.presetAssistantId) || isConciergeAssistant(data.customAgentId),
           // Forward team MCP stdio config so AcpAgent.loadBuiltinSessionMcpServers() can inject it
           teamMcpStdioConfig: (data as unknown as Record<string, unknown>).teamMcpStdioConfig as
             | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }> }
@@ -1490,6 +1502,16 @@ ${collectedResponses.join('\n')}`;
               );
               parts.push(getTeamGuidePrompt({ backend: this.options.backend, leaderLabel }));
             }
+            // Concierge self-knowledge on native ACP backends (Claude Code /
+            // Codex): inject the live capabilities manifest into the rules block
+            // so Concierge keeps accurate self-knowledge here too. Concierge-only
+            // (no userText, matching the WCore/Gemini first-message contract);
+            // non-Concierge capability turns are served by the per-turn advert.
+            const nativeManifest = await resolveCapabilitiesManifest({
+              presetAssistantId: this.options.presetAssistantId || this.options.customAgentId,
+              agentKey: this.options.backend,
+            });
+            if (nativeManifest) parts.push(`${CAPABILITIES_MANIFEST_HEADER}\n${nativeManifest}`);
             // Prepend Wayland Constitution + optional specialist overlay above
             // the preset rules + team guide. composePrompt returns '' when no
             // Constitution file exists, preserving the prior "skip rules block
@@ -1510,6 +1532,13 @@ ${collectedResponses.join('\n')}`;
               enableTeamGuide: !isInTeam && (await shouldInjectTeamGuideMcp(this.options.backend)),
               backend: this.options.backend,
               presetAssistantId: this.options.presetAssistantId || this.options.customAgentId,
+              // Concierge-only here (no userText) to match WCore/Gemini and avoid
+              // double-injecting on a non-Concierge capability first message - the
+              // per-turn advert already covers non-Concierge capability intents.
+              capabilitiesManifest: await resolveCapabilitiesManifest({
+                presetAssistantId: this.options.presetAssistantId || this.options.customAgentId,
+                agentKey: this.options.backend,
+              }),
             });
             contentToSend = injectedContent;
           }
@@ -1532,6 +1561,8 @@ ${collectedResponses.join('\n')}`;
             }
             const turnSkill = await buildTurnSkillContext(rawUserText, {
               alwaysOnNames: this.options.enabledSkills,
+              assistantId: this.options.presetAssistantId || this.options.customAgentId,
+              agentKey: this.options.backend,
             });
             if (turnSkill.advert) {
               contentToSend = `${turnSkill.advert}\n\n${contentToSend}`;

@@ -228,9 +228,17 @@ async function writeAssistantResource(
   fileNamePattern: (id: string, loc: string) => string
 ): Promise<boolean> {
   try {
+    // SECURITY: the assistant id becomes part of the written filename, so a
+    // traversal id (e.g. `../../../etc/foo`) would escape the assistants dir.
+    // Confine it the same way skill names are sanitized; refuse anything unsafe.
+    const safeId = sanitizeSkillName(assistantId);
+    if (!safeId) {
+      console.error(`[fsBridge] Refused assistant ${resourceType} write: unsafe id`);
+      return false;
+    }
     const assistantsDir = getAssistantsDir();
     await fs.mkdir(assistantsDir, { recursive: true });
-    const fileName = fileNamePattern(assistantId, locale);
+    const fileName = fileNamePattern(safeId, locale);
     await fs.writeFile(path.join(assistantsDir, fileName), content, 'utf-8');
     console.log(`[fsBridge] Wrote assistant ${resourceType}: ${fileName}`);
     return true;
@@ -263,6 +271,16 @@ async function deleteAssistantResource(resourceType: ResourceType, filePattern: 
 // File name patterns for rules and skills
 const ruleFilePattern = (id: string, loc: string) => `${id}.${loc}.md`;
 const skillFilePattern = (id: string, loc: string) => `${id}-skills.${loc}.md`;
+
+/**
+ * Write an assistant's rules/persona markdown from MAIN (Concierge Phase 2b
+ * `edit_assistant` apply path). Thin wrapper over the module-private
+ * `writeAssistantResource` so callers outside this module don't reach into its
+ * internals. Returns true on success.
+ */
+export async function writeAssistantRules(assistantId: string, content: string, locale = 'en-US'): Promise<boolean> {
+  return writeAssistantResource('rules', assistantId, content, locale, ruleFilePattern);
+}
 
 const workspaceFileListCache = new Map<string, IWorkspaceFlatFile[]>();
 const workspaceFileListInFlight = new Map<string, Promise<IWorkspaceFlatFile[]>>();

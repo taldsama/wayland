@@ -18,7 +18,10 @@ import {
   buildTurnSkillContext,
   mergeLoadedSkillsExtra,
   consumePendingSessionSkills,
+  resolveCapabilitiesManifest,
+  isConciergeAssistant,
 } from './agentUtils';
+import { BUILTIN_CONCIERGE_DIAG_ID } from '@process/resources/builtinMcp/constants';
 import { detectSkillLoadRequest, AcpSkillManager, buildSkillContentText } from './AcpSkillManager';
 import { uuid } from '@/common/utils';
 import { getProviderAuthType } from '@/common/utils/platformAuthType';
@@ -37,6 +40,7 @@ import BaseAgentManager from './BaseAgentManager';
 import { IpcAgentEventEmitter } from './IpcAgentEventEmitter';
 import { mainLog, mainWarn, mainError } from '@process/utils/mainLogger';
 import { hasCronCommands } from './CronCommandDetector';
+import { hasConciergeProposals } from './ConciergeProposeDetector';
 import { extractTextFromMessage, processCronInMessage } from './MessageMiddleware';
 import { stripThinkTags, extractAndStripThinkTags } from './ThinkTagDetector';
 import { teamEventBus } from '@process/team/teamEventBus';
@@ -282,6 +286,10 @@ export class GeminiAgentManager extends BaseAgentManager<
           enableTeamGuide: !this.teamMcpStdioConfig,
           backend: 'gemini',
           presetAssistantId: this.presetAssistantId,
+          capabilitiesManifest: await resolveCapabilitiesManifest({
+            presetAssistantId: this.presetAssistantId,
+            agentKey: 'gemini',
+          }),
         });
         const effectivePresetRules = systemInstructions ?? this.presetRules;
 
@@ -383,6 +391,14 @@ export class GeminiAgentManager extends BaseAgentManager<
         // undefined and never connection-tested; accept them on undefined to
         // match the ACP session path. User servers still require connected.
         .filter(shouldInjectSessionMcpServer)
+        // The read-only concierge diagnostics server is Concierge-only: exposing
+        // it to every assistant would bloat unrelated tool lists (and surface a
+        // diagnostics tool where it doesn't belong). Gate it to the Concierge
+        // preset assistant; all other servers pass through unchanged.
+        .filter(
+          (server: IMcpServer) =>
+            server.id !== BUILTIN_CONCIERGE_DIAG_ID || isConciergeAssistant(this.presetAssistantId)
+        )
         .forEach((server: IMcpServer) => {
           if (server.transport.type === 'stdio') {
             mcpConfig[server.name] = {
@@ -530,7 +546,11 @@ export class GeminiAgentManager extends BaseAgentManager<
       try {
         // Skills the user added to this chat from the composer - inject once.
         const pending = await consumePendingSessionSkills(this.conversation_id);
-        const turnSkill = await buildTurnSkillContext(data.input, { alwaysOnNames: this.enabledSkills });
+        const turnSkill = await buildTurnSkillContext(data.input, {
+          alwaysOnNames: this.enabledSkills,
+          assistantId: this.presetAssistantId,
+          agentKey: 'gemini',
+        });
         const prefix = [pending, turnSkill.advert].filter(Boolean).join('\n\n');
         if (prefix) {
           sendData = { ...data, input: `${prefix}\n\n${data.input}` };
@@ -1048,8 +1068,8 @@ export class GeminiAgentManager extends BaseAgentManager<
         }
       }
 
-      // Detect cron commands
-      if (textContent && hasCronCommands(textContent)) {
+      // Detect cron commands OR Concierge config proposals ([CONCIERGE_PROPOSE]).
+      if (textContent && (hasCronCommands(textContent) || hasConciergeProposals(textContent))) {
         // Create a message with finish status for middleware
         const msgWithStatus = { ...latestMsg, status: 'finish' as const };
         await processCronInMessage(this.conversation_id, 'gemini', msgWithStatus, (sysMsg) => {

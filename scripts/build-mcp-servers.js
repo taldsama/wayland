@@ -58,7 +58,7 @@ async function bundleWaylandMcp(pkgName, outName, opts = {}) {
   const src = candidates.find((p) => fs.existsSync(path.join(p, 'src', 'index.ts')));
   if (!src) {
     console.warn(
-      `[build-mcp-servers] @wayland/${pkgName} source not found in any of: ${candidates.join(', ')} - skipping.`,
+      `[build-mcp-servers] @wayland/${pkgName} source not found in any of: ${candidates.join(', ')} - skipping.`
     );
     return;
   }
@@ -95,7 +95,7 @@ async function bundleWaylandMcp(pkgName, outName, opts = {}) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(
-      `::warning::[build-mcp-servers] optional @wayland/${pkgName} failed to bundle and was SKIPPED (the builtin will be unavailable in this build): ${message.split('\n')[0]}`,
+      `::warning::[build-mcp-servers] optional @wayland/${pkgName} failed to bundle and was SKIPPED (the builtin will be unavailable in this build): ${message.split('\n')[0]}`
     );
     return;
   }
@@ -114,6 +114,20 @@ async function main() {
       ...SHARED_OPTIONS,
       entryPoints: [path.join(ROOT, 'src/process/resources/builtinMcp/searchSkillsServerEntry.ts')],
       outfile: path.join(ROOT, 'out/main/builtin-mcp-search-skills.js'),
+    }),
+    esbuild.build({
+      ...SHARED_OPTIONS,
+      // `better-sqlite3` is a NATIVE module. esbuild can inline its JS but NOT
+      // its `.node` binding; the inlined `bindings` loader then resolves
+      // relative to out/main (which has no build/Release) and throws
+      // "Could not locate the bindings file". Unlike the other stdio servers
+      // (which transitively reference the driver but never open a DB), the diag
+      // server ACTUALLY opens SQLite, so it must keep better-sqlite3 as an
+      // external require() resolved at runtime from the (asarUnpacked)
+      // node_modules - exactly how the Electron main process loads it.
+      external: [...SHARED_OPTIONS.external, 'better-sqlite3'],
+      entryPoints: [path.join(ROOT, 'src/process/resources/builtinMcp/conciergeDiagServerEntry.ts')],
+      outfile: path.join(ROOT, 'out/main/builtin-mcp-concierge-diag.js'),
     }),
     esbuild.build({
       ...SHARED_OPTIONS,

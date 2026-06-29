@@ -98,6 +98,8 @@ export interface AcpAgentConfig {
     teamMcpStdioConfig?: { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }> };
     /** Pending config option selections from Guid page (applied after session creation) */
     pendingConfigOptions?: Record<string, string>;
+    /** True when this session may receive the Concierge-only diagnostics MCP server. */
+    allowConciergeDiag?: boolean;
   };
   onStreamEvent: (data: IResponseMessage) => void;
   onSignalEvent?: (data: IResponseMessage) => void; // New: emit signal only, does not update UI
@@ -136,6 +138,8 @@ export class AcpAgent {
     pendingConfigOptions?: Record<string, string>;
     /** Per-conversation active MCP server ids (#348): undefined = all enabled, [] = none. */
     activeMcpServers?: string[];
+    /** True when this session may receive the Concierge-only diagnostics MCP server. */
+    allowConciergeDiag?: boolean;
   };
   private connection: AcpConnection;
   private adapter: AcpAdapter;
@@ -1690,7 +1694,14 @@ export class AcpAgent {
         if (mcpCaps) {
           // Per-conversation scoping (#348): only inject the MCP servers active
           // for this chat (undefined ⇒ all). Builtins always pass.
-          servers.push(...buildAcpSessionMcpServers(mcpConfig as IMcpServer[], mcpCaps, this.extra.activeMcpServers));
+          servers.push(
+            ...buildAcpSessionMcpServers(
+              mcpConfig as IMcpServer[],
+              mcpCaps,
+              this.extra.activeMcpServers,
+              this.extra.allowConciergeDiag === true
+            )
+          );
         }
       }
 

@@ -11,11 +11,17 @@ style.formality: casual
 style.energy: measured
 style.terseness: expansive
 style.emoji_use: rare
+expertise.yaml: novice
 expertise.markdown: novice
 expertise.javascript: novice
 expertise.python: novice
+expertise.shell: novice
+expertise.html: novice
 expertise.sql: novice
+expertise.rust: novice
 expertise.typescript: novice
+expertise.json: novice
+expertise.txt: novice
 </ijfw-profile>
 
 <ijfw-routing>

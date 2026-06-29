@@ -50,7 +50,7 @@ const isMcpScript = (f) =>
   /^(builtin-mcp-.+|team-mcp-stdio|team-guide-mcp-stdio)\.(js|mjs)$/.test(f) || f === 'eventkit-bridge';
 const mcpScripts = existsSync(outMain) ? readdirSync(outMain).filter(isMcpScript) : [];
 for (const f of mcpScripts) cpSync(join(outMain, f), join(PAYLOAD, 'dist-server', f));
-const REQUIRED_MCP = ['builtin-mcp-image-gen.js', 'builtin-mcp-search-skills.js', 'team-mcp-stdio.js', 'team-guide-mcp-stdio.js'];
+const REQUIRED_MCP = ['builtin-mcp-image-gen.js', 'builtin-mcp-search-skills.js', 'builtin-mcp-concierge-diag.js', 'team-mcp-stdio.js', 'team-guide-mcp-stdio.js'];
 const missingMcp = REQUIRED_MCP.filter((f) => !mcpScripts.includes(f));
 if (missingMcp.length) { console.error(`✗ MCP build incomplete, missing: ${missingMcp.join(', ')}`); process.exit(1); }
 console.log(`  + ${mcpScripts.length} MCP scripts → payload/dist-server`);

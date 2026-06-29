@@ -137,6 +137,7 @@ vi.mock('@/process/task/agentUtils', () => ({
   buildTurnSkillContext: vi.fn(async () => ({ advert: undefined, autoLoaded: [] })),
   consumePendingSessionSkills: vi.fn(async () => undefined),
   mergeLoadedSkillsExtra: vi.fn(async () => {}),
+  resolveCapabilitiesManifest: vi.fn(async () => undefined),
 }));
 
 // ── Import under test ──────────────────────────────────────────────

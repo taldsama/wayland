@@ -305,6 +305,21 @@ export const useGuidAgentSelection = ({
           }
         }
 
+        // Fresh install (no saved selection at all): land on the Concierge
+        // assistant by default. Reversible - a user who set
+        // `concierge.defaultPersona` to false keeps the first-detected-engine
+        // default. This NEVER overrides an explicit saved selection (handled
+        // above), so existing users are unaffected. Uses the canonical preset
+        // key format (`custom:builtin-concierge`) produced by getAgentKey.
+        if (!savedKey) {
+          const conciergeDisabled = (await ConfigStorage.get('concierge.defaultPersona')) === false;
+          if (cancelled) return;
+          if (!conciergeDisabled) {
+            _setSelectedAgentKey('custom:builtin-concierge');
+            return;
+          }
+        }
+
         // No saved preference or stale key - default to first detected engine
         const firstAgent = availableAgents[0];
         if (firstAgent) {
