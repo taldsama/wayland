@@ -180,5 +180,4 @@ describe('conciergeConfigBridge apply', () => {
     expect(res).toEqual({ ok: false, reason: 'unauthorized' });
     noWrites();
   });
-
 });
