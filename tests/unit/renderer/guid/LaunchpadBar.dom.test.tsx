@@ -69,12 +69,13 @@ describe('LaunchpadBar', () => {
     expect(screen.getByTestId('launchpad-add-chip')).toBeInTheDocument();
   });
 
-  it('places Concierge first by default', async () => {
+  it('places Cowork first (#1) and Concierge second (#2) by default', async () => {
     getMock.mockResolvedValueOnce(undefined);
     render(<LaunchpadBar onAnchorClick={vi.fn()} onViewAll={vi.fn()} />);
     await flushLoad();
-    const first = document.querySelector('[data-launchpad-entry]');
-    expect(first?.getAttribute('data-launchpad-entry')).toBe('builtin-concierge');
+    const cards = document.querySelectorAll('[data-launchpad-entry]');
+    expect(cards[0]?.getAttribute('data-launchpad-entry')).toBe('builtin-cowork');
+    expect(cards[1]?.getAttribute('data-launchpad-entry')).toBe('builtin-concierge');
   });
 
   it('clicking a card body fires onAnchorClick with the anchor shape', async () => {
@@ -139,7 +140,8 @@ describe('LaunchpadBar', () => {
     render(<LaunchpadBar onAnchorClick={vi.fn()} onViewAll={vi.fn()} />);
     await flushLoad();
 
-    expect(document.querySelectorAll('[data-launchpad-entry]')).toHaveLength(2);
+    // Pinned Concierge is injected at slot 1, so the 2 stored cards render as 3.
+    expect(document.querySelectorAll('[data-launchpad-entry]')).toHaveLength(3);
 
     act(() => {
       fireEvent.click(screen.getByTestId('launchpad-reset'));
@@ -168,14 +170,21 @@ describe('LaunchpadBar', () => {
     const ids = Array.from(document.querySelectorAll('[data-launchpad-entry]')).map((e) =>
       e.getAttribute('data-launchpad-entry')
     );
-    expect(ids).toEqual(['builtin-cowork', 'ext-copy']);
+    // Pinned Concierge is injected at slot 1; the unresolved ext id is still skipped.
+    expect(ids).toEqual(['builtin-cowork', 'builtin-concierge', 'ext-copy']);
   });
 
-  it('shows the empty-state slot when the user empties the bar', async () => {
+  it('keeps the pinned Concierge card even when the user empties the bar (never truly empty)', async () => {
     getMock.mockResolvedValueOnce([]);
     render(<LaunchpadBar onAnchorClick={vi.fn()} onViewAll={vi.fn()} />);
     await flushLoad();
-    expect(screen.getByTestId('launchpad-bar-empty')).toBeInTheDocument();
+    // Concierge is always-available: an emptied bar still surfaces it, so the
+    // empty-state slot is never shown.
+    expect(screen.queryByTestId('launchpad-bar-empty')).toBeNull();
+    const ids = Array.from(document.querySelectorAll('[data-launchpad-entry]')).map((e) =>
+      e.getAttribute('data-launchpad-entry')
+    );
+    expect(ids).toEqual(['builtin-concierge']);
   });
 
   // Bug 1 - card body uses semantic text token, not `inherit` (which gives
