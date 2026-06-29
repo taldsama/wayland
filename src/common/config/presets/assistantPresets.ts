@@ -57,7 +57,8 @@ export const ASSISTANT_PRESETS: AssistantPreset[] = [
     descriptionI18n: {
       'en-US':
         "Your in-app guide. Ask what Wayland can do, how to do anything, or why something isn't working - I'll walk you through it or set it up for you.",
-      'zh-CN': '你的应用内向导。问我 Wayland 能做什么、如何操作，或为什么某项功能不工作——我会一步步带你完成，或直接帮你设置好。',
+      'zh-CN':
+        '你的应用内向导。问我 Wayland 能做什么、如何操作，或为什么某项功能不工作——我会一步步带你完成，或直接帮你设置好。',
     },
     promptsI18n: {
       'en-US': [
@@ -67,7 +68,13 @@ export const ASSISTANT_PRESETS: AssistantPreset[] = [
         'Find me the right skill for a task',
         "Why didn't my scheduled task run?",
       ],
-      'zh-CN': ['Wayland 能做什么？', '如何连接 Claude？', '每天早上为我生成一份工作摘要', '帮我找到适合某个任务的技能', '我的定时任务为什么没有运行？'],
+      'zh-CN': [
+        'Wayland 能做什么？',
+        '如何连接 Claude？',
+        '每天早上为我生成一份工作摘要',
+        '帮我找到适合某个任务的技能',
+        '我的定时任务为什么没有运行？',
+      ],
     },
   },
   {

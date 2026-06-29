@@ -8,12 +8,23 @@
  * the proposal was 'pending'. Secrets are used once and never stored.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { IConciergeConfigContent, ConciergeConfirmParams, ConciergeConfirmResult } from '@/common/chat/conciergeConfig';
+import type {
+  IConciergeConfigContent,
+  ConciergeConfirmParams,
+  ConciergeConfirmResult,
+} from '@/common/chat/conciergeConfig';
 
 const { state, emitSpy, connectSpy, setSpy, getSpy, writeRulesSpy, updateSpy } = vi.hoisted(() => ({
-  state: { handler: null as null | ((p: ConciergeConfirmParams) => Promise<ConciergeConfirmResult>), msg: null as Record<string, unknown> | null },
+  state: {
+    handler: null as null | ((p: ConciergeConfirmParams) => Promise<ConciergeConfirmResult>),
+    msg: null as Record<string, unknown> | null,
+  },
   emitSpy: vi.fn(),
-  connectSpy: vi.fn(async () => ({ ok: true as boolean, error: undefined as string | undefined, warning: undefined as string | undefined })),
+  connectSpy: vi.fn(async () => ({
+    ok: true as boolean,
+    error: undefined as string | undefined,
+    warning: undefined as string | undefined,
+  })),
   setSpy: vi.fn(async () => {}),
   getSpy: vi.fn(async () => [] as unknown[]),
   writeRulesSpy: vi.fn(async () => true),
@@ -75,7 +86,12 @@ beforeEach(() => {
 describe('conciergeConfigBridge apply', () => {
   it('provider_connect accept calls connect with the card secret and never stores the key', async () => {
     setMsg({ kind: 'provider_connect', providerId: 'openai', label: 'OpenAI', status: 'pending' });
-    const res = await state.handler!({ conversationId: 'c1', msgId: 'm1', action: 'accept', secret: { apiKey: 'sk-secret-xyz' } });
+    const res = await state.handler!({
+      conversationId: 'c1',
+      msgId: 'm1',
+      action: 'accept',
+      secret: { apiKey: 'sk-secret-xyz' },
+    });
     expect(res.ok).toBe(true);
     expect(connectSpy).toHaveBeenCalledWith('openai', expect.objectContaining({ key: 'sk-secret-xyz' }));
     // The stored message (state.msg after updates) must NOT contain the key.
@@ -92,7 +108,14 @@ describe('conciergeConfigBridge apply', () => {
   });
 
   it('set_default_model accept writes the engine default model', async () => {
-    setMsg({ kind: 'set_default_model', engine: 'wcore', modelId: 'm/x', useModel: 'x', label: 'X', status: 'pending' });
+    setMsg({
+      kind: 'set_default_model',
+      engine: 'wcore',
+      modelId: 'm/x',
+      useModel: 'x',
+      label: 'X',
+      status: 'pending',
+    });
     const res = await state.handler!({ conversationId: 'c1', msgId: 'm1', action: 'accept' });
     expect(res.ok).toBe(true);
     expect(setSpy).toHaveBeenCalledWith('wcore.defaultModel', { id: 'm/x', useModel: 'x' });
@@ -102,7 +125,10 @@ describe('conciergeConfigBridge apply', () => {
     setMsg({ kind: 'add_mcp', name: 'fs', command: 'npx', args: ['-y', 'srv'], status: 'pending' });
     const ok = await state.handler!({ conversationId: 'c1', msgId: 'm1', action: 'accept' });
     expect(ok.ok).toBe(true);
-    expect(setSpy).toHaveBeenCalledWith('mcp.config', expect.arrayContaining([expect.objectContaining({ name: 'fs' })]));
+    expect(setSpy).toHaveBeenCalledWith(
+      'mcp.config',
+      expect.arrayContaining([expect.objectContaining({ name: 'fs' })])
+    );
 
     // Now a duplicate
     setSpy.mockClear();
@@ -114,7 +140,13 @@ describe('conciergeConfigBridge apply', () => {
   });
 
   it('edit_assistant accept writes the rules', async () => {
-    setMsg({ kind: 'edit_assistant', assistantId: 'builtin-concierge', label: 'Concierge', rules: 'Be helpful.', status: 'pending' });
+    setMsg({
+      kind: 'edit_assistant',
+      assistantId: 'builtin-concierge',
+      label: 'Concierge',
+      rules: 'Be helpful.',
+      status: 'pending',
+    });
     const res = await state.handler!({ conversationId: 'c1', msgId: 'm1', action: 'accept' });
     expect(res.ok).toBe(true);
     expect(writeRulesSpy).toHaveBeenCalledWith('builtin-concierge', 'Be helpful.', 'en-US');
@@ -138,7 +170,14 @@ describe('conciergeConfigBridge apply', () => {
   });
 
   it('accept on a non-pending proposal is refused and writes nothing', async () => {
-    setMsg({ kind: 'set_default_model', engine: 'gemini', modelId: 'a', useModel: 'b', label: 'C', status: 'accepted' });
+    setMsg({
+      kind: 'set_default_model',
+      engine: 'gemini',
+      modelId: 'a',
+      useModel: 'b',
+      label: 'C',
+      status: 'accepted',
+    });
     const res = await state.handler!({ conversationId: 'c1', msgId: 'm1', action: 'accept' });
     expect(res).toEqual({ ok: false, reason: 'already_resolved' });
     noWrites();
@@ -152,7 +191,15 @@ describe('conciergeConfigBridge apply', () => {
   });
 
   it('parseError proposals cannot be accepted', async () => {
-    setMsg({ kind: 'set_default_model', engine: 'wcore', modelId: 'a', useModel: 'b', label: 'C', status: 'pending', parseError: true });
+    setMsg({
+      kind: 'set_default_model',
+      engine: 'wcore',
+      modelId: 'a',
+      useModel: 'b',
+      label: 'C',
+      status: 'pending',
+      parseError: true,
+    });
     const res = await state.handler!({ conversationId: 'c1', msgId: 'm1', action: 'accept' });
     expect(res).toEqual({ ok: false, reason: 'parse_error_cannot_accept' });
     noWrites();

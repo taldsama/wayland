@@ -26,9 +26,13 @@ describe('QuickLaunchRow', () => {
     const onAnchorClick = vi.fn();
     const { container } = render(<QuickLaunchRow {...baseProps} onAnchorClick={onAnchorClick} />);
     fireEvent.click(container.querySelector('[data-quicklaunch-id="write-copy"]') as HTMLButtonElement);
-    expect(onAnchorClick).toHaveBeenCalledWith(expect.objectContaining({
-      id: 'write-copy', label: 'Write copy', assistantId: 'builtin-copy',
-    }));
+    expect(onAnchorClick).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'write-copy',
+        label: 'Write copy',
+        assistantId: 'builtin-copy',
+      })
+    );
   });
 
   it('renders a View-all link that calls onViewAll', () => {

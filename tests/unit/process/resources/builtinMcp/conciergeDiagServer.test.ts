@@ -9,10 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import BetterSqlite3 from 'better-sqlite3';
-import {
-  createConciergeDiagServer,
-  redact,
-} from '@process/resources/builtinMcp/conciergeDiagServer';
+import { createConciergeDiagServer, redact } from '@process/resources/builtinMcp/conciergeDiagServer';
 import { describeNativeSqlite } from '../../../helpers/nativeSqlite';
 
 // A realistic-looking secret used to prove redaction across every surface.
@@ -235,7 +232,10 @@ describe('createConciergeDiagServer — MCP health (config JSON)', () => {
 
   it('accepts plain-JSON config as a fallback encoding', () => {
     const configPath = tmp('plain.json');
-    fs.writeFileSync(configPath, JSON.stringify({ 'mcp.config': [{ id: 'p', name: 'plain', enabled: true, tools: [{ name: 'x' }] }] }));
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({ 'mcp.config': [{ id: 'p', name: 'plain', enabled: true, tools: [{ name: 'x' }] }] })
+    );
     const server = createConciergeDiagServer({ configPath });
     const result = server.mcpHealth();
     expect(result.available).toBe(true);
@@ -525,10 +525,7 @@ describeNativeSqlite('createConciergeDiagServer — overview (all sources wired)
     const configPath = tmp('wayland-config.txt');
     makeCronDb(cronDbPath);
     makeProviderDb(providerDbPath);
-    fs.writeFileSync(
-      configPath,
-      encodeConfig({ 'mcp.config': [{ id: 'x', name: 'srv', enabled: true, tools: [] }] })
-    );
+    fs.writeFileSync(configPath, encodeConfig({ 'mcp.config': [{ id: 'x', name: 'srv', enabled: true, tools: [] }] }));
 
     const server = createConciergeDiagServer({ cronDbPath, providerDbPath, configPath });
     const result = server.overview();

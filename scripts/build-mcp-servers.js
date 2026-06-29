@@ -58,7 +58,7 @@ async function bundleWaylandMcp(pkgName, outName, opts = {}) {
   const src = candidates.find((p) => fs.existsSync(path.join(p, 'src', 'index.ts')));
   if (!src) {
     console.warn(
-      `[build-mcp-servers] @wayland/${pkgName} source not found in any of: ${candidates.join(', ')} - skipping.`,
+      `[build-mcp-servers] @wayland/${pkgName} source not found in any of: ${candidates.join(', ')} - skipping.`
     );
     return;
   }
@@ -95,7 +95,7 @@ async function bundleWaylandMcp(pkgName, outName, opts = {}) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(
-      `::warning::[build-mcp-servers] optional @wayland/${pkgName} failed to bundle and was SKIPPED (the builtin will be unavailable in this build): ${message.split('\n')[0]}`,
+      `::warning::[build-mcp-servers] optional @wayland/${pkgName} failed to bundle and was SKIPPED (the builtin will be unavailable in this build): ${message.split('\n')[0]}`
     );
     return;
   }

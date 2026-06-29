@@ -20,26 +20,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const SENTINEL = 'CONCIERGE_MANIFEST_SENTINEL';
 
-const {
-  emitResponseStream,
-  mockDb,
-  agentStart,
-  resolveCapabilitiesManifestMock,
-  buildSystemInstructionsMock,
-} = vi.hoisted(() => ({
-  emitResponseStream: vi.fn(),
-  mockDb: {
-    getConversationMessages: vi.fn(() => ({ data: [] })),
-    getConversation: vi.fn(() => ({ success: false })),
-    updateConversation: vi.fn(),
-    createConversation: vi.fn(() => ({ success: true })),
-    insertMessage: vi.fn(),
-    updateMessage: vi.fn(),
-  },
-  agentStart: vi.fn().mockResolvedValue(undefined),
-  resolveCapabilitiesManifestMock: vi.fn(async () => undefined as string | undefined),
-  buildSystemInstructionsMock: vi.fn(async () => undefined as string | undefined),
-}));
+const { emitResponseStream, mockDb, agentStart, resolveCapabilitiesManifestMock, buildSystemInstructionsMock } =
+  vi.hoisted(() => ({
+    emitResponseStream: vi.fn(),
+    mockDb: {
+      getConversationMessages: vi.fn(() => ({ data: [] })),
+      getConversation: vi.fn(() => ({ success: false })),
+      updateConversation: vi.fn(),
+      createConversation: vi.fn(() => ({ success: true })),
+      insertMessage: vi.fn(),
+      updateMessage: vi.fn(),
+    },
+    agentStart: vi.fn().mockResolvedValue(undefined),
+    resolveCapabilitiesManifestMock: vi.fn(async () => undefined as string | undefined),
+    buildSystemInstructionsMock: vi.fn(async () => undefined as string | undefined),
+  }));
 
 vi.mock('@/common', () => ({
   ipcBridge: {

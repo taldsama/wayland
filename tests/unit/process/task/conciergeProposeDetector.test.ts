@@ -12,14 +12,17 @@ import {
 } from '@process/task/ConciergeProposeDetector';
 import { CONCIERGE_RULES_MAX_CHARS } from '@/common/chat/conciergeConfig';
 
-const block = (body: string) => `Sure, here is the change:\n[CONCIERGE_PROPOSE]\n${body}\n[/CONCIERGE_PROPOSE]\nLet me know.`;
+const block = (body: string) =>
+  `Sure, here is the change:\n[CONCIERGE_PROPOSE]\n${body}\n[/CONCIERGE_PROPOSE]\nLet me know.`;
 
 describe('detectConciergeProposals', () => {
   it('parses provider_connect (provider + label + optional base_url)', () => {
     const out = detectConciergeProposals(
       block('kind: provider_connect\nprovider: openai\nlabel: OpenAI\nbase_url: https://api.example.com')
     );
-    expect(out).toEqual([{ kind: 'provider_connect', providerId: 'openai', label: 'OpenAI', baseUrl: 'https://api.example.com' }]);
+    expect(out).toEqual([
+      { kind: 'provider_connect', providerId: 'openai', label: 'OpenAI', baseUrl: 'https://api.example.com' },
+    ]);
   });
 
   it('NEVER carries a secret: an api_key/key line in a provider_connect block is ignored', () => {
@@ -34,10 +37,18 @@ describe('detectConciergeProposals', () => {
 
   it('parses set_default_model and rejects an unknown engine', () => {
     const ok = detectConciergeProposals(
-      block('kind: set_default_model\nengine: wcore\nmodel_id: anthropic/claude-opus-4-8\nuse_model: claude-opus-4-8\nlabel: Claude Opus 4.8')
+      block(
+        'kind: set_default_model\nengine: wcore\nmodel_id: anthropic/claude-opus-4-8\nuse_model: claude-opus-4-8\nlabel: Claude Opus 4.8'
+      )
     );
     expect(ok).toEqual([
-      { kind: 'set_default_model', engine: 'wcore', modelId: 'anthropic/claude-opus-4-8', useModel: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
+      {
+        kind: 'set_default_model',
+        engine: 'wcore',
+        modelId: 'anthropic/claude-opus-4-8',
+        useModel: 'claude-opus-4-8',
+        label: 'Claude Opus 4.8',
+      },
     ]);
     const bad = detectConciergeProposals(
       block('kind: set_default_model\nengine: openrouter\nmodel_id: x\nuse_model: y\nlabel: z')
@@ -47,7 +58,9 @@ describe('detectConciergeProposals', () => {
 
   it('parses add_mcp (args space-split, env KEY=val pairs)', () => {
     const out = detectConciergeProposals(
-      block('kind: add_mcp\nname: filesystem\ncommand: npx\nargs: -y @modelcontextprotocol/server-filesystem /tmp\nenv: API_KEY=abc123, REGION=us-east-1')
+      block(
+        'kind: add_mcp\nname: filesystem\ncommand: npx\nargs: -y @modelcontextprotocol/server-filesystem /tmp\nenv: API_KEY=abc123, REGION=us-east-1'
+      )
     );
     expect(out).toEqual([
       {
@@ -62,7 +75,9 @@ describe('detectConciergeProposals', () => {
 
   it('parses edit_assistant (multi-line rules) and rejects oversized rules', () => {
     const out = detectConciergeProposals(
-      block('kind: edit_assistant\nassistant: builtin-concierge\nlabel: Concierge\nrules: You are helpful.\nAlways be concise.')
+      block(
+        'kind: edit_assistant\nassistant: builtin-concierge\nlabel: Concierge\nrules: You are helpful.\nAlways be concise.'
+      )
     );
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ kind: 'edit_assistant', assistantId: 'builtin-concierge', label: 'Concierge' });
@@ -75,10 +90,14 @@ describe('detectConciergeProposals', () => {
 
   it('rejects edit_assistant proposals with an unsafe (path-traversal) assistant id', () => {
     for (const bad of ['../../../../etc/cron.d/evil', 'a/b', '..', '.hidden', 'C:\\x', 'a\\b']) {
-      expect(detectConciergeProposals(block(`kind: edit_assistant\nassistant: ${bad}\nlabel: X\nrules: hi`))).toEqual([]);
+      expect(detectConciergeProposals(block(`kind: edit_assistant\nassistant: ${bad}\nlabel: X\nrules: hi`))).toEqual(
+        []
+      );
     }
     // A safe id still parses.
-    expect(detectConciergeProposals(block('kind: edit_assistant\nassistant: builtin-concierge\nlabel: X\nrules: hi'))).toHaveLength(1);
+    expect(
+      detectConciergeProposals(block('kind: edit_assistant\nassistant: builtin-concierge\nlabel: X\nrules: hi'))
+    ).toHaveLength(1);
   });
 
   it('omits blocks with an unknown kind or missing required fields', () => {
@@ -88,7 +107,8 @@ describe('detectConciergeProposals', () => {
   });
 
   it('ignores proposal blocks inside markdown code fences', () => {
-    const fenced = '```\n[CONCIERGE_PROPOSE]\nkind: provider_connect\nprovider: openai\nlabel: OpenAI\n[/CONCIERGE_PROPOSE]\n```';
+    const fenced =
+      '```\n[CONCIERGE_PROPOSE]\nkind: provider_connect\nprovider: openai\nlabel: OpenAI\n[/CONCIERGE_PROPOSE]\n```';
     expect(detectConciergeProposals(fenced)).toEqual([]);
   });
 

@@ -11,15 +11,16 @@ Read order: this file → `CONTRACT.md` (§2b) → `CONCIERGE-SPEC.md` → `AUDI
 
 Code is written, unit-green, AND now adversarially cross-audited end-to-end. But "audited code" still ≠ "live-verified." State:
 
-| Layer | Built | Unit-tested | Cross-audited | LIVE-verified in app |
-|---|---|---|---|---|
-| Phase 1 — knows | ✅ | ✅ | ✅ (re-audit: go) | ❌ |
-| Phase 2a — diagnoses | ✅ | ✅ | ✅ (re-audit: go) | ❌ (packaged subprocess spawn unproven) |
-| Phase 2b — acts | ✅ | ✅ | ✅ (`wf_6664cfc0-f24` — found CRITICAL, FIXED) | ❌ (NO agent-turn test) |
+| Layer                | Built | Unit-tested | Cross-audited                                  | LIVE-verified in app                    |
+| -------------------- | ----- | ----------- | ---------------------------------------------- | --------------------------------------- |
+| Phase 1 — knows      | ✅    | ✅          | ✅ (re-audit: go)                              | ❌                                      |
+| Phase 2a — diagnoses | ✅    | ✅          | ✅ (re-audit: go)                              | ❌ (packaged subprocess spawn unproven) |
+| Phase 2b — acts      | ✅    | ✅          | ✅ (`wf_6664cfc0-f24` — found CRITICAL, FIXED) | ❌ (NO agent-turn test)                 |
 
 **2b cross-audit verdict (commit `57f4e9dfd` fixes it):** the audit found 2b was **100% non-functional** — the manager finish-gates routed turns into the middleware only on `hasCronCommands()` (false for `[CONCIERGE_PROPOSE]`), so the detector never fired (no card, raw tag leaked). FIXED: trigger wired in all 3 managers; HIGH path-traversal in `edit_assistant` hardened (detector + `writeAssistantResource`); strip-leak fixed; apply-failure now retryable; acceptance test added (concierge-only turn → persist+broadcast+strip; static guard on the 3 gates). The 4 prior wiring unknowns (#1 persist, #2 renderer render, #3 processAgentResponse called, #4 card updates) are now resolved — downstream pieces verified correct; only the gate was broken.
 
 **What still makes it ~80%, not done:**
+
 - **Nothing live-verified in a running app.** No real "what can you do?" turn, no real `[CONCIERGE_PROPOSE]` → card → apply, no packaged diag-subprocess spawn. Local harness can't run wcore agent turns (memory `local-harness-cannot-run-wcore-tasks`) → route to **Overwatch/Windows**.
 - **Open fast-follows** (flagged in PR #439): diag persona-gating + 3 low redaction refinements (SEC-1/SEC-2/NR-1); residual coverage (initStorage seed path, Gemini/ACP-native wiring tests).
 - **2b medium polish** still open: Edit affordance is dropped (bridge supports `action:'edit'`, card doesn't offer it — dead branch or implement); parseError card path is still unreachable (detector drops bad-value blocks rather than carding them).
@@ -61,6 +62,7 @@ The 2b cross-audit is DONE and its critical is FIXED+pushed (see §1). Remaining
    before declaring done.
 
 ### Resume / verify commands
+
 ```
 cd /private/tmp/wt-concierge
 gh auth switch --user FerroxLabs        # drifts to TradeCanyon
@@ -70,5 +72,6 @@ gh pr view 439 -R FerroxLabs/wayland    # the open PR
 ```
 
 ## 4. Build discipline notes
+
 - Swarm agents 529'd during this session (backend overload); 2b was built solo against the locked contract module (`conciergeConfig.ts`) — that contract is the source of truth if re-swarming.
 - No AI signatures anywhere (project rule). Commits `<type>(<scope>): <subject>`. Push `ferrox`, gh `FerroxLabs` (drifts to TradeCanyon — re-`gh auth switch`).

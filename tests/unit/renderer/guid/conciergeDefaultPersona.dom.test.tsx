@@ -34,8 +34,7 @@ vi.mock('@/common/config/storage', () => ({
 // setAvailableAgents into an infinite render loop.
 const swrEmpty = vi.hoisted(() => ({ list: [] as never[] }));
 vi.mock('swr', () => ({
-  default: (key: string) =>
-    key === 'agents.detected' ? { data: agents.current } : { data: swrEmpty.list },
+  default: (key: string) => (key === 'agents.detected' ? { data: agents.current } : { data: swrEmpty.list }),
 }));
 
 vi.mock('@/common', () => ({
@@ -85,9 +84,7 @@ vi.mock('@/renderer/pages/guid/hooks/useAgentAvailability', () => ({
 import { useGuidAgentSelection } from '@/renderer/pages/guid/hooks/useGuidAgentSelection';
 
 const renderSelection = () =>
-  renderHook(() =>
-    useGuidAgentSelection({ modelList: [], isGoogleAuth: false, localeKey: 'en-US' })
-  );
+  renderHook(() => useGuidAgentSelection({ modelList: [], isGoogleAuth: false, localeKey: 'en-US' }));
 
 describe('useGuidAgentSelection - Concierge default persona', () => {
   beforeEach(() => {

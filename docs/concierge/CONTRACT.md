@@ -4,6 +4,7 @@ Read with `CONCIERGE-SPEC.md`. Every build agent MUST follow this. All facts re-
 `feat/concierge`. **Do not re-research these — they are confirmed.**
 
 ## Global invariants (apply to EVERY unit)
+
 - TS strict, **no `any`**, prefer `type`. Path aliases `@/* @process/* @renderer/* @worker/*`.
 - **Process boundaries:** `src/process/**` = main (no DOM); `src/renderer/**` = renderer (no Node);
   never import across. Cross-process only via `ipcBridge` / `src/preload.ts`.
@@ -19,19 +20,20 @@ Read with `CONCIERGE-SPEC.md`. Every build agent MUST follow this. All facts re-
 - Directory ≤ 10 children. New dirs are fine (e.g. `services/capabilities/`).
 
 ## FILE OWNERSHIP — single-owner rule (no two agents edit the same file)
+
 SHARED files (exactly one owner each; all edits to that file go through that owner):
 
-| Shared file | Owner unit | Edit |
-|---|---|---|
-| `src/process/task/agentUtils.ts` | **U2 inject** | add `capabilitiesManifest?` to `FirstMessageConfig`; inject in native + ACP; capability-intent trigger |
-| `src/common/config/presets/assistantPresets.ts` | **U4 preset** | add `concierge` entry |
-| `src/process/utils/initStorage.ts` | **U-INT (me, lead)** | seed `concierge-diag` (+ later `concierge-config`) in `ensureBuiltinMcpServers()`; (preset resource copy is generic—no edit) |
-| `src/process/resources/builtinMcp/constants.ts` | **U-INT (me, lead)** | add `BUILTIN_CONCIERGE_DIAG_*` (+ later CONFIG) |
-| `src/renderer/pages/guid/GuidPage.tsx` | **U6 home-ui** | mount capabilities panel + default-persona wiring |
-| `src/renderer/pages/guid/intents.ts` | **U6 home-ui** | (only if adding an intent key) |
-| `src/renderer/pages/guid/quickLaunchAnchors.ts` | **U6 home-ui** | pin `concierge` first |
-| `src/renderer/pages/guid/hooks/useGuidAgentSelection.ts` | **U6 home-ui** | default-persona setting |
-| `src/common/config/i18n-config.json` | **U7 i18n** | add `"concierge"` to `modules` |
+| Shared file                                              | Owner unit           | Edit                                                                                                                         |
+| -------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `src/process/task/agentUtils.ts`                         | **U2 inject**        | add `capabilitiesManifest?` to `FirstMessageConfig`; inject in native + ACP; capability-intent trigger                       |
+| `src/common/config/presets/assistantPresets.ts`          | **U4 preset**        | add `concierge` entry                                                                                                        |
+| `src/process/utils/initStorage.ts`                       | **U-INT (me, lead)** | seed `concierge-diag` (+ later `concierge-config`) in `ensureBuiltinMcpServers()`; (preset resource copy is generic—no edit) |
+| `src/process/resources/builtinMcp/constants.ts`          | **U-INT (me, lead)** | add `BUILTIN_CONCIERGE_DIAG_*` (+ later CONFIG)                                                                              |
+| `src/renderer/pages/guid/GuidPage.tsx`                   | **U6 home-ui**       | mount capabilities panel + default-persona wiring                                                                            |
+| `src/renderer/pages/guid/intents.ts`                     | **U6 home-ui**       | (only if adding an intent key)                                                                                               |
+| `src/renderer/pages/guid/quickLaunchAnchors.ts`          | **U6 home-ui**       | pin `concierge` first                                                                                                        |
+| `src/renderer/pages/guid/hooks/useGuidAgentSelection.ts` | **U6 home-ui**       | default-persona setting                                                                                                      |
+| `src/common/config/i18n-config.json`                     | **U7 i18n**          | add `"concierge"` to `modules`                                                                                               |
 
 NEW files: owned solely by the creating unit (disjoint paths → safe to build in parallel).
 
@@ -43,10 +45,11 @@ shared file return a precise diff/patch description; the lead applies and gates.
 ## PHASE 1
 
 ### U1 — Capabilities manifest service (NEW files only)
+
 - Create `src/process/services/capabilities/CapabilitiesManifest.ts`.
 - Export: `buildCapabilitiesManifest(opts?: CapabilitiesManifestOptions): Promise<string>` where
   `type CapabilitiesManifestOptions = { includeSkills?: boolean; includeWorkflows?: boolean;
-  includeModels?: boolean; agentKey?: string }` (all default true except agentKey).
+includeModels?: boolean; agentKey?: string }` (all default true except agentKey).
 - Sources (main-process, direct calls — NOT ipc):
   - Skills: `SkillLibrary.getInstance().stats()` → `{ total, bySource, pinned, flagged, verified }`
     and `.list({ type })` for top categories (group by `entry.metadata?.category`).
@@ -66,6 +69,7 @@ shared file return a precise diff/patch description; the lead applies and gates.
   degradation when a source throws, cache hit avoids recompute.
 
 ### U2 — Injection (OWNS agentUtils.ts)
+
 - Add `capabilitiesManifest?: string` to `FirstMessageConfig`.
 - In `buildSystemInstructionsWithSkillsIndex`: push the manifest block AFTER skills index / team
   guide, BEFORE workflow protocol, only when `config.capabilitiesManifest` is set. Wrap in a clear
@@ -84,6 +88,7 @@ shared file return a precise diff/patch description; the lead applies and gates.
   when `capabilitiesManifest` set and absence when unset.
 
 ### U3 — Concierge persona + how-to skill (NEW files only)
+
 - Persona: `src/process/resources/assistant/concierge/concierge.md` (en-US). Voice per SPEC §3:
   warm, plain-English, zero jargon, **answer-first**, real specifics, end with **one** offer
   ("Want me to set that up?"). Phase-1 routing: capability/how-to → answer from the live manifest +
@@ -100,6 +105,7 @@ shared file return a precise diff/patch description; the lead applies and gates.
 - No test (content asset); retrieval covered by U2/integration.
 
 ### U4 — Concierge preset (OWNS assistantPresets.ts)
+
 - Add to `ASSISTANT_PRESETS`:
   ```ts
   {
@@ -121,6 +127,7 @@ shared file return a precise diff/patch description; the lead applies and gates.
   locales exist + promptsI18n present.
 
 ### U6 — Home UI (OWNS GuidPage.tsx, quickLaunchAnchors.ts, useGuidAgentSelection.ts, intents.ts)
+
 - NEW `src/renderer/pages/guid/components/newChatStarter/WaylandCapabilitiesPanel.tsx` (+ `.module.css`):
   a live-state suggestion panel titled via i18n "What can Wayland do?". Reads live state with the
   EXISTING renderer pattern (`useEffect` + `ipcBridge.*.invoke().then()`, or `swr` which is already a
@@ -148,6 +155,7 @@ shared file return a precise diff/patch description; the lead applies and gates.
   setting false → not concierge).
 
 ### U7 — i18n (OWNS i18n-config.json)
+
 - Add `"concierge"` to `modules` in `src/common/config/i18n-config.json`.
 - Create `src/renderer/services/i18n/locales/en-US/concierge.json` with all keys used by U6/preset
   (`concierge.title`, `concierge.whatCanWaylandDo`, `concierge.suggest.connectModel`,
@@ -161,6 +169,7 @@ shared file return a precise diff/patch description; the lead applies and gates.
 ---
 
 ## PHASE 2a — Diagnostics MCP (`concierge-diag`) — stdio subprocess, READ-ONLY
+
 - NEW `src/process/resources/builtinMcp/conciergeDiagServer.ts` (factory, mirrors
   `searchSkillsServer.ts` shape) + `conciergeDiagServerEntry.ts` (stdio `McpServer` wrapper +
   `main()`, mirrors `searchSkillsServerEntry.ts`). Tool name e.g. `wayland_concierge_diag`.
@@ -179,11 +188,13 @@ shared file return a precise diff/patch description; the lead applies and gates.
   redaction (no full secret in output), and that no write method exists/!is called.
 
 ## PHASE 2b — Conversational config — MUTATING — RESOLVED: propose/confirm/apply (NO MCP subprocess)
+
 Mirror the existing, battle-tested **cron propose/confirm/apply** flow. Config mutations do NOT use
 an MCP subprocess (a subprocess can't touch Electron safeStorage/secrets) — instead the agent emits a
 chat-tag block, the renderer confirms, and MAIN applies. Secrets only ever live in MAIN.
 
 Reuse these proven pieces (read them before building):
+
 - **Propose (agent → block):** mirror `[CRON_PROPOSE]…[/CRON_PROPOSE]`. New tag `[CONCIERGE_PROPOSE]`
   with `kind: 'provider_connect' | 'set_default_model' | 'add_mcp' | 'edit_assistant'` + fields.
   Parser mirrors `src/process/task/CronCommandDetector.ts`; message creation mirrors
@@ -214,6 +225,7 @@ Reuse these proven pieces (read them before building):
 ---
 
 ## Green gate (lead runs before any slice is "done")
+
 `bunx tsc --noEmit` · `bun run test` (≥80% new) · `bun run lint` · `bun run i18n:types` +
 `node scripts/check-i18n.js` · `prek run --from-ref origin/main --to-ref HEAD`. Then `oss-pr`,
 base `ferrox/main`, remote `ferrox`, gh `FerroxLabs`, no AI signatures.

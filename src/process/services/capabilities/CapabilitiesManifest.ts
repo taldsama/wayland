@@ -251,9 +251,7 @@ export async function buildCapabilitiesManifest(opts?: CapabilitiesManifestOptio
 
     const rendered = lines.join('\n');
     const value =
-      rendered.length > CAPABILITIES_MANIFEST_MAX_CHARS
-        ? rendered.slice(0, CAPABILITIES_MANIFEST_MAX_CHARS)
-        : rendered;
+      rendered.length > CAPABILITIES_MANIFEST_MAX_CHARS ? rendered.slice(0, CAPABILITIES_MANIFEST_MAX_CHARS) : rendered;
 
     cache = { key, value };
     return value;

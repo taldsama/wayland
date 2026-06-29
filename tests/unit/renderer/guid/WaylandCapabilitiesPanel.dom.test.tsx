@@ -80,8 +80,7 @@ const provider = () => ({ id: 'openai' });
 const cronJob = () => ({ id: 'job-1' });
 const skill = (n: number) => ({ name: `skill-${n}` });
 
-const keysOf = () =>
-  screen.getAllByTestId('capability-row').map((row) => row.getAttribute('data-suggest-key'));
+const keysOf = () => screen.getAllByTestId('capability-row').map((row) => row.getAttribute('data-suggest-key'));
 
 describe('<WaylandCapabilitiesPanel>', () => {
   beforeEach(() => {

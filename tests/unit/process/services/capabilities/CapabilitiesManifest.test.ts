@@ -62,13 +62,21 @@ function primeHappyPath(): void {
   mockStats.mockResolvedValue({ total: 2105, bySource: {}, pinned: 0, flagged: 0, verified: 1900 });
   mockList.mockImplementation(async (filter?: { type?: string }) => {
     if (filter?.type === 'workflow') {
-      return [workflow('daily-digest', 'Daily Digest'), workflow('research-report'), workflow('w3'), workflow('w4'), workflow('w5')];
+      return [
+        workflow('daily-digest', 'Daily Digest'),
+        workflow('research-report'),
+        workflow('w3'),
+        workflow('w4'),
+        workflow('w5'),
+      ];
     }
     // skills
     return [skill('a', 'web-dev'), skill('b', 'web-dev'), skill('c', 'data'), skill('d', 'devops'), skill('e')];
   });
   getInstance.mockReturnValue({ stats: mockStats, list: mockList });
-  mockGetProviderCatalog.mockResolvedValue(new Array(100).fill({ id: 'p', displayName: 'P', baseUrl: '', envVar: '' }));
+  mockGetProviderCatalog.mockResolvedValue(
+    Array.from({ length: 100 }, () => ({ id: 'p', displayName: 'P', baseUrl: '', envVar: '' }))
+  );
   mockProcessConfigGet.mockResolvedValue([
     provider('Anthropic', ['claude-opus', 'claude-sonnet']),
     provider('OpenAI', ['gpt-4o']),
@@ -109,7 +117,7 @@ describe('buildCapabilitiesManifest', () => {
       return manyCategories;
     });
     getInstance.mockReturnValue({ stats: mockStats, list: mockList });
-    mockGetProviderCatalog.mockResolvedValue(new Array(500).fill({ id: 'p' }));
+    mockGetProviderCatalog.mockResolvedValue(Array.from({ length: 500 }, () => ({ id: 'p' })));
     mockProcessConfigGet.mockResolvedValue(
       Array.from({ length: 50 }, (_, i) => provider(`Provider-With-A-Long-Name-${i}`, [`model-long-id-${i}`]))
     );

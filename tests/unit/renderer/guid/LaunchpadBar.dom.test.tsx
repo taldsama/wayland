@@ -106,10 +106,7 @@ describe('LaunchpadBar', () => {
     fireEvent.click(removeBtn);
 
     expect(document.querySelectorAll('[data-launchpad-entry]')).toHaveLength(6);
-    expect(setMock).toHaveBeenCalledWith(
-      'launchpad.barOrder',
-      expect.not.arrayContaining(['builtin-quiet-money'])
-    );
+    expect(setMock).toHaveBeenCalledWith('launchpad.barOrder', expect.not.arrayContaining(['builtin-quiet-money']));
   });
 
   it('clicking + opens the picker drawer (and toggles closed)', async () => {
@@ -127,9 +124,7 @@ describe('LaunchpadBar', () => {
   it('renders View-all in compact mode only', async () => {
     getMock.mockResolvedValueOnce(undefined);
     const onViewAll = vi.fn();
-    const { rerender } = render(
-      <LaunchpadBar onAnchorClick={vi.fn()} onViewAll={onViewAll} mode='compact' />
-    );
+    const { rerender } = render(<LaunchpadBar onAnchorClick={vi.fn()} onViewAll={onViewAll} mode='compact' />);
     await flushLoad();
     expect(screen.getByTestId('launchpad-view-all')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('launchpad-view-all'));

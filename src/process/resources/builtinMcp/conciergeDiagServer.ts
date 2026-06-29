@@ -329,7 +329,11 @@ export const createConciergeDiagServer = (deps: ConciergeDiagDeps = {}) => {
   const readScheduledTasks = (): DiagSection<ScheduledTaskHealth> => {
     const db = openReadonlyDb(cronDbPath);
     if (!db) {
-      return { available: false, source: cronDbPath ? `cron db unavailable: ${scrubHome(cronDbPath)}` : 'cron db path not set', items: [] };
+      return {
+        available: false,
+        source: cronDbPath ? `cron db unavailable: ${scrubHome(cronDbPath)}` : 'cron db path not set',
+        items: [],
+      };
     }
     try {
       const rows = db
@@ -365,7 +369,11 @@ export const createConciergeDiagServer = (deps: ConciergeDiagDeps = {}) => {
   const readMcpHealth = (): DiagSection<McpServerHealth> => {
     const config = readConfigJson(configPath);
     if (!config) {
-      return { available: false, source: configPath ? `config unavailable: ${scrubHome(configPath)}` : 'config path not set', items: [] };
+      return {
+        available: false,
+        source: configPath ? `config unavailable: ${scrubHome(configPath)}` : 'config path not set',
+        items: [],
+      };
     }
     const servers = config['mcp.config'];
     if (!Array.isArray(servers)) {
@@ -401,7 +409,11 @@ export const createConciergeDiagServer = (deps: ConciergeDiagDeps = {}) => {
   const readProviders = (): DiagSection<ProviderHealth> => {
     const db = openReadonlyDb(providerDbPath);
     if (!db) {
-      return { available: false, source: providerDbPath ? `provider db unavailable: ${scrubHome(providerDbPath)}` : 'provider db path not set', items: [] };
+      return {
+        available: false,
+        source: providerDbPath ? `provider db unavailable: ${scrubHome(providerDbPath)}` : 'provider db path not set',
+        items: [],
+      };
     }
     try {
       const rows = db
@@ -438,7 +450,11 @@ export const createConciergeDiagServer = (deps: ConciergeDiagDeps = {}) => {
   /** Recent error-ish lines tailed from the log directory (bounded, redacted). */
   const readRecentErrors = (): RecentErrorsSection => {
     if (!logDir || !fs.existsSync(logDir)) {
-      return { available: false, source: logDir ? `log dir unavailable: ${scrubHome(logDir)}` : 'log dir not set', lines: [] };
+      return {
+        available: false,
+        source: logDir ? `log dir unavailable: ${scrubHome(logDir)}` : 'log dir not set',
+        lines: [],
+      };
     }
     let files: string[];
     try {

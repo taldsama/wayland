@@ -57,7 +57,9 @@ async function applyProposal(
         baseUrl: secret?.baseUrl ?? content.baseUrl,
       });
       if (!result.ok) {
-        throw new Error(result.error ? `Could not connect ${content.label}: ${result.error}` : `Could not connect ${content.label}`);
+        throw new Error(
+          result.error ? `Could not connect ${content.label}: ${result.error}` : `Could not connect ${content.label}`
+        );
       }
       return result.warning ? `Connected ${content.label} (note: ${result.warning}).` : `Connected ${content.label}.`;
     }
@@ -77,11 +79,22 @@ async function applyProposal(
         id: uuid(),
         name: content.name,
         enabled: true,
-        transport: { type: 'stdio', command: content.command, args: content.args, ...(content.env ? { env: content.env } : {}) },
+        transport: {
+          type: 'stdio',
+          command: content.command,
+          args: content.args,
+          ...(content.env ? { env: content.env } : {}),
+        },
         createdAt: now,
         updatedAt: now,
         originalJson: JSON.stringify(
-          { [content.name]: { command: content.command, args: content.args, ...(content.env ? { env: content.env } : {}) } },
+          {
+            [content.name]: {
+              command: content.command,
+              args: content.args,
+              ...(content.env ? { env: content.env } : {}),
+            },
+          },
           null,
           2
         ),
@@ -100,85 +113,87 @@ async function applyProposal(
 
 /** Initialize the Concierge config IPC bridge handler. */
 export function initConciergeConfigBridge(): void {
-  ipcBridge.conciergeConfig.confirmProposal.provider(async ({ conversationId, msgId, action, secret }): Promise<ConciergeConfirmResult> => {
-    const db = await getDatabase();
-    const lookup = db.getMessageByMsgId(conversationId, msgId, 'concierge_propose');
-    if (!lookup.success || !lookup.data) {
-      return { ok: false, reason: 'message_not_found' };
-    }
-    const msg = lookup.data as TMessage;
-    if (msg.type !== 'concierge_propose') {
-      return { ok: false, reason: 'wrong_message_type' };
-    }
-    // Authorization at the trust boundary (belt-and-suspenders with the scoped lookup).
-    if (msg.conversation_id !== conversationId) {
-      return { ok: false, reason: 'unauthorized' };
-    }
-    const content = msg.content as IConciergeConfigContent;
-    if (content.status !== 'pending') {
-      return { ok: false, reason: 'already_resolved' };
-    }
+  ipcBridge.conciergeConfig.confirmProposal.provider(
+    async ({ conversationId, msgId, action, secret }): Promise<ConciergeConfirmResult> => {
+      const db = await getDatabase();
+      const lookup = db.getMessageByMsgId(conversationId, msgId, 'concierge_propose');
+      if (!lookup.success || !lookup.data) {
+        return { ok: false, reason: 'message_not_found' };
+      }
+      const msg = lookup.data as TMessage;
+      if (msg.type !== 'concierge_propose') {
+        return { ok: false, reason: 'wrong_message_type' };
+      }
+      // Authorization at the trust boundary (belt-and-suspenders with the scoped lookup).
+      if (msg.conversation_id !== conversationId) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      const content = msg.content as IConciergeConfigContent;
+      if (content.status !== 'pending') {
+        return { ok: false, reason: 'already_resolved' };
+      }
 
-    const emit = (data: IConciergeConfigContent): void => {
-      ipcBridge.conversation.responseStream.emit({
-        type: 'concierge_propose',
-        conversation_id: msg.conversation_id,
-        msg_id: msg.msg_id || msg.id,
-        data,
-      });
-    };
+      const emit = (data: IConciergeConfigContent): void => {
+        ipcBridge.conversation.responseStream.emit({
+          type: 'concierge_propose',
+          conversation_id: msg.conversation_id,
+          msg_id: msg.msg_id || msg.id,
+          data,
+        });
+      };
 
-    if (action === 'cancel') {
-      const updated: TMessage = { ...msg, content: { ...content, status: 'cancelled' } };
-      db.updateMessage(msg.id, updated);
-      emit(updated.content as IConciergeConfigContent);
-      return { ok: true };
-    }
+      if (action === 'cancel') {
+        const updated: TMessage = { ...msg, content: { ...content, status: 'cancelled' } };
+        db.updateMessage(msg.id, updated);
+        emit(updated.content as IConciergeConfigContent);
+        return { ok: true };
+      }
 
-    if (action === 'edit') {
-      // Don't change status - the user may cancel out of the edit affordance and re-engage.
-      return { ok: true, editPayload: { conversationId: msg.conversation_id, kind: content.kind, content } };
-    }
+      if (action === 'edit') {
+        // Don't change status - the user may cancel out of the edit affordance and re-engage.
+        return { ok: true, editPayload: { conversationId: msg.conversation_id, kind: content.kind, content } };
+      }
 
-    // action === 'accept' - the ONLY path that mutates config.
-    // Pre-accept validation: return a reason WITHOUT any state change or write.
-    if (content.parseError) {
-      return { ok: false, reason: 'parse_error_cannot_accept' };
-    }
-    if (content.kind === 'provider_connect' && !secret?.apiKey) {
-      return { ok: false, reason: 'secret_required' };
-    }
-    if (content.kind === 'edit_assistant' && content.rules.length > CONCIERGE_RULES_MAX_CHARS) {
-      return { ok: false, reason: 'rules_too_long' };
-    }
-    if (content.kind === 'add_mcp') {
-      const existing = (await ProcessConfig.get('mcp.config').catch(() => [] as IMcpServer[])) ?? [];
-      const list = Array.isArray(existing) ? (existing as IMcpServer[]) : [];
-      if (list.some((s) => s?.name === content.name)) {
-        return { ok: false, reason: 'mcp_name_exists' };
+      // action === 'accept' - the ONLY path that mutates config.
+      // Pre-accept validation: return a reason WITHOUT any state change or write.
+      if (content.parseError) {
+        return { ok: false, reason: 'parse_error_cannot_accept' };
+      }
+      if (content.kind === 'provider_connect' && !secret?.apiKey) {
+        return { ok: false, reason: 'secret_required' };
+      }
+      if (content.kind === 'edit_assistant' && content.rules.length > CONCIERGE_RULES_MAX_CHARS) {
+        return { ok: false, reason: 'rules_too_long' };
+      }
+      if (content.kind === 'add_mcp') {
+        const existing = (await ProcessConfig.get('mcp.config').catch(() => [] as IMcpServer[])) ?? [];
+        const list = Array.isArray(existing) ? (existing as IMcpServer[]) : [];
+        if (list.some((s) => s?.name === content.name)) {
+          return { ok: false, reason: 'mcp_name_exists' };
+        }
+      }
+
+      // Atomic transition to 'processing' so a parallel accept short-circuits at
+      // the status guard above (rapid double-click race).
+      const processing: TMessage = { ...msg, content: { ...content, status: 'processing' } };
+      db.updateMessage(msg.id, processing);
+      emit(processing.content as IConciergeConfigContent);
+
+      try {
+        const summary = await applyProposal(content, secret);
+        const accepted: TMessage = { ...msg, content: { ...content, status: 'accepted', resultSummary: summary } };
+        db.updateMessage(msg.id, accepted);
+        emit(accepted.content as IConciergeConfigContent);
+        return { ok: true, summary };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        // Revert to 'pending' (mirror cronBridge) so the card's buttons return and
+        // the user can retry - the most common failure (a wrong provider key) is
+        // recoverable in-place. The renderer surfaces the error as a toast.
+        db.updateMessage(msg.id, msg);
+        emit(content);
+        return { ok: false, reason: message };
       }
     }
-
-    // Atomic transition to 'processing' so a parallel accept short-circuits at
-    // the status guard above (rapid double-click race).
-    const processing: TMessage = { ...msg, content: { ...content, status: 'processing' } };
-    db.updateMessage(msg.id, processing);
-    emit(processing.content as IConciergeConfigContent);
-
-    try {
-      const summary = await applyProposal(content, secret);
-      const accepted: TMessage = { ...msg, content: { ...content, status: 'accepted', resultSummary: summary } };
-      db.updateMessage(msg.id, accepted);
-      emit(accepted.content as IConciergeConfigContent);
-      return { ok: true, summary };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      // Revert to 'pending' (mirror cronBridge) so the card's buttons return and
-      // the user can retry - the most common failure (a wrong provider key) is
-      // recoverable in-place. The renderer surfaces the error as a toast.
-      db.updateMessage(msg.id, msg);
-      emit(content);
-      return { ok: false, reason: message };
-    }
-  });
+  );
 }

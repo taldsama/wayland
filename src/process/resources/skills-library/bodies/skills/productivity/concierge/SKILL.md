@@ -7,13 +7,13 @@ description: |
 license: Apache-2.0
 metadata:
   author: foundry-skills
-  version: "1.0.0"
-  tags: "wayland onboarding automation guide productivity"
-  category: "productivity"
-  subcategory: "automation"
-  depends: ""
-  disclaimer: "none"
-  difficulty: "beginner"
+  version: '1.0.0'
+  tags: 'wayland onboarding automation guide productivity'
+  category: 'productivity'
+  subcategory: 'automation'
+  depends: ''
+  disclaimer: 'none'
+  difficulty: 'beginner'
 ---
 
 # Concierge — How to Use Wayland

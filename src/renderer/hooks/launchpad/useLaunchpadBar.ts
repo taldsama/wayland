@@ -46,6 +46,14 @@ export function ensurePinned(order: LaunchpadBarOrder): LaunchpadBarOrder {
     const slot = Math.min(PINNED_SLOTS[id] ?? next.length, next.length);
     next.splice(slot, 0, id);
   }
+  // Respect the product cap: if injecting a pinned card pushed the bar over the
+  // ceiling, drop trailing NON-pinned entries (never a pinned id) until back at
+  // the cap. Dropped cards remain available via "View all" / the picker.
+  if (next !== order && next.length > LAUNCHPAD_MAX_ENTRIES) {
+    for (let i = next.length - 1; i >= 0 && next.length > LAUNCHPAD_MAX_ENTRIES; i--) {
+      if (!PINNED_BAR_IDS.includes(next[i])) next.splice(i, 1);
+    }
+  }
   return next;
 }
 
@@ -152,47 +160,37 @@ export function useLaunchpadBar(): UseLaunchpadBarReturn {
     [persist]
   );
 
-  const addToBar = useCallback(
-    (assistantId: string) => {
-      setBarOrderState((prev) => {
-        if (prev.includes(assistantId)) return prev;
-        if (prev.length >= LAUNCHPAD_MAX_ENTRIES) {
-          console.warn(
-            '[useLaunchpadBar] bar at cap (%d); refusing to add %s',
-            LAUNCHPAD_MAX_ENTRIES,
-            assistantId
-          );
-          return prev;
-        }
-        const next = [...prev, assistantId];
-        userMutatedRef.current = true;
-        void ConfigStorage.set(STORAGE_KEY, next).catch((err) => {
-          console.warn('[useLaunchpadBar] failed to persist bar order', err);
-        });
-        return next;
-      });
-    },
-    []
-  );
-
-  const removeFromBar = useCallback(
-    (assistantId: string) => {
-      if (PINNED_BAR_IDS.includes(assistantId)) {
-        console.warn('[useLaunchpadBar] refusing to remove pinned card %s', assistantId);
-        return;
+  const addToBar = useCallback((assistantId: string) => {
+    setBarOrderState((prev) => {
+      if (prev.includes(assistantId)) return prev;
+      if (prev.length >= LAUNCHPAD_MAX_ENTRIES) {
+        console.warn('[useLaunchpadBar] bar at cap (%d); refusing to add %s', LAUNCHPAD_MAX_ENTRIES, assistantId);
+        return prev;
       }
-      setBarOrderState((prev) => {
-        const next = prev.filter((id) => id !== assistantId);
-        if (next.length === prev.length) return prev;
-        userMutatedRef.current = true;
-        void ConfigStorage.set(STORAGE_KEY, next).catch((err) => {
-          console.warn('[useLaunchpadBar] failed to persist bar order', err);
-        });
-        return next;
+      const next = [...prev, assistantId];
+      userMutatedRef.current = true;
+      void ConfigStorage.set(STORAGE_KEY, next).catch((err) => {
+        console.warn('[useLaunchpadBar] failed to persist bar order', err);
       });
-    },
-    []
-  );
+      return next;
+    });
+  }, []);
+
+  const removeFromBar = useCallback((assistantId: string) => {
+    if (PINNED_BAR_IDS.includes(assistantId)) {
+      console.warn('[useLaunchpadBar] refusing to remove pinned card %s', assistantId);
+      return;
+    }
+    setBarOrderState((prev) => {
+      const next = prev.filter((id) => id !== assistantId);
+      if (next.length === prev.length) return prev;
+      userMutatedRef.current = true;
+      void ConfigStorage.set(STORAGE_KEY, next).catch((err) => {
+        console.warn('[useLaunchpadBar] failed to persist bar order', err);
+      });
+      return next;
+    });
+  }, []);
 
   const resetToDefaults = useCallback(() => {
     persist([...DEFAULT_BAR_ORDER]);

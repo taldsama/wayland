@@ -13,7 +13,7 @@ security model structurally beats AionUI, and the 2b plan (propose→confirm→a
 - **Business council:** ship-with-changes (all 3 seats converge; blocking concern = truthfulness at the trust surface).
 - **DevOps council:** no-go until the better-sqlite3 binding is fixed, then go.
 - **Verification:** 18 findings raised → 8 medium+ adversarially verified against live code → **8 survived, 0 refuted**.
-- **Coverage gap:** the *performance* finder crashed (StructuredOutput retry cap); that dimension was NOT
+- **Coverage gap:** the _performance_ finder crashed (StructuredOutput retry cap); that dimension was NOT
   covered by a dedicated seat. Re-run before final sign-off. (Per-turn cost was partially covered by the
   correctness finding on `isCapabilityIntent`.)
 
@@ -22,6 +22,7 @@ security model structurally beats AionUI, and the 2b plan (propose→confirm→a
 ## BLOCKERS (must fix before ship) — all independently re-confirmed
 
 ### B1 · CRITICAL · Bundled diag subprocess cannot load `better-sqlite3` → scheduledTasks + providers dead in every build
+
 `conciergeDiagServer.ts:31` hard-imports native `better-sqlite3`; `scripts/build-mcp-servers.js` marks
 external only `['electron','bun:sqlite']`, so esbuild inlines it and `require('bindings')('better_sqlite3.node')`
 can't resolve from `out/main`. `openReadonlyDb` catches → `{available:false}` → the two SQLite-backed sections
@@ -32,6 +33,7 @@ the main process); confirm asarUnpack covers hoisted deps; add a **packaged-spaw
 real `wayland.db` and asserts `available:true`.
 
 ### B2 · HIGH · `concierge` i18n namespace registered in 0/12 locales → panel renders raw keys in every language
+
 All 12 `locales/*/index.ts` omit `import concierge` + the export entry (verified 12/12 missing; 12/12
 `concierge.json` present). i18next bundles only from those static exports, so `WaylandCapabilitiesPanel`'s
 13 `t('concierge.*')` call sites render literal keys. Typecheck/i18n-key checks pass (keys are in the `.d.ts`).
@@ -39,6 +41,7 @@ All 12 `locales/*/index.ts` omit `import concierge` + the export entry (verified
 `projects`); run `node scripts/check-i18n.js`. Add a cold-start render test asserting the namespace resolves.
 
 ### B3 · HIGH · Capabilities manifest skill count inflated + internally inconsistent (trust anchor lies)
+
 `readSkillTotal()`/`buildSkillsLine` call `stats()` with NO type filter → "Skills: N available" includes
 ~107 workflows + ~25 agent-profiles, disagreeing with its own `{type:'skill'}` category breakdown by ~130,
 and double-counting workflows against the separate Workflows line. The unfiltered total also seeds the cache key.
@@ -77,17 +80,19 @@ headline equals the summed skill-only categories and excludes workflows.
 ## OPEN QUESTIONS FOR SEAN (genuine product calls)
 
 1. **concierge-diag scope** — global (current, mirrors search-skills; any-agent exfiltration surface + BM25 budget)
-   vs gated to the Concierge persona. *Council rec: gate to Concierge before 2c.*
+   vs gated to the Concierge persona. _Council rec: gate to Concierge before 2c._
 2. **Release sequencing** — confirm ship 1+2a+2b as one PR; never cut a knows+diagnoses-only build with
-   action-shaped "set it up for you" copy (would break "never lies about itself"). *Council rec: enforce combined unit.*
+   action-shaped "set it up for you" copy (would break "never lies about itself"). _Council rec: enforce combined unit._
 3. **Reversibility** — `concierge.defaultPersona` has no settings toggle and the panel has no dismiss. Add a real
-   user-facing toggle + panel auto-retire, or stop calling it a user setting? *Council rec: add the toggle.*
+   user-facing toggle + panel auto-retire, or stop calling it a user setting? _Council rec: add the toggle._
 
 ## NICE-TO-HAVE (post-ship)
+
 agentKey dead-plumbing removal · orphaned `isBuiltinConciergeDiag*` exports · workflow signal in manifest cache key
-+ wire `invalidateCapabilitiesManifestCache()` · home-dir/username scrub in diag `source` fields · state-agnostic
-phrasing in `concierge.md` · listing regex include workflows/assistants/teams · derive asarUnpack/REQUIRED_MCP from
-`MCP_STDIO_SCRIPT_NAMES` to kill 4-list drift · guard the diag seed block from dropping same-run mcp.config updates.
+
+- wire `invalidateCapabilitiesManifestCache()` · home-dir/username scrub in diag `source` fields · state-agnostic
+  phrasing in `concierge.md` · listing regex include workflows/assistants/teams · derive asarUnpack/REQUIRED_MCP from
+  `MCP_STDIO_SCRIPT_NAMES` to kill 4-list drift · guard the diag seed block from dropping same-run mcp.config updates.
 
 ---
 
@@ -97,6 +102,7 @@ All blockers + highs + applicable mediums fixed. Re-audited against live code (r
 9 agents): **GO — 0 blocking issues.** All 3 prior blockers verified genuinely closed; all 9 fixes
 hold. Only **3 low survivors** (verified), all diag-redaction refinements, folded into the diag
 persona-gating fast-follow (#9) — diag is not persona-exposed until then, so they are not urgent:
+
 - **SEC-1 (low):** `scrubHome()` covers `source` labels but not data-bearing fields (log lines, cron
   `last_error`, provider `error`) — OS username can leak there. Fix: apply `scrubHome` in `sanitize()`'s
   string branch.
@@ -111,12 +117,13 @@ aliased to Cowork). **NR-2** (a few bare-generic Wayland intents now under-fire 
 assistants) left as-is — acceptable: Concierge always carries the manifest and the kill-switch backstops.
 
 ### Final gate (remediated unit)
-| Gate | Result |
-|---|---|
-| Typecheck | **exit 0** |
-| Full suite | **11,544 passed / 0 failed** (24 skipped) |
-| Lint (changed) | **0 errors** |
-| i18n | **passed** |
-| AI signatures | **none** |
+
+| Gate           | Result                                    |
+| -------------- | ----------------------------------------- |
+| Typecheck      | **exit 0**                                |
+| Full suite     | **11,544 passed / 0 failed** (24 skipped) |
+| Lint (changed) | **0 errors**                              |
+| i18n           | **passed**                                |
+| AI signatures  | **none**                                  |
 
 **Phase 1 + 2a is sound and ready to build Phase 2b on.**

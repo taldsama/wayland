@@ -44,8 +44,7 @@ export function isCapabilityIntent(userText: string): boolean {
   // because the Concierge persona always carries the manifest regardless, and
   // this gate only governs NON-Concierge assistants. (regex bounded, no
   // catastrophic backtracking.)
-  const WL_NOUN =
-    '(provider|assistant|workflow|mcp|flux|wayland|integration|api key|cron|scheduled task)';
+  const WL_NOUN = '(provider|assistant|workflow|mcp|flux|wayland|integration|api key|cron|scheduled task)';
   const WL_VERB = '(connect|set\\s?up|configure|launch|schedule|install|enable|turn on|switch|import)';
   return (
     // "what/which can you/it/wayland ... do?"
@@ -63,7 +62,9 @@ export function isCapabilityIntent(userText: string): boolean {
     // "what's possible / able to do"
     /\bwhat('?s| is| are)\b.{0,20}\b(possible|able to do)\b/.test(t) ||
     // "how do/can/would/to I ... <wayland noun>"  (noun-anchored; allow plural)
-    new RegExp(`\\b(how\\s+(do|can|would|to)\\s+i?|can\\s+(you|wayland|it|this))\\b.{0,40}\\b${WL_NOUN}s?\\b`).test(t) ||
+    new RegExp(`\\b(how\\s+(do|can|would|to)\\s+i?|can\\s+(you|wayland|it|this))\\b.{0,40}\\b${WL_NOUN}s?\\b`).test(
+      t
+    ) ||
     // "<wayland verb> ... <wayland noun>"  (verb+noun; allow plural)
     new RegExp(`\\b${WL_VERB}\\b.{0,30}\\b${WL_NOUN}s?\\b`).test(t)
   );

@@ -92,9 +92,7 @@ export function isBuiltinSearchSkillsTransport(transport?: {
     return false;
   }
 
-  return (transport.args || []).some(
-    (arg) => typeof arg === 'string' && arg.includes('builtin-mcp-search-skills.js')
-  );
+  return (transport.args || []).some((arg) => typeof arg === 'string' && arg.includes('builtin-mcp-search-skills.js'));
 }
 
 export const BUILTIN_CONCIERGE_DIAG_ID = 'concierge-diag';
@@ -115,7 +113,5 @@ export function isBuiltinConciergeDiagTransport(transport?: {
     return false;
   }
 
-  return (transport.args || []).some(
-    (arg) => typeof arg === 'string' && arg.includes('builtin-mcp-concierge-diag.js')
-  );
+  return (transport.args || []).some((arg) => typeof arg === 'string' && arg.includes('builtin-mcp-concierge-diag.js'));
 }

@@ -231,24 +231,14 @@ const LaunchpadBar: React.FC<LaunchpadBarProps> = ({ onAnchorClick, onViewAll, m
 
       <div className={styles.actions}>
         {entries.length > 0 ? (
-          <button
-            type='button'
-            className={styles.reset}
-            onClick={resetToDefaults}
-            data-testid='launchpad-reset'
-          >
+          <button type='button' className={styles.reset} onClick={resetToDefaults} data-testid='launchpad-reset'>
             {t('guid.launchpad.reset', { defaultValue: 'Reset to defaults' })}
           </button>
         ) : (
           <span />
         )}
         {mode === 'compact' && onViewAll ? (
-          <button
-            type='button'
-            className={styles.viewAll}
-            onClick={onViewAll}
-            data-testid='launchpad-view-all'
-          >
+          <button type='button' className={styles.viewAll} onClick={onViewAll} data-testid='launchpad-view-all'>
             {t('guid.launchpad.viewAll', {
               defaultValue: 'View all {{count}} →',
               count: assistantCount,

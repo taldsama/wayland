@@ -109,7 +109,11 @@ const migrateLegacyData = async () => {
           try {
             await fs.rm(oldDir, { recursive: true });
           } catch (cleanupError) {
-            console.warn('[Wayland] Failed to clean up original directory, please delete manually:', oldDir, cleanupError);
+            console.warn(
+              '[Wayland] Failed to clean up original directory, please delete manually:',
+              oldDir,
+              cleanupError
+            );
           }
         }
       }
@@ -919,8 +923,7 @@ const ensureBuiltinMcpServers = async (): Promise<void> => {
       const existingTransport = existing.transport;
       if (existingTransport.type === 'stdio' && existingTransport.command === 'node') {
         const needsPathUpdate = (existingTransport.args || [])[0] !== conciergeDiagScriptPath;
-        const needsEnvUpdate =
-          JSON.stringify(existingTransport.env ?? {}) !== JSON.stringify(conciergeDiagEnv);
+        const needsEnvUpdate = JSON.stringify(existingTransport.env ?? {}) !== JSON.stringify(conciergeDiagEnv);
 
         if (needsPathUpdate || needsEnvUpdate) {
           const updatedTransport: IMcpServer['transport'] = {
