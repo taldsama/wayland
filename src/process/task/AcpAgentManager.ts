@@ -69,6 +69,7 @@ import {
   consumePendingSessionSkills,
   resolveCapabilitiesManifest,
   CAPABILITIES_MANIFEST_HEADER,
+  BUILTIN_CONCIERGE_ASSISTANT_ID,
 } from '@process/task/agentUtils';
 import { composePrompt } from '@process/services/constitution/composePrompt';
 import { shouldInjectTeamGuideMcp } from '@process/team/prompts/teamGuideCapability.ts';
@@ -1356,6 +1357,13 @@ ${collectedResponses.join('\n')}`;
           pendingConfigOptions: data.pendingConfigOptions,
           // Per-conversation MCP scoping (#348): forward to loadBuiltinSessionMcpServers.
           activeMcpServers: data.activeMcpServers,
+          // The read-only concierge diagnostics MCP server is Concierge-only.
+          // Forward whether THIS assistant is Concierge so loadBuiltinSessionMcpServers
+          // can gate the diag server (it's a builtin and would otherwise inject for
+          // every assistant). Mirrors the Gemini path in GeminiAgentManager.
+          allowConciergeDiag:
+            data.presetAssistantId === BUILTIN_CONCIERGE_ASSISTANT_ID ||
+            data.customAgentId === BUILTIN_CONCIERGE_ASSISTANT_ID,
           // Forward team MCP stdio config so AcpAgent.loadBuiltinSessionMcpServers() can inject it
           teamMcpStdioConfig: (data as unknown as Record<string, unknown>).teamMcpStdioConfig as
             | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }> }
