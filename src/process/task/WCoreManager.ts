@@ -21,6 +21,7 @@ import {
   buildTurnSkillContext,
   consumePendingSessionSkills,
   mergeLoadedSkillsExtra,
+  resolveCapabilitiesManifest,
 } from './agentUtils';
 import { getDatabase } from '@process/services/database';
 import { ProviderRepository } from '@process/providers/storage/ProviderRepository';
@@ -288,6 +289,10 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
           enableTeamGuide: mergedData.enableTeamGuide,
           backend: 'wcore',
           presetAssistantId: mergedData.presetAssistantId,
+          capabilitiesManifest: await resolveCapabilitiesManifest({
+            presetAssistantId: mergedData.presetAssistantId,
+            agentKey: 'wcore',
+          }),
         });
     const effectivePresetRules = rawEngineMode ? undefined : (systemInstructions ?? mergedData.presetRules);
 
@@ -462,7 +467,10 @@ export class WCoreManager extends BaseAgentManager<WCoreManagerData, string> {
       if (pending) {
         contentToSend = `${pending}\n\n${contentToSend}`;
       }
-      const turnSkill = await buildTurnSkillContext(data.content);
+      const turnSkill = await buildTurnSkillContext(data.content, {
+        assistantId: this.data.data.presetAssistantId,
+        agentKey: 'wcore',
+      });
       if (turnSkill.advert) {
         contentToSend = `${turnSkill.advert}\n\n${contentToSend}`;
       }

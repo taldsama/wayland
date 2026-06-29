@@ -5,6 +5,7 @@
  */
 
 import type { CodexPermissionRequest } from '@/common/types/codex/types';
+import type { IConciergeConfigContent } from '@/common/chat/conciergeConfig';
 import type {
   ExecCommandBeginData,
   ExecCommandEndData,
@@ -90,6 +91,7 @@ type TMessageType =
   | 'skill_suggest'
   | 'cron_trigger'
   | 'cron_propose'
+  | 'concierge_propose'
   | 'sub_agent'
   | 'activity';
 
@@ -406,6 +408,17 @@ export type IMessageCronPropose = IMessage<
 >;
 
 /**
+ * Concierge Phase 2b - inline confirmation card for a conversational config
+ * change (connect a provider, set a default model, add an MCP server, edit an
+ * assistant's rules). The agent emits a [CONCIERGE_PROPOSE] block; the user
+ * picks Accept/Edit/Cancel; the action routes through
+ * ipcBridge.conciergeConfig.confirmProposal which applies the change in MAIN
+ * (where secrets live) only on Accept. Content carries NO secret - the API key
+ * for provider_connect is entered in the card and sent over the confirm IPC.
+ */
+export type IMessageConciergeConfig = IMessage<'concierge_propose', IConciergeConfigContent>;
+
+/**
  * v0.9.4 - inline activity card for a spawned sub-agent.
  * Keyed by parentCallId (e.g. "spawn:{idx}:{name}"). Multiple sub-agents
  * produce distinct cards, one per unique parentCallId. Status tracks the
@@ -518,6 +531,7 @@ export type TMessage =
   | IMessageSkillSuggest
   | IMessageCronTrigger
   | IMessageCronPropose
+  | IMessageConciergeConfig
   | IMessageSubAgent
   | IMessageActivity;
 
@@ -727,6 +741,22 @@ export const transformMessage = (message: IResponseMessage): TMessage => {
         conversation_id: message.conversation_id,
         position: 'left',
         content: proposeData,
+      };
+    }
+    case 'concierge_propose': {
+      // Concierge Phase 2b - inline config-change confirmation card. Data is
+      // broadcast from MessageMiddleware after the agent emits a
+      // [CONCIERGE_PROPOSE] block (and re-broadcast by conciergeConfigBridge on
+      // accept/cancel); renderer maps to IMessageConciergeConfig for
+      // ConciergeConfigCard to render Accept/Edit/Cancel UI.
+      const configData = message.data as IMessageConciergeConfig['content'];
+      return {
+        id: uuid(),
+        type: 'concierge_propose',
+        msg_id: message.msg_id,
+        conversation_id: message.conversation_id,
+        position: 'left',
+        content: configData,
       };
     }
     case 'sub_agent_event': {

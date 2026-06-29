@@ -220,6 +220,18 @@ export interface IConfigStorageRefer {
   'upload.saveToWorkspace'?: boolean;
   // Last selected agent type on the guid page
   'guid.lastSelectedAgent'?: string;
+  // Concierge default landing persona (reversible). Absent/true = a fresh
+  // install lands on the Concierge assistant; false = opt out (keep the
+  // first detected engine). Never overrides an explicit saved selection.
+  'concierge.defaultPersona'?: boolean;
+  // Runtime kill-switch for capabilities-manifest injection (Concierge + per-turn
+  // advert). Absent/true = enabled; false = disable all manifest injection from
+  // Settings without a release. Covers the cross-cutting injection that
+  // `concierge.defaultPersona` does not.
+  'concierge.capabilityInjection'?: boolean;
+  // Whether the user dismissed the cold-start "What can Wayland do?" panel.
+  // Absent/false = show; true = hidden (persisted per the dismiss control).
+  'concierge.panelDismissed'?: boolean;
   // Migration flag: fix assistant enabled default value issue from older versions
   'migration.assistantEnabledFixed'?: boolean;
   // Migration flag: add default enabled skills for the cowork assistant

@@ -18,6 +18,7 @@ import {
   buildTurnSkillContext,
   mergeLoadedSkillsExtra,
   consumePendingSessionSkills,
+  resolveCapabilitiesManifest,
 } from './agentUtils';
 import { detectSkillLoadRequest, AcpSkillManager, buildSkillContentText } from './AcpSkillManager';
 import { uuid } from '@/common/utils';
@@ -282,6 +283,10 @@ export class GeminiAgentManager extends BaseAgentManager<
           enableTeamGuide: !this.teamMcpStdioConfig,
           backend: 'gemini',
           presetAssistantId: this.presetAssistantId,
+          capabilitiesManifest: await resolveCapabilitiesManifest({
+            presetAssistantId: this.presetAssistantId,
+            agentKey: 'gemini',
+          }),
         });
         const effectivePresetRules = systemInstructions ?? this.presetRules;
 
@@ -530,7 +535,11 @@ export class GeminiAgentManager extends BaseAgentManager<
       try {
         // Skills the user added to this chat from the composer - inject once.
         const pending = await consumePendingSessionSkills(this.conversation_id);
-        const turnSkill = await buildTurnSkillContext(data.input, { alwaysOnNames: this.enabledSkills });
+        const turnSkill = await buildTurnSkillContext(data.input, {
+          alwaysOnNames: this.enabledSkills,
+          assistantId: this.presetAssistantId,
+          agentKey: 'gemini',
+        });
         const prefix = [pending, turnSkill.advert].filter(Boolean).join('\n\n');
         if (prefix) {
           sendData = { ...data, input: `${prefix}\n\n${data.input}` };

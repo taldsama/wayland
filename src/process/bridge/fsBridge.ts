@@ -264,6 +264,16 @@ async function deleteAssistantResource(resourceType: ResourceType, filePattern: 
 const ruleFilePattern = (id: string, loc: string) => `${id}.${loc}.md`;
 const skillFilePattern = (id: string, loc: string) => `${id}-skills.${loc}.md`;
 
+/**
+ * Write an assistant's rules/persona markdown from MAIN (Concierge Phase 2b
+ * `edit_assistant` apply path). Thin wrapper over the module-private
+ * `writeAssistantResource` so callers outside this module don't reach into its
+ * internals. Returns true on success.
+ */
+export async function writeAssistantRules(assistantId: string, content: string, locale = 'en-US'): Promise<boolean> {
+  return writeAssistantResource('rules', assistantId, content, locale, ruleFilePattern);
+}
+
 const workspaceFileListCache = new Map<string, IWorkspaceFlatFile[]>();
 const workspaceFileListInFlight = new Map<string, Promise<IWorkspaceFlatFile[]>>();
 const workspaceFileListGeneration = new Map<string, number>();

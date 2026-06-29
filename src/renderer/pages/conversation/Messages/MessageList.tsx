@@ -37,6 +37,7 @@ import OrbitThinking from '@/renderer/components/chat/observability/OrbitThinkin
 import { activityToSteps, subAgentToStep, toolSummaryToSteps } from '@/common/chat/activity/projectMessages';
 import MessageCronTrigger from './components/MessageCronTrigger';
 import CronProposeCard from './components/CronProposeCard';
+import ConciergeConfigCard from './components/ConciergeConfigCard';
 import MessageSkillSuggest from './components/MessageSkillSuggest';
 import MessageText from './components/MessageText';
 import type { ActionsDisplay } from './components/MessageActions';
@@ -167,6 +168,8 @@ const MessageItem: React.FC<{
           return <MessageCronTrigger message={message} />;
         case 'cron_propose':
           return <CronProposeCard message={message} />;
+        case 'concierge_propose':
+          return <ConciergeConfigCard message={message} />;
         case 'sub_agent':
           // #252 rework: a spawned sub-agent renders as one collapsible timeline
           // step carrying its parsed inner subtree (tools / thinking / nested agents).

@@ -40,6 +40,8 @@ import { getDatabase } from '../services/database/export';
 import type { AcpBackendConfig } from '@/common/types/acpTypes';
 import { migrateFromElectronConfig, importConfigFromFile } from './configMigration';
 import {
+  BUILTIN_CONCIERGE_DIAG_ID,
+  BUILTIN_CONCIERGE_DIAG_NAME,
   BUILTIN_IMAGE_GEN_ID,
   BUILTIN_IMAGE_GEN_LEGACY_NAMES,
   BUILTIN_IMAGE_GEN_NAME,
@@ -577,6 +579,7 @@ const getBuiltinAssistants = (): AcpBackendConfig[] => {
     // Read default enabled skills from preset config (excluding cron, which is builtin and auto-injected)
     const defaultEnabledSkills = preset.defaultEnabledSkills;
     const enabledByDefault =
+      preset.id === 'concierge' ||
       preset.id === 'word-creator' ||
       preset.id === 'ppt-creator' ||
       preset.id === 'excel-creator' ||
@@ -865,6 +868,92 @@ const ensureBuiltinMcpServers = async (): Promise<void> => {
         createdAt: now,
         updatedAt: now,
         originalJson: buildSearchSkillsOriginalJson(searchSkillsScriptPath),
+      };
+      mcpServers.push(newServer);
+      changed = true;
+    }
+
+    // ── Built-in concierge-diag MCP server (Phase 2a) ────────────────────────
+    // Read-only diagnostics tool (`wayland_concierge_diag`) that inspects
+    // on-disk state to answer "why isn't X working?". The standalone stdio
+    // subprocess has no Electron APIs, so the four on-disk sources it reads are
+    // injected as env vars — using the EXACT same path expressions the app uses
+    // to write them:
+    //   - WAYLAND_CONFIG_PATH → the config file `configFile` writes (mcp.config).
+    //   - WAYLAND_CRON_DB / WAYLAND_PROVIDER_DB → the main `wayland.db`
+    //     (resolveDbPath() = path.join(getDataPath(), 'wayland.db')); CronStore
+    //     and ProviderRepository both run against this single shared DB.
+    //   - WAYLAND_LOG_DIR → the electron-log directory (same one getSystemDir()
+    //     reports). Enabled by default — the tool is silent unless invoked and
+    //     never mutates anything.
+    const conciergeDiagScriptPath = getBuiltinMcpScriptPath('builtin-mcp-concierge-diag');
+    const conciergeDiagDbPath = path.join(getDataPath(), 'wayland.db');
+    const conciergeDiagEnv: Record<string, string> = {
+      WAYLAND_CONFIG_PATH: path.join(cacheDir, STORAGE_PATH.config),
+      WAYLAND_CRON_DB: conciergeDiagDbPath,
+      WAYLAND_PROVIDER_DB: conciergeDiagDbPath,
+      WAYLAND_LOG_DIR: getPlatformServices().paths.getLogsDir(),
+    };
+    const conciergeDiagExistingIdx = mcpServers.findIndex(
+      (s) => s.builtin === true && s.id === BUILTIN_CONCIERGE_DIAG_ID
+    );
+
+    const buildConciergeDiagOriginalJson = (scriptPathValue: string, envValue: Record<string, string>) =>
+      JSON.stringify(
+        {
+          [BUILTIN_CONCIERGE_DIAG_NAME]: {
+            command: 'node',
+            args: [scriptPathValue],
+            env: envValue,
+          },
+        },
+        null,
+        2
+      );
+
+    if (conciergeDiagExistingIdx >= 0) {
+      // Update command path / injected env in case app location or paths changed.
+      // Narrow the transport union once so `args`/`env` are accessible (SSE/HTTP
+      // variants carry neither).
+      const existing = mcpServers[conciergeDiagExistingIdx];
+      const existingTransport = existing.transport;
+      if (existingTransport.type === 'stdio' && existingTransport.command === 'node') {
+        const needsPathUpdate = (existingTransport.args || [])[0] !== conciergeDiagScriptPath;
+        const needsEnvUpdate =
+          JSON.stringify(existingTransport.env ?? {}) !== JSON.stringify(conciergeDiagEnv);
+
+        if (needsPathUpdate || needsEnvUpdate) {
+          const updatedTransport: IMcpServer['transport'] = {
+            ...existingTransport,
+            args: [conciergeDiagScriptPath],
+            env: conciergeDiagEnv,
+          };
+          mcpServers[conciergeDiagExistingIdx] = {
+            ...existing,
+            transport: updatedTransport,
+            originalJson: buildConciergeDiagOriginalJson(conciergeDiagScriptPath, conciergeDiagEnv),
+            updatedAt: now,
+          };
+          changed = true;
+        }
+      }
+    } else {
+      const newServer: IMcpServer = {
+        id: BUILTIN_CONCIERGE_DIAG_ID,
+        name: BUILTIN_CONCIERGE_DIAG_NAME,
+        description:
+          'Built-in read-only diagnostics tool that inspects on-disk state (scheduled tasks, MCP servers, providers, recent errors) to explain why something is not working. Never mutates anything; secrets are masked.',
+        enabled: true,
+        builtin: true,
+        transport: {
+          type: 'stdio',
+          command: 'node',
+          args: [conciergeDiagScriptPath],
+          env: conciergeDiagEnv,
+        },
+        createdAt: now,
+        updatedAt: now,
+        originalJson: buildConciergeDiagOriginalJson(conciergeDiagScriptPath, conciergeDiagEnv),
       };
       mcpServers.push(newServer);
       changed = true;

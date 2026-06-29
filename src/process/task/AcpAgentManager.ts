@@ -66,6 +66,8 @@ import {
   buildTurnSkillContext,
   mergeLoadedSkillsExtra,
   consumePendingSessionSkills,
+  resolveCapabilitiesManifest,
+  CAPABILITIES_MANIFEST_HEADER,
 } from '@process/task/agentUtils';
 import { composePrompt } from '@process/services/constitution/composePrompt';
 import { shouldInjectTeamGuideMcp } from '@process/team/prompts/teamGuideCapability.ts';
@@ -1490,6 +1492,16 @@ ${collectedResponses.join('\n')}`;
               );
               parts.push(getTeamGuidePrompt({ backend: this.options.backend, leaderLabel }));
             }
+            // Concierge self-knowledge on native ACP backends (Claude Code /
+            // Codex): inject the live capabilities manifest into the rules block
+            // so Concierge keeps accurate self-knowledge here too. Concierge-only
+            // (no userText, matching the WCore/Gemini first-message contract);
+            // non-Concierge capability turns are served by the per-turn advert.
+            const nativeManifest = await resolveCapabilitiesManifest({
+              presetAssistantId: this.options.presetAssistantId || this.options.customAgentId,
+              agentKey: this.options.backend,
+            });
+            if (nativeManifest) parts.push(`${CAPABILITIES_MANIFEST_HEADER}\n${nativeManifest}`);
             // Prepend Wayland Constitution + optional specialist overlay above
             // the preset rules + team guide. composePrompt returns '' when no
             // Constitution file exists, preserving the prior "skip rules block
@@ -1510,6 +1522,13 @@ ${collectedResponses.join('\n')}`;
               enableTeamGuide: !isInTeam && (await shouldInjectTeamGuideMcp(this.options.backend)),
               backend: this.options.backend,
               presetAssistantId: this.options.presetAssistantId || this.options.customAgentId,
+              // Concierge-only here (no userText) to match WCore/Gemini and avoid
+              // double-injecting on a non-Concierge capability first message - the
+              // per-turn advert already covers non-Concierge capability intents.
+              capabilitiesManifest: await resolveCapabilitiesManifest({
+                presetAssistantId: this.options.presetAssistantId || this.options.customAgentId,
+                agentKey: this.options.backend,
+              }),
             });
             contentToSend = injectedContent;
           }
@@ -1532,6 +1551,8 @@ ${collectedResponses.join('\n')}`;
             }
             const turnSkill = await buildTurnSkillContext(rawUserText, {
               alwaysOnNames: this.options.enabledSkills,
+              assistantId: this.options.presetAssistantId || this.options.customAgentId,
+              agentKey: this.options.backend,
             });
             if (turnSkill.advert) {
               contentToSend = `${turnSkill.advert}\n\n${contentToSend}`;

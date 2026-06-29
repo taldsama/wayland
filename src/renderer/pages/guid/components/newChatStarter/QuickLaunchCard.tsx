@@ -6,6 +6,7 @@
 
 import React from 'react';
 import {
+  Sparkles,
   Zap,
   PenLine,
   Handshake,
@@ -29,6 +30,7 @@ import styles from './QuickLaunchCard.module.css';
  */
 
 const ICON_MAP: Record<string, LucideIcon> = {
+  'sparkles': Sparkles,
   'zap': Zap,
   'pen-line': PenLine,
   'handshake': Handshake,
@@ -38,6 +40,9 @@ const ICON_MAP: Record<string, LucideIcon> = {
 };
 
 const ANCHOR_PALETTE: Record<QuickLaunchAnchorId, PaletteKey> = {
+  // Concierge is the front door - give it a distinct tile so it doesn't read as
+  // a second Cowork card.
+  'concierge': 'research',
   'cowork': 'cowork',
   'write-copy': 'write',
   'close-deal': 'sales',

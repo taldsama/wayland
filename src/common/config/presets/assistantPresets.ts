@@ -37,6 +37,40 @@ export type AssistantPreset = {
 
 export const ASSISTANT_PRESETS: AssistantPreset[] = [
   {
+    id: 'concierge',
+    avatar: 'lucide:Sparkles',
+    // Runs on the native Wayland Core engine so self-knowledge works without an
+    // external CLI; the user can still switch its backend from the home picker.
+    presetAgentType: 'wcore',
+    category: 'general',
+    resourceDir: 'src/process/resources/assistant/concierge',
+    ruleFiles: {
+      'en-US': 'concierge.md',
+      'zh-CN': 'concierge.zh-CN.md',
+    },
+    // The bundled how-to skill (productivity/concierge) - rides BM25 retrieval.
+    defaultEnabledSkills: ['concierge'],
+    nameI18n: {
+      'en-US': 'Concierge',
+      'zh-CN': '礼宾助手',
+    },
+    descriptionI18n: {
+      'en-US':
+        "Your in-app guide. Ask what Wayland can do, how to do anything, or why something isn't working - I'll walk you through it or set it up for you.",
+      'zh-CN': '你的应用内向导。问我 Wayland 能做什么、如何操作，或为什么某项功能不工作——我会一步步带你完成，或直接帮你设置好。',
+    },
+    promptsI18n: {
+      'en-US': [
+        'What can Wayland do?',
+        'How do I connect Claude?',
+        'Set up a daily digest of my work every morning',
+        'Find me the right skill for a task',
+        "Why didn't my scheduled task run?",
+      ],
+      'zh-CN': ['Wayland 能做什么？', '如何连接 Claude？', '每天早上为我生成一份工作摘要', '帮我找到适合某个任务的技能', '我的定时任务为什么没有运行？'],
+    },
+  },
+  {
     id: 'word-creator',
     avatar: 'lucide:FileText',
     presetAgentType: 'gemini',

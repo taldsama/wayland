@@ -8,12 +8,18 @@ import { describe, expect, it } from 'vitest';
 import { QUICK_LAUNCH_ANCHORS, type QuickLaunchAnchorId } from '@/renderer/pages/guid/quickLaunchAnchors';
 
 describe('QUICK_LAUNCH_ANCHORS', () => {
-  it('defines exactly 6 anchors', () => {
-    expect(QUICK_LAUNCH_ANCHORS).toHaveLength(6);
+  it('defines exactly 7 anchors', () => {
+    expect(QUICK_LAUNCH_ANCHORS).toHaveLength(7);
   });
 
-  it('declares Cowork first (place anchor for IJFW universal button)', () => {
-    expect(QUICK_LAUNCH_ANCHORS[0].id).toBe('cowork');
+  it('pins Concierge first (universal ask-anything entry point)', () => {
+    expect(QUICK_LAUNCH_ANCHORS[0].id).toBe('concierge');
+    expect(QUICK_LAUNCH_ANCHORS[0].assistantId).toBe('builtin-concierge');
+    expect(QUICK_LAUNCH_ANCHORS[0].lucideIcon).toBe('sparkles');
+  });
+
+  it('keeps Cowork as the second anchor (autonomous-execution button)', () => {
+    expect(QUICK_LAUNCH_ANCHORS[1].id).toBe('cowork');
   });
 
   it('every anchor has all required fields populated', () => {
@@ -23,10 +29,16 @@ describe('QUICK_LAUNCH_ANCHORS', () => {
       expect(anchor.label.length).toBeLessThanOrEqual(20);
       expect(anchor.sub).toBeTruthy();
       expect(anchor.sub.length).toBeLessThanOrEqual(28);
-      expect(anchor.prefill).toBeTruthy();
-      expect(anchor.prefill.length).toBeGreaterThan(2);
       expect(anchor.assistantId).toBeTruthy();
       expect(anchor.lucideIcon).toBeTruthy();
+      // Concierge intentionally carries an empty prefill (free-form "ask
+      // anything"); every other anchor seeds a deliberate prompt stub.
+      if (anchor.id === 'concierge') {
+        expect(anchor.prefill).toBe('');
+      } else {
+        expect(anchor.prefill).toBeTruthy();
+        expect(anchor.prefill.length).toBeGreaterThan(2);
+      }
     }
   });
 
@@ -36,7 +48,15 @@ describe('QUICK_LAUNCH_ANCHORS', () => {
   });
 
   it('exports a discriminated union of anchor ids', () => {
-    const validIds: QuickLaunchAnchorId[] = ['cowork', 'write-copy', 'close-deal', 'launch-it', 'numbers', 'quiet-money'];
-    expect(validIds).toHaveLength(6);
+    const validIds: QuickLaunchAnchorId[] = [
+      'concierge',
+      'cowork',
+      'write-copy',
+      'close-deal',
+      'launch-it',
+      'numbers',
+      'quiet-money',
+    ];
+    expect(validIds).toHaveLength(7);
   });
 });

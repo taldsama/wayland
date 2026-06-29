@@ -60,7 +60,7 @@ describe('getMcpScriptPath', () => {
 });
 
 describe('MCP_STDIO_SCRIPT_NAMES', () => {
-  it('lists exactly the four scripts emitted by build-mcp-servers.js', () => {
+  it('lists exactly the five scripts emitted by build-mcp-servers.js', () => {
     // If `scripts/build-mcp-servers.js` emits a new script, the canary
     // list MUST be updated in lockstep - otherwise startup assertions
     // won't catch a missing-script failure for the new file.

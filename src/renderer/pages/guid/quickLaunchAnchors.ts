@@ -11,11 +11,13 @@
  * the action row; (2) prefills the input with `prefill`; (3) fires
  * 'launchpad.card_clicked' telemetry for Phase 2 PredictiveEngine.
  *
- * Cowork is anchor #1 (place-anchor / Sutherland) - the universal
- * autonomous-execution button. Other 5 are recurring entrepreneur jobs.
+ * Concierge is anchor #1 - the universal "ask anything" entry point that
+ * answers what Wayland can do and helps set things up. Cowork follows as the
+ * autonomous-execution button; the other 5 are recurring entrepreneur jobs.
  */
 
 export type QuickLaunchAnchorId =
+  | 'concierge'
   | 'cowork'
   | 'write-copy'
   | 'close-deal'
@@ -33,6 +35,7 @@ export type QuickLaunchAnchor = {
 };
 
 export const QUICK_LAUNCH_ANCHORS: readonly QuickLaunchAnchor[] = [
+  { id: 'concierge',   label: 'Concierge',    sub: 'Ask anything',       prefill: '',                          assistantId: 'builtin-concierge',      lucideIcon: 'sparkles' },
   { id: 'cowork',      label: 'Cowork',       sub: 'Autonomous',         prefill: 'Cowork: ',                  assistantId: 'builtin-cowork',         lucideIcon: 'zap' },
   { id: 'write-copy',  label: 'Write copy',   sub: 'Email, ad, page',    prefill: 'Draft me ',                 assistantId: 'builtin-copy',           lucideIcon: 'pen-line' },
   { id: 'close-deal',  label: 'Close a deal', sub: 'Outreach · follow',  prefill: 'Help me close ',            assistantId: 'builtin-sales',          lucideIcon: 'handshake' },

@@ -6,6 +6,7 @@
 
 import {
   Zap,
+  Sparkles,
   PenLine,
   Handshake,
   Rocket,
@@ -65,6 +66,7 @@ export type LaunchpadBarEntry = {
 
 const LUCIDE_ICON_MAP: Record<string, LucideIcon> = {
   'zap': Zap,
+  'sparkles': Sparkles,
   'pen-line': PenLine,
   'handshake': Handshake,
   'rocket': Rocket,

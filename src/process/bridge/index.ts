@@ -16,6 +16,7 @@ import { initBedrockBridge } from './bedrockBridge';
 import { initChannelBridge } from './channelBridge';
 import { initConversationBridge } from './conversationBridge';
 import { initCronBridge } from './cronBridge';
+import { initConciergeConfigBridge } from './conciergeConfigBridge';
 import { initProjectBridge } from './projectBridge';
 import { initDatabaseBridge } from './databaseBridge';
 import { initDialogBridge } from './dialogBridge';
@@ -108,6 +109,7 @@ export function initAllBridges(deps: BridgeDependencies): void {
   initDatabaseBridge(deps.conversationRepo);
   initExtensionsBridge(deps.conversationRepo, deps.workerTaskManager);
   initCronBridge();
+  initConciergeConfigBridge();
   initProjectBridge();
   initKickoffBridge();
   initSystemSettingsBridge();
@@ -175,6 +177,7 @@ export {
   initChannelBridge,
   initConversationBridge,
   initCronBridge,
+  initConciergeConfigBridge,
   initProjectBridge,
   initDatabaseBridge,
   initDialogBridge,

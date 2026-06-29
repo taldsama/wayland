@@ -59,22 +59,22 @@ describe('LaunchpadBar', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the 6 default anchors plus the + chip', async () => {
+  it('renders the 7 default anchors plus the + chip', async () => {
     getMock.mockResolvedValueOnce(undefined);
     render(<LaunchpadBar onAnchorClick={vi.fn()} onViewAll={vi.fn()} />);
     await flushLoad();
 
     const cards = document.querySelectorAll('[data-launchpad-entry]');
-    expect(cards).toHaveLength(6);
+    expect(cards).toHaveLength(7);
     expect(screen.getByTestId('launchpad-add-chip')).toBeInTheDocument();
   });
 
-  it('places Cowork first by default', async () => {
+  it('places Concierge first by default', async () => {
     getMock.mockResolvedValueOnce(undefined);
     render(<LaunchpadBar onAnchorClick={vi.fn()} onViewAll={vi.fn()} />);
     await flushLoad();
     const first = document.querySelector('[data-launchpad-entry]');
-    expect(first?.getAttribute('data-launchpad-entry')).toBe('builtin-cowork');
+    expect(first?.getAttribute('data-launchpad-entry')).toBe('builtin-concierge');
   });
 
   it('clicking a card body fires onAnchorClick with the anchor shape', async () => {
@@ -100,12 +100,12 @@ describe('LaunchpadBar', () => {
     render(<LaunchpadBar onAnchorClick={vi.fn()} onViewAll={vi.fn()} />);
     await flushLoad();
 
-    expect(document.querySelectorAll('[data-launchpad-entry]')).toHaveLength(6);
+    expect(document.querySelectorAll('[data-launchpad-entry]')).toHaveLength(7);
 
     const removeBtn = screen.getByTestId('launchpad-remove-builtin-quiet-money');
     fireEvent.click(removeBtn);
 
-    expect(document.querySelectorAll('[data-launchpad-entry]')).toHaveLength(5);
+    expect(document.querySelectorAll('[data-launchpad-entry]')).toHaveLength(6);
     expect(setMock).toHaveBeenCalledWith(
       'launchpad.barOrder',
       expect.not.arrayContaining(['builtin-quiet-money'])
@@ -150,10 +150,11 @@ describe('LaunchpadBar', () => {
       fireEvent.click(screen.getByTestId('launchpad-reset'));
     });
 
-    expect(document.querySelectorAll('[data-launchpad-entry]')).toHaveLength(6);
+    expect(document.querySelectorAll('[data-launchpad-entry]')).toHaveLength(7);
     expect(setMock).toHaveBeenCalledWith(
       'launchpad.barOrder',
       expect.arrayContaining([
+        'builtin-concierge',
         'builtin-cowork',
         'builtin-copy',
         'builtin-sales',

@@ -1248,6 +1248,21 @@ export const cron = {
   ),
 };
 
+/**
+ * Concierge Phase 2b - confirm or dismiss an inline ConciergeConfigCard (rendered
+ * when the agent emits [CONCIERGE_PROPOSE] in a chat). The mutation is applied in
+ * MAIN only on `accept`; the optional `secret` carries a card-entered API key for
+ * provider_connect and never crosses into the stored message. Status transitions
+ * are guarded server-side (auth + pending-only + atomic processing) to prevent
+ * double-fire and cross-conversation hijack - see conciergeConfigBridge.ts.
+ */
+export const conciergeConfig = {
+  confirmProposal: buildProvider<
+    import('@/common/chat/conciergeConfig').ConciergeConfirmResult,
+    import('@/common/chat/conciergeConfig').ConciergeConfirmParams
+  >('conciergeConfig.confirm-proposal'),
+};
+
 /** Mission Control - unified task ledger (team tasks + cron jobs). */
 export const missionControl = {
   snapshot: buildProvider<import('@/common/types/missionControl').MissionControlSnapshot, { userId: string }>(

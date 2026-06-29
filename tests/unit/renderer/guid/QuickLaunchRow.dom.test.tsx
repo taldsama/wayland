@@ -12,14 +12,14 @@ import QuickLaunchRow from '@/renderer/pages/guid/components/newChatStarter/Quic
 describe('QuickLaunchRow', () => {
   const baseProps = { onAnchorClick: vi.fn(), onViewAll: vi.fn() };
 
-  it('renders all 6 anchor cards', () => {
+  it('renders all 7 anchor cards', () => {
     const { container } = render(<QuickLaunchRow {...baseProps} />);
-    expect(container.querySelectorAll('[data-quicklaunch-id]')).toHaveLength(6);
+    expect(container.querySelectorAll('[data-quicklaunch-id]')).toHaveLength(7);
   });
 
-  it('renders Cowork first', () => {
+  it('renders Concierge first', () => {
     const { container } = render(<QuickLaunchRow {...baseProps} />);
-    expect(container.querySelector('[data-quicklaunch-id]')?.getAttribute('data-quicklaunch-id')).toBe('cowork');
+    expect(container.querySelector('[data-quicklaunch-id]')?.getAttribute('data-quicklaunch-id')).toBe('concierge');
   });
 
   it('routes card clicks to onAnchorClick with the anchor object', () => {

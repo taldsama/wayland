@@ -10,6 +10,8 @@ import type { AgentBackend } from '@/common/types/acpTypes';
 import { uuid } from '@/common/utils';
 import { cronService } from '@process/services/cron/cronServiceSingleton';
 import { detectCronCommands, stripCronCommands, type CronCommand } from './CronCommandDetector';
+import { detectConciergeProposals, stripConciergeProposals } from './ConciergeProposeDetector';
+import type { ConciergeProposal } from '@/common/chat/conciergeConfig';
 import { addMessage } from '@process/utils/message';
 import { hasThinkTags, stripThinkTags } from './ThinkTagDetector';
 
@@ -76,6 +78,17 @@ export async function processAgentResponse(
 
     // Strip cron commands from display
     displayContent = stripCronCommands(displayContent);
+    needsDisplayMessage = true;
+  }
+
+  // Concierge Phase 2b - detect [CONCIERGE_PROPOSE] config-change blocks and
+  // render an inline confirmation card (concierge_propose message). No config
+  // is mutated here; the change applies only when the user accepts the card
+  // (conciergeConfigBridge.confirmProposal).
+  const conciergeProposals = detectConciergeProposals(displayContent);
+  if (conciergeProposals.length > 0) {
+    await handleConciergeProposals(conversationId, agentType, conciergeProposals);
+    displayContent = stripConciergeProposals(displayContent);
     needsDisplayMessage = true;
   }
 
@@ -184,6 +197,46 @@ export async function processCronInMessage(
     }
   } catch {
     // Silently handle errors
+  }
+}
+
+/**
+ * Concierge Phase 2b - turn detected [CONCIERGE_PROPOSE] blocks into inline
+ * confirmation cards (concierge_propose messages). NO config is mutated here:
+ * the card is the consent surface, and the change applies only when the user
+ * accepts (conciergeConfigBridge.confirmProposal). The proposal carries no
+ * secret (provider keys are entered in the card), so it is safe to persist +
+ * broadcast.
+ */
+async function handleConciergeProposals(
+  conversationId: string,
+  agentType: AgentBackend,
+  proposals: ConciergeProposal[]
+): Promise<void> {
+  for (const proposal of proposals) {
+    try {
+      const proposalMsgId = uuid();
+      const proposalContent = { ...proposal, status: 'pending' as const, agentType };
+      const proposalMessage: TMessage = {
+        id: proposalMsgId,
+        msg_id: proposalMsgId,
+        conversation_id: conversationId,
+        type: 'concierge_propose',
+        position: 'left',
+        content: proposalContent,
+        createdAt: Date.now(),
+        status: 'finish',
+      };
+      await addMessage(conversationId, proposalMessage);
+      ipcBridge.conversation.responseStream.emit({
+        type: 'concierge_propose',
+        conversation_id: conversationId,
+        msg_id: proposalMsgId,
+        data: proposalContent,
+      });
+    } catch {
+      // Best-effort: a failed card creation must not break the agent turn.
+    }
   }
 }
 
