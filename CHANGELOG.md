@@ -4,6 +4,29 @@ All notable changes to the Wayland Electron app are documented in this file. For
 
 ## [Unreleased]
 
+## [0.11.7] - 2026-06-29
+
+### Highlights
+
+- **Meet Concierge — the first built-in helper inside Wayland.** Concierge knows your actual setup (the models you've connected, your skills, your scheduled tasks) and answers from it in plain English. Ask it what Wayland can do, how to do anything, or why something didn't run. Better yet, it sets things up *for* you: it proposes a change, you see a confirmation card, you click Apply — connect an AI provider, set your default model, add a connected tool, or edit an assistant. You stay in control; it does the legwork.
+- **Every assistant now opens with suggested starting cards** (Concierge and Cowork included), so you're never staring at a blank box. The home screen is cleaner.
+
+### Wayland Core engine
+
+- Bundled engine updated to **v0.12.16**: Flux Auto now gets a proper reasoning-tier output budget (long, reasoning-heavy replies stop getting cut off), plus sandboxed bash, WebFetch, and cleaner reasoning output.
+
+### Fixed
+
+- **Your chat draft survives a reload or restart** — close the app mid-thought and it's still there when you come back.
+- **macOS auto-update self-recovers from silent stuck updates** — if an update ever quietly failed to apply, Wayland now detects it and recovers instead of leaving you on an old version.
+- **Local tools (MCP servers) stay connected on macOS** instead of dropping out.
+- **Claude Code heals its own cache** after a partial download instead of refusing to start.
+- Telegram and Signal connectors fixed; OpenCode models now surface in the picker; macOS title-bar overlay close icons are clickable; the chat context menu no longer clips Delete.
+
+### Security
+
+- The Concierge diagnostics view now masks home paths and usernames from all output, and ignores model-proposed provider endpoints for known providers so a connected API key is never redirected.
+
 ## [0.11.6] - 2026-06-29
 
 ### Fixed
