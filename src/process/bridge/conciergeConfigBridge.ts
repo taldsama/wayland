@@ -38,6 +38,21 @@ import {
 } from '@/common/chat/conciergeConfig';
 
 /**
+ * Self-hosted / "bring your own endpoint" providers: these have NO fixed
+ * canonical endpoint, so a base URL is REQUIRED to reach them and a
+ * model-proposed value is the legitimate way to set it. Every other provider
+ * (`openai`, `anthropic`, ... and the models.dev catalog ids) resolves to a
+ * fixed endpoint, so a MODEL-controlled base URL there is a key-exfiltration
+ * vector: a prompt-injected propose of `provider: openai, base_url: https://evil.com`
+ * would send the user's real OpenAI key to the attacker. For fixed-endpoint
+ * providers we honor ONLY a base URL the USER explicitly typed into the card.
+ */
+const SELF_HOSTED_PROVIDER_IDS: ReadonlySet<ProviderId> = new Set<ProviderId>([
+  'openai-compatible',
+  'ollama-local',
+]);
+
+/**
  * Apply a confirmed proposal via the real MAIN-process write paths. Returns a
  * human-readable result summary, or throws on failure (the caller reverts the
  * card to an error state). `secret` is provided only for provider_connect.
@@ -52,9 +67,16 @@ async function applyProposal(
       // Defensive: the caller pre-checks this, so reaching here without a key is
       // a programming error rather than a user-facing path.
       if (!apiKey) throw new Error('missing api key');
-      const result = await connectModelRegistryProvider(content.providerId as ProviderId, {
+      // Trust the model-proposed base URL ONLY for self-hosted/custom providers
+      // (no fixed endpoint). For known fixed-endpoint providers, ignore
+      // content.baseUrl entirely and honor only a USER-typed override.
+      const providerId = content.providerId as ProviderId;
+      const baseUrl = SELF_HOSTED_PROVIDER_IDS.has(providerId)
+        ? secret?.baseUrl ?? content.baseUrl
+        : secret?.baseUrl;
+      const result = await connectModelRegistryProvider(providerId, {
         key: apiKey,
-        baseUrl: secret?.baseUrl ?? content.baseUrl,
+        baseUrl,
       });
       if (!result.ok) {
         throw new Error(

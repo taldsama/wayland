@@ -333,6 +333,34 @@ describe('createConciergeDiagServer — recentErrors (logs)', () => {
     expect(result.available).toBe(false);
     expect(result.lines).toEqual([]);
   });
+
+  // SECURITY: home-directory paths / OS usernames embedded in log CONTENT (not
+  // just `source` metadata) must be scrubbed before they reach the model. The
+  // username segment is the leak — `/Users/<name>`, `C:\Users\<name>`.
+  it('scrubs home/username paths embedded in tailed log lines', () => {
+    const logDir = tmp('logs-home');
+    fs.mkdirSync(logDir);
+    fs.writeFileSync(
+      path.join(logDir, 'main.log'),
+      [
+        'error: cannot read /Users/alice/Library/wayland/config.json',
+        'error: spawn failed for C:\\Users\\alice\\AppData\\Roaming\\wayland',
+      ].join('\n')
+    );
+
+    const server = createConciergeDiagServer({ logDir });
+    const result = server.recentErrors();
+    const serialized = JSON.stringify(result);
+
+    expect(result.available).toBe(true);
+    // The username must not survive in any form.
+    expect(serialized).not.toContain('/Users/alice');
+    expect(serialized).not.toContain('C:\\Users\\alice');
+    expect(serialized).not.toContain('alice');
+    // The path shape is preserved with the username masked.
+    expect(serialized).toContain('/Users/<user>');
+    expect(serialized).toContain('C:\\\\Users\\\\<user>');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -532,6 +560,37 @@ describeNativeSqlite('createConciergeDiagServer — providers (sqlite, state onl
     expect(serialized).not.toContain(FAKE_SECRET);
     expect(serialized).not.toContain('creds');
     expect(serialized).not.toContain('credsEncrypted');
+  });
+
+  // SECURITY: a home/username path stored in the `error` column must be scrubbed
+  // — these strings flow through sanitize() only, never an explicit scrubHome().
+  it('scrubs home/username paths in the provider error column', () => {
+    const providerDbPath = tmp('providers-home.db');
+    const db = new BetterSqlite3(providerDbPath);
+    db.exec(
+      `CREATE TABLE model_registry_providers (
+         provider_id TEXT PRIMARY KEY,
+         connected_via TEXT,
+         state TEXT NOT NULL,
+         error TEXT,
+         creds_encrypted TEXT,
+         created_at INTEGER,
+         updated_at INTEGER
+       )`
+    );
+    db.prepare(
+      `INSERT INTO model_registry_providers
+         (provider_id, connected_via, state, error, creds_encrypted, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run('local', 'self-hosted', 'error', 'ENOENT: missing /Users/alice/.wayland/model.gguf', null, 1, 2);
+    db.close();
+
+    const server = createConciergeDiagServer({ providerDbPath });
+    const serialized = JSON.stringify(server.providers());
+
+    expect(serialized).not.toContain('/Users/alice');
+    expect(serialized).not.toContain('alice');
+    expect(serialized).toContain('/Users/<user>');
   });
 });
 

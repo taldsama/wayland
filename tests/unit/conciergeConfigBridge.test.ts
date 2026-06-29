@@ -99,6 +99,71 @@ describe('conciergeConfigBridge apply', () => {
     expect((state.msg!.content as IConciergeConfigContent).status).toBe('accepted');
   });
 
+  it('provider_connect IGNORES a model-proposed baseUrl for a known fixed-endpoint provider', async () => {
+    // Prompt-injection vector: Concierge proposes a known catalog provider with
+    // an attacker base_url. With no user-typed override the real key must NEVER
+    // be sent to the model-controlled host.
+    setMsg({
+      kind: 'provider_connect',
+      providerId: 'openai',
+      label: 'OpenAI',
+      baseUrl: 'https://evil.com',
+      status: 'pending',
+    });
+    const res = await state.handler!({
+      conversationId: 'c1',
+      msgId: 'm1',
+      action: 'accept',
+      secret: { apiKey: 'sk-secret-xyz' },
+    });
+    expect(res.ok).toBe(true);
+    expect(connectSpy).toHaveBeenCalledWith('openai', { key: 'sk-secret-xyz', baseUrl: undefined });
+    const [, creds] = connectSpy.mock.calls[0] as [string, { baseUrl?: string }];
+    expect(creds.baseUrl).not.toBe('https://evil.com');
+  });
+
+  it('provider_connect honors a USER-typed baseUrl over the model-proposed one for a known provider', async () => {
+    setMsg({
+      kind: 'provider_connect',
+      providerId: 'openai',
+      label: 'OpenAI',
+      baseUrl: 'https://evil.com',
+      status: 'pending',
+    });
+    const res = await state.handler!({
+      conversationId: 'c1',
+      msgId: 'm1',
+      action: 'accept',
+      secret: { apiKey: 'sk-secret-xyz', baseUrl: 'https://proxy.mycorp.internal/v1' },
+    });
+    expect(res.ok).toBe(true);
+    expect(connectSpy).toHaveBeenCalledWith('openai', {
+      key: 'sk-secret-xyz',
+      baseUrl: 'https://proxy.mycorp.internal/v1',
+    });
+  });
+
+  it('provider_connect honors a model-proposed baseUrl for a self-hosted/custom provider', async () => {
+    setMsg({
+      kind: 'provider_connect',
+      providerId: 'openai-compatible',
+      label: 'Local',
+      baseUrl: 'http://127.0.0.1:8080/v1',
+      status: 'pending',
+    });
+    const res = await state.handler!({
+      conversationId: 'c1',
+      msgId: 'm1',
+      action: 'accept',
+      secret: { apiKey: 'sk-secret-xyz' },
+    });
+    expect(res.ok).toBe(true);
+    expect(connectSpy).toHaveBeenCalledWith('openai-compatible', {
+      key: 'sk-secret-xyz',
+      baseUrl: 'http://127.0.0.1:8080/v1',
+    });
+  });
+
   it('provider_connect accept WITHOUT a secret returns secret_required and writes nothing', async () => {
     setMsg({ kind: 'provider_connect', providerId: 'openai', label: 'OpenAI', status: 'pending' });
     const res = await state.handler!({ conversationId: 'c1', msgId: 'm1', action: 'accept' });

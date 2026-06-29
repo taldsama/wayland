@@ -20,7 +20,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { TMessage } from '@/common/chat/chatLib';
 
-const { addSpy, emitSpy } = vi.hoisted(() => ({ addSpy: vi.fn(), emitSpy: vi.fn() }));
+const { addSpy, emitSpy, getMsgSpy, updateMsgSpy } = vi.hoisted(() => ({
+  addSpy: vi.fn(),
+  emitSpy: vi.fn(),
+  getMsgSpy: vi.fn(),
+  updateMsgSpy: vi.fn(),
+}));
 
 vi.mock('@/common', () => ({
   ipcBridge: { conversation: { responseStream: { emit: emitSpy } } },
@@ -33,8 +38,11 @@ vi.mock('@/common/utils', () => {
 vi.mock('@process/services/cron/cronServiceSingleton', () => ({
   cronService: { listJobsByConversation: vi.fn(async () => []), addJob: vi.fn(), removeJob: vi.fn() },
 }));
+vi.mock('@process/services/database/export', () => ({
+  getDatabase: vi.fn(async () => ({ getMessageByMsgId: getMsgSpy, updateMessage: updateMsgSpy })),
+}));
 
-import { processAgentResponse } from '@process/task/MessageMiddleware';
+import { processAgentResponse, processCronInMessage } from '@process/task/MessageMiddleware';
 
 const PROPOSE_BLOCK =
   'Sure — here you go:\n[CONCIERGE_PROPOSE]\nkind: set_default_model\nengine: wcore\nmodel_id: m/x\nuse_model: x\nlabel: Model X\n[/CONCIERGE_PROPOSE]\nDone.';
@@ -82,6 +90,58 @@ describe('Concierge 2b middleware wiring (behavioral)', () => {
     expect(addSpy).not.toHaveBeenCalled(); // invalid → no card
     const displayText = (result.displayMessage?.content as { content?: string } | undefined)?.content ?? '';
     expect(displayText).not.toContain('[CONCIERGE_PROPOSE]');
+  });
+});
+
+describe('Concierge 2b persisted-text strip (no raw tag leaks into the saved bubble)', () => {
+  beforeEach(() => {
+    addSpy.mockClear();
+    emitSpy.mockClear();
+    getMsgSpy.mockReset();
+    updateMsgSpy.mockReset();
+  });
+
+  function rawRow(content: string) {
+    return {
+      success: true as const,
+      data: {
+        id: 'row-1',
+        msg_id: 'turn-1',
+        conversation_id: 'c1',
+        type: 'text' as const,
+        position: 'left' as const,
+        content: { content },
+        status: 'finish' as const,
+        createdAt: 0,
+      },
+    };
+  }
+
+  it('overwrites the persisted turn row with stripped content (prose kept, tag gone)', async () => {
+    // The streamed text row already holds the RAW block (what the manager persisted).
+    getMsgSpy.mockReturnValue(rawRow(PROPOSE_BLOCK));
+
+    await processCronInMessage('c1', 'wcore', finishMsg(PROPOSE_BLOCK), () => {});
+
+    // Found the persisted row by msg_id and replaced it in place (not appended).
+    expect(getMsgSpy).toHaveBeenCalledWith('c1', 'turn-1', 'text');
+    expect(updateMsgSpy).toHaveBeenCalledTimes(1);
+    const [rowId, updated] = updateMsgSpy.mock.calls[0];
+    expect(rowId).toBe('row-1');
+
+    const savedText = updated.content.content as string;
+    expect(savedText).not.toContain('[CONCIERGE_PROPOSE]');
+    expect(savedText).not.toContain('[/CONCIERGE_PROPOSE]');
+    expect(savedText).toContain('Sure');
+    expect(savedText).toContain('Done.');
+  });
+
+  it('does not touch the persisted row for a turn with no concierge block', async () => {
+    getMsgSpy.mockReturnValue(rawRow('just a normal answer'));
+
+    await processCronInMessage('c1', 'wcore', finishMsg('just a normal answer'), () => {});
+
+    expect(updateMsgSpy).not.toHaveBeenCalled();
   });
 });
 

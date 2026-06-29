@@ -23,6 +23,7 @@ import CollapsibleContent from '@renderer/components/chat/CollapsibleContent';
 import FilePreview from '@renderer/components/media/FilePreview';
 import HorizontalFileList from '@renderer/components/media/HorizontalFileList';
 import MarkdownView from '@renderer/components/Markdown';
+import { CONCIERGE_PROPOSE_OPEN } from '@/common/chat/conciergeConfig';
 import { stripThinkTags, hasThinkTags } from '@renderer/utils/chat/thinkTagFilter';
 import { stripSkillSuggest, hasSkillSuggest } from '@renderer/utils/chat/skillSuggestParser';
 import { WorkflowMessageBody } from './WorkflowMessageBody';
@@ -46,6 +47,16 @@ const stripWorkflowEnvelopes = (text: string): string => {
   out = out.replace(WORKFLOW_ANSWER_RE, (_match, answer: string) => answer);
   return out.trimStart();
 };
+
+// Concierge proposal blocks render as the confirmation card (handled by the
+// concierge_propose message type); the raw fenced block must never show in the
+// assistant bubble. The DB row is stripped at turn-end, but the live renderer
+// accumulates streamed deltas in memory and doesn't re-hydrate, so strip at
+// render too (mirrors stripThinkTags). Tag source of truth: CONCIERGE_PROPOSE_*
+// in @/common/chat/conciergeConfig.
+const CONCIERGE_PROPOSE_RE = /(?:```[a-zA-Z]*\s*)?\[CONCIERGE_PROPOSE\][\s\S]*?\[\/CONCIERGE_PROPOSE\](?:\s*```)?\s*/g;
+const stripConciergeProposals = (text: string): string =>
+  text.includes(CONCIERGE_PROPOSE_OPEN) ? text.replace(CONCIERGE_PROPOSE_RE, '').trimEnd() : text;
 
 // The hidden begin message WorkflowSurface fires to kick the agent.
 // After stripping the WORKFLOW_STEP_CONTEXT envelope, what remains is a
@@ -145,6 +156,8 @@ const MessageText: React.FC<{ message: IMessageText; toolbarMode?: ActionsDispla
       if (hasSkillSuggest(content)) {
         content = stripSkillSuggest(content);
       }
+      // Strip Concierge proposal blocks (rendered as the confirmation card)
+      content = stripConciergeProposals(content);
       return content;
     }
     return content;

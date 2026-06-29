@@ -21,9 +21,11 @@
  *   - log dir                                → recent redacted errors
  *
  * Secret hygiene is non-negotiable: every string in every output is passed
- * through `redact()` (key/token-shaped values are masked to last-4) and the
- * provider creds column is NEVER read. No tool throws — a missing/unreadable
- * source degrades to an `available: false` section.
+ * through the central `sanitize()` choke point, which applies BOTH `redact()`
+ * (key/token-shaped values masked to last-4) AND `scrubHome()` (home-directory
+ * paths / OS usernames masked) to every string field — not just `source`
+ * metadata. The provider creds column is NEVER read. No tool throws — a
+ * missing/unreadable source degrades to an `available: false` section.
  */
 
 import fs from 'node:fs';
@@ -204,17 +206,34 @@ export function redact(value: string): string {
   return out;
 }
 
+/** Replacement token for a masked OS username segment. */
+const USER_MASK = '<user>';
+
 /**
- * Replace the current user's home-directory prefix with `~` so model-visible
- * `source` strings never disclose the OS username. No-op when the path is not
- * under the home directory.
+ * Mask home-directory paths / OS usernames so no model-visible string discloses
+ * the OS username. Applied to EVERY output string via `sanitize()` (not just
+ * `source` metadata), so it also scrubs `recentErrors` log lines and the sqlite
+ * `last_error` / `error` column values, wherever the path appears in the string.
+ *
+ * Two layers:
+ *   1. The running process's exact home dir (`os.homedir()`) → `~`, anywhere it
+ *      occurs (not only as a leading prefix).
+ *   2. Generic per-OS user-home shapes whose `<name>` segment is the username —
+ *      `/Users/<name>` (macOS), `/home/<name>` (Linux), `C:\Users\<name>`
+ *      (Windows) — masked even when `<name>` is NOT the running user (e.g. a
+ *      path copied into a log line from another machine).
  */
 function scrubHome(p: string): string {
+  if (!p) return p;
+  let out = p;
+  // Layer 1: replace every occurrence of the literal home dir with `~`.
   const home = os.homedir();
-  if (home && (p === home || p.startsWith(`${home}${path.sep}`))) {
-    return `~${p.slice(home.length)}`;
-  }
-  return p;
+  if (home) out = out.split(home).join('~');
+  // Layer 2a: POSIX user homes (/Users/<name>, /home/<name>).
+  out = out.replace(/(\/(?:Users|home)\/)([^/\\\s]+)/g, (_m, prefix: string) => `${prefix}${USER_MASK}`);
+  // Layer 2b: Windows user homes (C:\Users\<name>).
+  out = out.replace(/([A-Za-z]:\\Users\\)([^\\/\s]+)/gi, (_m, prefix: string) => `${prefix}${USER_MASK}`);
+  return out;
 }
 
 /**
@@ -224,7 +243,10 @@ function scrubHome(p: string): string {
  */
 function sanitize<T>(value: T): T {
   if (typeof value === 'string') {
-    const masked = redact(value);
+    // Both choke-point passes: secret masking AND home/username scrubbing, so
+    // every string field is covered — recentErrors lines and the sqlite
+    // last_error/error columns included, not just `source` metadata.
+    const masked = scrubHome(redact(value));
     return (masked.length > MAX_STRING_CHARS ? `${masked.slice(0, MAX_STRING_CHARS)}…` : masked) as unknown as T;
   }
   if (Array.isArray(value)) {
