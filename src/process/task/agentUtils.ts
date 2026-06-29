@@ -21,6 +21,16 @@ import { buildCapabilitiesManifest } from '@process/services/capabilities/Capabi
 /** Runtime id of the built-in Concierge assistant (preset id `concierge`). */
 export const BUILTIN_CONCIERGE_ASSISTANT_ID = 'builtin-concierge';
 
+/**
+ * Single source of truth for "is this conversation the built-in Concierge?".
+ * Used to gate Concierge-only surfaces (e.g. the read-only diagnostics MCP
+ * server) across every backend so the check can't drift per call site. Accepts
+ * either a presetAssistantId or a customAgentId (both carry the runtime id).
+ */
+export function isConciergeAssistant(assistantId?: string | null): boolean {
+  return assistantId === BUILTIN_CONCIERGE_ASSISTANT_ID;
+}
+
 /** Header the live capabilities manifest is wrapped in when injected. */
 export const CAPABILITIES_MANIFEST_HEADER = '## Wayland capabilities (live)';
 

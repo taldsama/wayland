@@ -19,7 +19,7 @@ import {
   mergeLoadedSkillsExtra,
   consumePendingSessionSkills,
   resolveCapabilitiesManifest,
-  BUILTIN_CONCIERGE_ASSISTANT_ID,
+  isConciergeAssistant,
 } from './agentUtils';
 import { BUILTIN_CONCIERGE_DIAG_ID } from '@process/resources/builtinMcp/constants';
 import { detectSkillLoadRequest, AcpSkillManager, buildSkillContentText } from './AcpSkillManager';
@@ -397,7 +397,7 @@ export class GeminiAgentManager extends BaseAgentManager<
         // preset assistant; all other servers pass through unchanged.
         .filter(
           (server: IMcpServer) =>
-            server.id !== BUILTIN_CONCIERGE_DIAG_ID || this.presetAssistantId === BUILTIN_CONCIERGE_ASSISTANT_ID
+            server.id !== BUILTIN_CONCIERGE_DIAG_ID || isConciergeAssistant(this.presetAssistantId)
         )
         .forEach((server: IMcpServer) => {
           if (server.transport.type === 'stdio') {

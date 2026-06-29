@@ -38,14 +38,17 @@ describe('Concierge manifest wiring — native assemblers (structural)', () => {
 describe('Concierge diag MCP gate — Gemini (structural)', () => {
   it('GeminiAgentManager excludes the concierge-diag server from non-Concierge sessions', () => {
     const src = read('src/process/task/GeminiAgentManager.ts');
-    // The gate must reference BOTH the diag server id and the Concierge assistant id.
+    // Keep-if-(not-diag)-OR-(is-Concierge), routed through the shared predicate so
+    // the gate logic stays a single source of truth across backends.
     expect(src).toContain('BUILTIN_CONCIERGE_DIAG_ID');
-    expect(src).toContain('BUILTIN_CONCIERGE_ASSISTANT_ID');
-    // Keep-if-(not-diag)-OR-(is-Concierge): the diag server survives the filter
-    // only for the Concierge preset assistant.
     expect(src).toMatch(
-      /server\.id\s*!==\s*BUILTIN_CONCIERGE_DIAG_ID\s*\|\|\s*this\.presetAssistantId\s*===\s*BUILTIN_CONCIERGE_ASSISTANT_ID/
+      /server\.id\s*!==\s*BUILTIN_CONCIERGE_DIAG_ID\s*\|\|\s*isConciergeAssistant\(this\.presetAssistantId\)/
     );
+  });
+
+  it('AcpAgentManager computes allowConciergeDiag via the shared predicate', () => {
+    const src = read('src/process/task/AcpAgentManager.ts');
+    expect(src).toMatch(/allowConciergeDiag:\s*isConciergeAssistant\(/);
   });
 });
 
