@@ -12,14 +12,16 @@ describe('QUICK_LAUNCH_ANCHORS', () => {
     expect(QUICK_LAUNCH_ANCHORS).toHaveLength(7);
   });
 
-  it('pins Concierge first (universal ask-anything entry point)', () => {
-    expect(QUICK_LAUNCH_ANCHORS[0].id).toBe('concierge');
-    expect(QUICK_LAUNCH_ANCHORS[0].assistantId).toBe('builtin-concierge');
-    expect(QUICK_LAUNCH_ANCHORS[0].lucideIcon).toBe('sparkles');
+  it('keeps Cowork as the first anchor (autonomous-execution button)', () => {
+    expect(QUICK_LAUNCH_ANCHORS[0].id).toBe('cowork');
+    expect(QUICK_LAUNCH_ANCHORS[0].assistantId).toBe('builtin-cowork');
+    expect(QUICK_LAUNCH_ANCHORS[0].lucideIcon).toBe('zap');
   });
 
-  it('keeps Cowork as the second anchor (autonomous-execution button)', () => {
-    expect(QUICK_LAUNCH_ANCHORS[1].id).toBe('cowork');
+  it('pins Concierge as the second anchor (universal ask-anything entry point)', () => {
+    expect(QUICK_LAUNCH_ANCHORS[1].id).toBe('concierge');
+    expect(QUICK_LAUNCH_ANCHORS[1].assistantId).toBe('builtin-concierge');
+    expect(QUICK_LAUNCH_ANCHORS[1].lucideIcon).toBe('sparkles');
   });
 
   it('every anchor has all required fields populated', () => {

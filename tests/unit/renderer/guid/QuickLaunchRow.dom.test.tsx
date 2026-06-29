@@ -17,9 +17,9 @@ describe('QuickLaunchRow', () => {
     expect(container.querySelectorAll('[data-quicklaunch-id]')).toHaveLength(7);
   });
 
-  it('renders Concierge first', () => {
+  it('renders Cowork first', () => {
     const { container } = render(<QuickLaunchRow {...baseProps} />);
-    expect(container.querySelector('[data-quicklaunch-id]')?.getAttribute('data-quicklaunch-id')).toBe('concierge');
+    expect(container.querySelector('[data-quicklaunch-id]')?.getAttribute('data-quicklaunch-id')).toBe('cowork');
   });
 
   it('routes card clicks to onAnchorClick with the anchor object', () => {
