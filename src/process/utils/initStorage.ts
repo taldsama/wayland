@@ -46,9 +46,16 @@ import {
   BUILTIN_IMAGE_GEN_ID,
   BUILTIN_IMAGE_GEN_LEGACY_NAMES,
   BUILTIN_IMAGE_GEN_NAME,
+  BUILTIN_PLAYWRIGHT_BLOCKED_ORIGINS,
+  BUILTIN_PLAYWRIGHT_ID,
+  BUILTIN_PLAYWRIGHT_LIBRARY_ENTRY_ID,
+  BUILTIN_PLAYWRIGHT_NAME,
+  BUILTIN_PLAYWRIGHT_PACKAGE,
   BUILTIN_SEARCH_SKILLS_ID,
   BUILTIN_SEARCH_SKILLS_NAME,
 } from '../resources/builtinMcp/constants';
+import { resolveNpxPath } from './shellEnv';
+import { getPlaywrightBrowsersDir } from '../services/mcpServices/playwrightBrowsers';
 import { getMcpScriptPath, inspectMcpScripts } from './mcpScriptDir';
 import { getBuiltinCatalogAssistants } from './builtinCatalog';
 // Platform and architecture types (moved from deleted updateConfig)
@@ -966,6 +973,87 @@ const ensureBuiltinMcpServers = async (): Promise<void> => {
         createdAt: now,
         updatedAt: now,
         originalJson: buildConciergeDiagOriginalJson(conciergeDiagScriptPath, conciergeDiagEnv),
+      };
+      mcpServers.push(newServer);
+      changed = true;
+    }
+
+    // ── Built-in Playwright MCP server (browser capability, #465) ────────────
+    // The upstream @playwright/mcp server, run through the bundled bun (no system
+    // Node). Seeded ENABLED so the agent has browser tools out of the box. The
+    // `npx`->bun swap is app-side only (McpProtocol), but the wcore engine spawns
+    // MCP servers straight from its config.toml — so we pre-resolve the bundled
+    // bun HERE (command + `x --bun @playwright/mcp@<ver>`), so every spawn path
+    // (wcore engine, ACP CLIs, app SDK) runs it identically with no system Node.
+    // Chromium is fetched on first use into PLAYWRIGHT_BROWSERS_PATH; see
+    // playwrightBrowsers.ensurePlaywrightChromium (triggered from McpService).
+    // SSRF guardrail (#465): block link-local + cloud-metadata origins.
+    const playwrightBun = resolveNpxPath(process.env);
+    const playwrightArgs = [
+      'x',
+      '--bun',
+      BUILTIN_PLAYWRIGHT_PACKAGE,
+      '--blocked-origins',
+      BUILTIN_PLAYWRIGHT_BLOCKED_ORIGINS,
+    ];
+    const playwrightEnv: Record<string, string> = { PLAYWRIGHT_BROWSERS_PATH: getPlaywrightBrowsersDir() };
+    const buildPlaywrightOriginalJson = (command: string, args: string[], env: Record<string, string>) =>
+      JSON.stringify({ [BUILTIN_PLAYWRIGHT_NAME]: { command, args, env } }, null, 2);
+    // Match ANY existing Playwright server, not just our builtin id: a user may
+    // already have one (catalog/manual install) whose sanitized name collides
+    // with ours — two servers sharing the wcore config.toml [mcp.servers."<name>"]
+    // key is a TOML collision. Detect by id / libraryEntryId / name / @playwright/mcp arg.
+    const looksLikePlaywright = (s: IMcpServer): boolean => {
+      if (s.id === BUILTIN_PLAYWRIGHT_ID) return true;
+      if (s.libraryEntryId === BUILTIN_PLAYWRIGHT_LIBRARY_ENTRY_ID) return true;
+      if (s.name === BUILTIN_PLAYWRIGHT_NAME) return true;
+      return (
+        s.transport.type === 'stdio' &&
+        (s.transport.args ?? []).some((a) => typeof a === 'string' && a.includes('@playwright/mcp'))
+      );
+    };
+    const playwrightExistingIdx = mcpServers.findIndex(looksLikePlaywright);
+
+    if (playwrightExistingIdx >= 0 && mcpServers[playwrightExistingIdx].id !== BUILTIN_PLAYWRIGHT_ID) {
+      // ADOPT a pre-existing user/manual Playwright install: do NOT seed a second
+      // server (would collide on the wcore TOML key). The user owns that server's
+      // enabled state and args; we leave it untouched.
+      console.log('[Wayland] Adopting existing Playwright MCP server; skipping builtin seed');
+    } else if (playwrightExistingIdx >= 0) {
+      // Our builtin exists → refresh command/args/env in case the bundled bun
+      // path, managed browsers dir, or blocked-origins changed across an app
+      // update. Never flip `enabled` — respect a user who turned browsing off.
+      const existing = mcpServers[playwrightExistingIdx];
+      const t = existing.transport;
+      if (t.type === 'stdio') {
+        const needsUpdate =
+          t.command !== playwrightBun ||
+          JSON.stringify(t.args ?? []) !== JSON.stringify(playwrightArgs) ||
+          JSON.stringify(t.env ?? {}) !== JSON.stringify(playwrightEnv);
+        if (needsUpdate) {
+          mcpServers[playwrightExistingIdx] = {
+            ...existing,
+            transport: { ...t, command: playwrightBun, args: playwrightArgs, env: playwrightEnv },
+            originalJson: buildPlaywrightOriginalJson(playwrightBun, playwrightArgs, playwrightEnv),
+            updatedAt: now,
+          };
+          changed = true;
+        }
+      }
+    } else {
+      const newServer: IMcpServer = {
+        id: BUILTIN_PLAYWRIGHT_ID,
+        name: BUILTIN_PLAYWRIGHT_NAME,
+        description:
+          'Headless browser automation (navigate, click, type, screenshot) powered by Playwright. Chromium is downloaded on first use.',
+        enabled: true,
+        builtin: true,
+        source: 'library',
+        libraryEntryId: BUILTIN_PLAYWRIGHT_LIBRARY_ENTRY_ID,
+        transport: { type: 'stdio', command: playwrightBun, args: playwrightArgs, env: playwrightEnv },
+        createdAt: now,
+        updatedAt: now,
+        originalJson: buildPlaywrightOriginalJson(playwrightBun, playwrightArgs, playwrightEnv),
       };
       mcpServers.push(newServer);
       changed = true;
