@@ -4,6 +4,15 @@ All notable changes to the Wayland Electron app are documented in this file. For
 
 ## [Unreleased]
 
+## [0.11.8] - 2026-06-30
+
+### Wayland Core engine
+
+- **Bundled wayland-core engine v0.12.16 → v0.12.17.** Carries three customer-driven fixes:
+  - **Named messaging channels now resolve correctly.** `send_message` to a channel registered under an instance name (e.g. an IMAP email channel registered as `email-imap`) reaches it instead of failing with "unknown channel" — outbound email and other named channels now work. (wayland-core #116)
+  - **Large project context no longer bloats the cached prompt.** Oversized `AGENTS.md`/`@`-includes/presets are capped, so big projects stop ballooning token usage and cost. (wayland-core #115)
+  - **Long-context replay no longer 400s on strict providers.** Internal routing metadata is stripped from outbound tool calls, fixing "Extra inputs are not permitted" rejections from strict OpenAI-compatible endpoints. (wayland-core #120)
+
 ## [0.11.7] - 2026-06-29
 
 ### Highlights
