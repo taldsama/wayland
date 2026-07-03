@@ -42,20 +42,11 @@ export function initSkillsBridge(): void {
     return entry?.security ?? null;
   });
 
-  ipcBridge.skills.rescanAll.provider(async () => {
-    const lib = SkillLibrary.getInstance();
-    const { SKILL_SCANNER_VERSION } = await import('@/common/types/skillTypes');
-    const all = await lib.list();
-    let rescanned = 0;
-    for (const e of all) {
-      const sv = e.security?.scannerVersion ?? 0;
-      if (sv < SKILL_SCANNER_VERSION) {
-        await lib.rescanIfStale(e.name);
-        rescanned += 1;
-      }
-    }
-    return { rescanned };
-  });
+  // Regex-only, scannerVersion-gated library sweep (C4). Both the legacy
+  // rescanAll IPC and the manual "Scan library" action delegate to the same
+  // batched SkillLibrary.rescanStale so there is one code path and one gate.
+  ipcBridge.skills.rescanAll.provider(async () => SkillLibrary.getInstance().rescanStale());
+  ipcBridge.skills.scanLibrary.provider(async () => SkillLibrary.getInstance().rescanStale());
 
   const importer = new SkillImport();
 
@@ -63,6 +54,13 @@ export function initSkillsBridge(): void {
   ipcBridge.skills.import.git.provider(async ({ url }) => importer.importGit(url));
   ipcBridge.skills.import.zip.provider(async ({ zipPath }) => importer.importZip(zipPath));
   ipcBridge.skills.import.singleSkillMd.provider(async ({ srcPath }) => importer.importSingleSkillMd(srcPath));
+
+  // C3: register a previously-swept, user-approved `review` skill. Idempotent
+  // and replay-safe (keyed by the imported on-disk path + the contentHash the
+  // user actually approved). See SkillImport.confirmImport.
+  ipcBridge.skills.confirmImport.provider(async ({ name, destPath, contentHash }) =>
+    importer.confirmImport({ name, destPath, contentHash })
+  );
 
   // ---------------------------------------------------------------------------
   // Type-aware import (Assistants + Workflows)
@@ -76,6 +74,13 @@ export function initSkillsBridge(): void {
     const items: ImportItemResult[] = [];
 
     for (const entry of result.imported) {
+      // C3: a `review` entry is HELD (registered:false) pending explicit
+      // consent - do not silently activate it as an assistant. It is still
+      // reported so the caller can surface the verdict.
+      if (!entry.registered) {
+        items.push({ name: entry.name, registeredAs: entry.type, verdict: entry.report.verdict });
+        continue;
+      }
       if (entry.type === 'agent-profile') {
         const parsed = parseFrontmatter(entry.body);
         const name = parsed?.name ?? entry.name;
@@ -83,21 +88,17 @@ export function initSkillsBridge(): void {
         // ConfigStorage('assistants') array, so parallelizing would drop
         // writes. A single import batch is tiny, so the cost is negligible.
         // oxlint-disable-next-line no-await-in-loop
-        const imported = await importAgentProfile(
-          { name, description: parsed?.description },
-          entry.body,
-          {
-            getAssistants: async () => (await ProcessConfig.get('assistants')) ?? [],
-            setAssistants: async (next) => {
-              await ProcessConfig.set('assistants', next);
-            },
-            writeRule: async (assistantId, content) => {
-              await mkdir(getAssistantsDir(), { recursive: true });
-              await writeFile(path.join(getAssistantsDir(), `${assistantId}.en-US.md`), content, 'utf-8');
-            },
-            now: Date.now,
-          }
-        );
+        const imported = await importAgentProfile({ name, description: parsed?.description }, entry.body, {
+          getAssistants: async () => (await ProcessConfig.get('assistants')) ?? [],
+          setAssistants: async (next) => {
+            await ProcessConfig.set('assistants', next);
+          },
+          writeRule: async (assistantId, content) => {
+            await mkdir(getAssistantsDir(), { recursive: true });
+            await writeFile(path.join(getAssistantsDir(), `${assistantId}.en-US.md`), content, 'utf-8');
+          },
+          now: Date.now,
+        });
         items.push({
           name: entry.name,
           registeredAs: 'agent-profile',
@@ -292,4 +293,16 @@ export function initSkillsBridge(): void {
 
     return { name: kebab, verdict: report.verdict };
   });
+
+  // C4: one-time library sweep on app start. The 2,054 vendored skills seed as
+  // `unscanned` and nothing ever scans them, so the "verified safe" counter
+  // reads 0. Run the regex-only, scannerVersion-gated sweep once, fire-and-
+  // forget so it never blocks boot; after a full sweep the gate makes it a
+  // no-op on subsequent launches. Failures are swallowed - a scan miss must
+  // never crash startup.
+  void SkillLibrary.getInstance()
+    .rescanStale()
+    .catch((err) => {
+      console.warn('[skillsBridge] startup library sweep failed', err);
+    });
 }

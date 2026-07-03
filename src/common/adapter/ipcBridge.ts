@@ -454,6 +454,12 @@ export const skills = {
   scan: buildProvider<SkillSecurityReport | null, { name: string }>('skills.scan'),
   getReport: buildProvider<SkillSecurityReport | null, { name: string }>('skills.get-report'),
   rescanAll: buildProvider<{ rescanned: number }, void>('skills.rescan-all'),
+  /**
+   * Manual "Scan library" action (C4). Runs the same regex-only,
+   * scannerVersion-gated sweep as the app-start trigger and returns how many
+   * entries were (re)scanned. Never spends a model call — first-party content.
+   */
+  scanLibrary: buildProvider<{ rescanned: number }, void>('skills.scan-library'),
   import: {
     /** Import a skill from a local folder path. */
     folder: buildProvider<ImportResult, { srcPath: string }>('skills.import.folder'),
@@ -464,6 +470,17 @@ export const skills = {
     /** Import a single SKILL.md file. */
     singleSkillMd: buildProvider<ImportResult, { srcPath: string }>('skills.import.single-skill-md'),
   },
+  /**
+   * Register a previously-swept, user-approved `review` skill (C3 consent
+   * gate). Idempotent and replay-safe: the approval is keyed by the imported
+   * on-disk path + the `contentHash` the user actually saw, so an approval
+   * can't be replayed against a different body. Returns `{ ok: false }` with a
+   * reason when the on-disk content changed, is now blocked, or is missing.
+   */
+  confirmImport: buildProvider<
+    { ok: true } | { ok: false; error: 'content-changed' | 'blocked' | 'not-found' },
+    { name: string; destPath: string; contentHash: string }
+  >('skills.confirm-import'),
   /**
    * Return entries from the SkillLibrary index. Defaults to `type: 'skill'`
    * so the Skills page contract is preserved; pass `{ type: 'workflow' }`
