@@ -23,9 +23,9 @@
  * (shared with /assistants); tracked for next bundle-rendering refactor.
  */
 
-import { Button, Input, Message, Select } from '@arco-design/web-react';
+import { Button, Input, Message, Select, Tabs } from '@arco-design/web-react';
 import { Plus, Search, Upload, Users } from 'lucide-react';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { ipcBridge } from '@/common';
@@ -36,10 +36,11 @@ import { useAssistantList } from '@/renderer/hooks/assistant';
 import type { AssistantListItem } from '@/renderer/pages/settings/AssistantSettings/types';
 import type { TeamExport } from '@process/team/importExport/TeamExportSchema';
 import BuildMyOwnTeamCard from './components/BuildMyOwnTeamCard';
-import CapabilityReviewModal, {
-  type TeamCapabilities,
-} from './components/CapabilityReviewModal';
+import CapabilityReviewModal, { type TeamCapabilities } from './components/CapabilityReviewModal';
 import TeamCard from './components/TeamCard';
+import ConfiguredTeamCard from './components/ConfiguredTeamCard';
+import { useTeamList } from '@renderer/pages/team/hooks/useTeamList';
+import type { TTeam, TeamTask } from '@/common/types/teamTypes';
 import styles from './TeamsLibraryPage.module.css';
 
 type ImportPreviewState = {
@@ -93,11 +94,7 @@ const matchesTeamQuery = (team: AssistantListItem, localeKey: string, query: str
   return haystack.includes(query);
 };
 
-const sortTeams = (
-  list: AssistantListItem[],
-  sortKey: TeamSortKey,
-  localeKey: string
-): AssistantListItem[] => {
+const sortTeams = (list: AssistantListItem[], sortKey: TeamSortKey, localeKey: string): AssistantListItem[] => {
   if (sortKey === 'default') return list;
   const sorted = [...list];
   if (sortKey === 'name') {
@@ -124,10 +121,7 @@ const TeamsLibraryPage: React.FC = () => {
   const normalizedQuery = query.trim().toLowerCase();
   const isSearching = normalizedQuery.length > 0;
 
-  const hasAnyTeams = useMemo(
-    () => assistants.some((assistant) => assistant._kind === 'team'),
-    [assistants]
-  );
+  const hasAnyTeams = useMemo(() => assistants.some((assistant) => assistant._kind === 'team'), [assistants]);
 
   const { standing, teams } = useMemo(() => {
     const standingList: AssistantListItem[] = [];
@@ -145,6 +139,63 @@ const TeamsLibraryPage: React.FC = () => {
   }, [assistants, localeKey, normalizedQuery, sortKey]);
 
   const totalTeams = standing.length + teams.length;
+
+  const { teams: userTeams, removeTeam } = useTeamList();
+  const [teamTasks, setTeamTasks] = useState<Record<string, TeamTask[]>>({});
+
+  useEffect(() => {
+    const loadAllTasks = async () => {
+      const tasksMap: Record<string, TeamTask[]> = {};
+      await Promise.all(
+        userTeams.map(async (t) => {
+          try {
+            const tasks = await ipcBridge.team.listTasks.invoke({ teamId: t.id });
+            tasksMap[t.id] = Array.isArray(tasks) ? tasks : [];
+          } catch (e) {
+            tasksMap[t.id] = [];
+          }
+        })
+      );
+      setTeamTasks(tasksMap);
+    };
+    if (userTeams.length > 0) {
+      void loadAllTasks();
+    }
+  }, [userTeams]);
+
+  const filteredUserTeams = useMemo(() => {
+    if (!normalizedQuery) return userTeams;
+    return userTeams.filter((t) => t.name.toLowerCase().includes(normalizedQuery));
+  }, [userTeams, normalizedQuery]);
+
+  const { activeUserTeams, completedUserTeams } = useMemo(() => {
+    const active: typeof userTeams = [];
+    const completed: typeof userTeams = [];
+    for (const t of filteredUserTeams) {
+      const tasks = teamTasks[t.id] ?? [];
+      const isCompleted =
+        tasks.length > 0 &&
+        tasks.every(
+          (task) =>
+            task.status === 'completed' ||
+            task.status === 'failed' ||
+            task.status === 'deleted'
+        );
+      if (isCompleted) {
+        completed.push(t);
+      } else {
+        active.push(t);
+      }
+    }
+    return { activeUserTeams: active, completedUserTeams: completed };
+  }, [filteredUserTeams, teamTasks]);
+
+  const handleLaunchTeamSession = useCallback(
+    (teamSession: TTeam) => {
+      navigate(`/team/${teamSession.id}`);
+    },
+    [navigate]
+  );
 
   // Synchronous navigation guard - debounces double-clicks on launcher cards
   // so we don't push 2 history entries (Bug from adversarial e2e). The ref
@@ -188,9 +239,7 @@ const TeamsLibraryPage: React.FC = () => {
         jsonText = await file.text();
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        Message.error(
-          `${t('teams.import.fileReadError', { defaultValue: 'Could not read file' })}: ${message}`
-        );
+        Message.error(`${t('teams.import.fileReadError', { defaultValue: 'Could not read file' })}: ${message}`);
         return;
       }
       try {
@@ -219,9 +268,7 @@ const TeamsLibraryPage: React.FC = () => {
         });
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        Message.error(
-          `${t('teams.import.error', { defaultValue: 'Failed to import team' })}: ${message}`
-        );
+        Message.error(`${t('teams.import.error', { defaultValue: 'Failed to import team' })}: ${message}`);
       }
     },
     [t]
@@ -256,9 +303,7 @@ const TeamsLibraryPage: React.FC = () => {
         }
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        Message.error(
-          `${t('teams.import.error', { defaultValue: 'Failed to import team' })}: ${message}`
-        );
+        Message.error(`${t('teams.import.error', { defaultValue: 'Failed to import team' })}: ${message}`);
         setImportLoading(false);
       }
     },
@@ -321,99 +366,168 @@ const TeamsLibraryPage: React.FC = () => {
       />
 
       <div className={styles.scroll}>
-        {hasAnyTeams && (
-          <div className={styles.controls} data-testid='teams-controls'>
-            <Input
-              className={styles.search}
-              allowClear
-              prefix={<Search size={15} />}
-              placeholder={t('teams.controls.searchPlaceholder', { defaultValue: 'Search teams' })}
-              value={query}
-              onChange={setQuery}
-              data-testid='teams-search-input'
-            />
-            <div className={styles.sortControl}>
-              <span className={styles.sortLabel}>
-                {t('teams.controls.sortLabel', { defaultValue: 'Sort' })}
-              </span>
-              <Select
-                className={styles.sortSelect}
-                value={sortKey}
-                onChange={(value) => setSortKey(value as TeamSortKey)}
-                data-testid='teams-sort-select'
-              >
-                <Select.Option value='default'>
-                  {t('teams.sort.default', { defaultValue: 'Default' })}
-                </Select.Option>
-                <Select.Option value='name'>
-                  {t('teams.sort.name', { defaultValue: 'Name (A-Z)' })}
-                </Select.Option>
-                <Select.Option value='roles'>
-                  {t('teams.sort.roles', { defaultValue: 'Most roles' })}
-                </Select.Option>
-                <Select.Option value='schedule'>
-                  {t('teams.sort.schedule', { defaultValue: 'Schedule' })}
-                </Select.Option>
-              </Select>
+        <Tabs defaultActiveTab='my_teams' className={styles.tabsContainer}>
+          <Tabs.TabPane key='my_teams' title={t('teams.tab.myTeams', { defaultValue: 'My Teams' })}>
+            <div className={styles.tabContent} style={{ paddingTop: 16 }}>
+              {/* activeUserTeams section */}
+              <section className={styles.sectionGroup} data-testid='teams-group-active'>
+                <LibrarySectionHeader
+                  label={t('teams.group.activeUserTeams', { defaultValue: 'Active Teams' })}
+                  variant='tier'
+                  hint={t('teams.group.activeUserTeamsHint', {
+                    count: activeUserTeams.length,
+                    defaultValue: '{{count}} active squads currently running',
+                  })}
+                />
+                {activeUserTeams.length === 0 ? (
+                  <div className={styles.emptyState}>
+                    {t('teams.emptyActive', { defaultValue: 'No active teams. Build or import a team above to get started!' })}
+                  </div>
+                ) : (
+                  <div className={styles.gridStanding}>
+                    {activeUserTeams.map((teamSession) => {
+                      const preset = assistants.find((a) => a.id === teamSession.sourceLauncherId);
+                      const desc =
+                        preset?.descriptionI18n?.[localeKey] ||
+                        preset?.descriptionI18n?.['en-US'] ||
+                        preset?.description;
+                      return (
+                        <ConfiguredTeamCard
+                          key={teamSession.id}
+                          team={teamSession}
+                          tasks={teamTasks[teamSession.id] ?? []}
+                          onLaunch={handleLaunchTeamSession}
+                          onDelete={removeTeam}
+                          presetDescription={desc}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              {/* completedUserTeams section */}
+              {completedUserTeams.length > 0 && (
+                <section className={styles.sectionGroup} data-testid='teams-group-completed'>
+                  <LibrarySectionHeader
+                    label={t('teams.group.completedUserTeams', { defaultValue: 'History (Completed)' })}
+                    hint={t('teams.group.completedUserTeamsHint', {
+                      count: completedUserTeams.length,
+                      defaultValue: '{{count}} archived or finished projects',
+                    })}
+                  />
+                  <div className={styles.gridTeams}>
+                    {completedUserTeams.map((teamSession) => {
+                      const preset = assistants.find((a) => a.id === teamSession.sourceLauncherId);
+                      const desc =
+                        preset?.descriptionI18n?.[localeKey] ||
+                        preset?.descriptionI18n?.['en-US'] ||
+                        preset?.description;
+                      return (
+                        <ConfiguredTeamCard
+                          key={teamSession.id}
+                          team={teamSession}
+                          tasks={teamTasks[teamSession.id] ?? []}
+                          onLaunch={handleLaunchTeamSession}
+                          onDelete={removeTeam}
+                          presetDescription={desc}
+                        />
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
             </div>
-          </div>
-        )}
+          </Tabs.TabPane>
 
-        {!hasAnyTeams && (
-          <div className={styles.emptyState} data-testid='teams-empty-state'>
-            {t('teams.emptyState', { defaultValue: 'No teams available yet.' })}
-          </div>
-        )}
+          <Tabs.TabPane key='presets' title={t('teams.tab.presets', { defaultValue: 'Presets' })}>
+            <div className={styles.tabContent} style={{ paddingTop: 16 }}>
+              {hasAnyTeams && (
+                <div className={styles.controls} data-testid='teams-controls'>
+                  <Input
+                    className={styles.search}
+                    allowClear
+                    prefix={<Search size={15} />}
+                    placeholder={t('teams.controls.searchPlaceholder', { defaultValue: 'Search teams' })}
+                    value={query}
+                    onChange={setQuery}
+                    data-testid='teams-search-input'
+                  />
+                  <div className={styles.sortControl}>
+                    <span className={styles.sortLabel}>{t('teams.controls.sortLabel', { defaultValue: 'Sort' })}</span>
+                    <Select
+                      className={styles.sortSelect}
+                      value={sortKey}
+                      onChange={(value) => setSortKey(value as TeamSortKey)}
+                      data-testid='teams-sort-select'
+                    >
+                      <Select.Option value='default'>{t('teams.sort.default', { defaultValue: 'Default' })}</Select.Option>
+                      <Select.Option value='name'>{t('teams.sort.name', { defaultValue: 'Name (A-Z)' })}</Select.Option>
+                      <Select.Option value='roles'>{t('teams.sort.roles', { defaultValue: 'Most roles' })}</Select.Option>
+                      <Select.Option value='schedule'>{t('teams.sort.schedule', { defaultValue: 'Schedule' })}</Select.Option>
+                    </Select>
+                  </div>
+                </div>
+              )}
 
-        {hasAnyTeams && totalTeams === 0 && (
-          <div className={styles.emptyState} data-testid='teams-no-results'>
-            {t('teams.noResults', { defaultValue: 'No teams match your search.' })}
-          </div>
-        )}
+              {!hasAnyTeams && (
+                <div className={styles.emptyState} data-testid='teams-empty-state'>
+                  {t('teams.emptyState', { defaultValue: 'No teams available yet.' })}
+                </div>
+              )}
 
-        {standing.length > 0 && (
-          <section className={styles.sectionGroup} data-testid='teams-group-standing'>
-            <LibrarySectionHeader
-              label={t('teams.group.standing', { defaultValue: 'Standing Companies' })}
-              variant='tier'
-              hint={t('teams.group.standingHint', {
-                count: standing.length,
-                defaultValue: '{{count}} - persistent, ritualized orgs that run continuously',
-              })}
-            />
-            <div className={styles.gridStanding}>
-              {standing.map((team) => (
-                <TeamCard key={team.id} team={team} localeKey={localeKey} onLaunch={handleLaunchTeam} />
-              ))}
+              {hasAnyTeams && totalTeams === 0 && (
+                <div className={styles.emptyState} data-testid='teams-no-results'>
+                  {t('teams.noResults', { defaultValue: 'No teams match your search.' })}
+                </div>
+              )}
+
+              {standing.length > 0 && (
+                <section className={styles.sectionGroup} data-testid='teams-group-standing'>
+                  <LibrarySectionHeader
+                    label={t('teams.group.standing', { defaultValue: 'Standing Companies' })}
+                    variant='tier'
+                    hint={t('teams.group.standingHint', {
+                      count: standing.length,
+                      defaultValue: '{{count}} - persistent, ritualized orgs that run continuously',
+                    })}
+                  />
+                  <div className={styles.gridStanding}>
+                    {standing.map((team) => (
+                      <TeamCard key={team.id} team={team} localeKey={localeKey} onLaunch={handleLaunchTeam} />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {hasAnyTeams && (teams.length > 0 || !isSearching) && (
+                <section className={styles.sectionGroup} data-testid='teams-group-teams'>
+                  <LibrarySectionHeader
+                    label={
+                      teams.length > 0
+                        ? t('teams.group.teams', { defaultValue: 'Teams' })
+                        : t('teams.group.startNew', { defaultValue: 'Start a new team' })
+                    }
+                    hint={
+                      teams.length > 0
+                        ? t('teams.group.teamsHint', {
+                            count: teams.length,
+                            defaultValue: '{{count}} - ad-hoc squads for a specific outcome. Spawn, ship, dissolve.',
+                          })
+                        : undefined
+                    }
+                  />
+                  <div className={styles.gridTeams}>
+                    {teams.map((team) => (
+                      <TeamCard key={team.id} team={team} localeKey={localeKey} onLaunch={handleLaunchTeam} />
+                    ))}
+                    {!isSearching && <BuildMyOwnTeamCard onClick={handleBuildMyOwn} />}
+                  </div>
+                </section>
+              )}
             </div>
-          </section>
-        )}
-
-        {hasAnyTeams && (teams.length > 0 || !isSearching) && (
-          <section className={styles.sectionGroup} data-testid='teams-group-teams'>
-            <LibrarySectionHeader
-              label={
-                teams.length > 0
-                  ? t('teams.group.teams', { defaultValue: 'Teams' })
-                  : t('teams.group.startNew', { defaultValue: 'Start a new team' })
-              }
-              hint={
-                teams.length > 0
-                  ? t('teams.group.teamsHint', {
-                      count: teams.length,
-                      defaultValue: '{{count}} - ad-hoc squads for a specific outcome. Spawn, ship, dissolve.',
-                    })
-                  : undefined
-              }
-            />
-            <div className={styles.gridTeams}>
-              {teams.map((team) => (
-                <TeamCard key={team.id} team={team} localeKey={localeKey} onLaunch={handleLaunchTeam} />
-              ))}
-              {!isSearching && <BuildMyOwnTeamCard onClick={handleBuildMyOwn} />}
-            </div>
-          </section>
-        )}
+          </Tabs.TabPane>
+        </Tabs>
       </div>
       {importPreview && (
         <CapabilityReviewModal
