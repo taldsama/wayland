@@ -473,7 +473,7 @@ export const ASSISTANT_PRESETS: AssistantPreset[] = [
       'zh-CN':
         '将 CSV 或表格数据转化为精美的 Excel 仪表盘，包含 KPI 卡片、关联实时数据的图表、迷你图和条件格式。根据数据量自动缩放复杂度--从简洁汇总到完整分析面板。',
       'ru-RU':
-        'Преобразует CSV и табличные данные в аккуратные Excel-дашборды: KPI-карточки, графики с привязкой к данным, спарклайны и условное форматирование. Масштабирует сложность под объём данных - от краткой сводки до полноценной аналитической панели.',
+        'Преобразует CSV и табличные данные в аккуратные Excel-дашборды: KPI-карточки, графики с привязкой к данным, спарклайны и условное форматирование. Автоматично масштабує складність під обсяг даних.',
       'uk-UA':
         "Перетворюйте CSV або табличні дані на професійні дашборди Excel: KPI-картки, графіки з прив'язкою до даних, спарклайни та умовне форматування. Автоматично масштабує складність під обсяг даних.",
     },
@@ -642,6 +642,90 @@ export const ASSISTANT_PRESETS: AssistantPreset[] = [
         'Виправити помилку Unauthorized на сторінці Star Office',
         'Підключити попередній перегляд Aion до http://127.0.0.1:19000',
       ],
+    },
+  },
+  {
+    id: 'homelab-ops',
+    avatar: 'lucide:Server',
+    presetAgentType: 'hermes-homelab-ops',
+    category: 'run',
+    resourceDir: 'src/process/resources/assistant/homelab-ops-assistant',
+    ruleFiles: {
+      'en-US': 'homelab-ops.md',
+    },
+    nameI18n: {
+      'en-US': 'Homelab Ops Agent',
+      'es-ES': 'Agente Homelab Ops',
+    },
+    descriptionI18n: {
+      'en-US': 'Manages Proxmox and Pterodactyl homelab operations.',
+      'es-ES': 'Administra las operaciones de homelab (Proxmox y Pterodactyl).',
+    },
+    promptsI18n: {
+      'en-US': [
+        'Check the status of all Proxmox nodes',
+        'Backup my Pterodactyl server',
+        'Restart the Minecraft server',
+      ],
+      'es-ES': [
+        'Revisa el estado de todos los nodos de Proxmox',
+        'Haz un respaldo de mi servidor en Pterodactyl',
+        'Reinicia el servidor de Minecraft',
+      ],
+    },
+  },
+  {
+    id: 'secretaria',
+    avatar: 'lucide:BookOpen',
+    presetAgentType: 'hermes-secretaria',
+    category: 'run',
+    resourceDir: 'src/process/resources/assistant/secretaria-assistant',
+    ruleFiles: {
+      'en-US': 'secretaria.md',
+    },
+    nameI18n: {
+      'en-US': 'Secretaria Agent',
+      'es-ES': 'Agente Secretaria',
+    },
+    descriptionI18n: {
+      'en-US': 'Secretaria duty agent with all Wayland features active.',
+      'es-ES': 'Agente secretaria con todas las características de Wayland activas.',
+    },
+  },
+  {
+    id: 'default',
+    avatar: 'lucide:User',
+    presetAgentType: 'hermes-default',
+    category: 'run',
+    resourceDir: 'src/process/resources/assistant/default-assistant',
+    ruleFiles: {
+      'en-US': 'default.md',
+    },
+    nameI18n: {
+      'en-US': 'Hermes Default Agent',
+      'es-ES': 'Agente Hermes por Defecto',
+    },
+    descriptionI18n: {
+      'en-US': 'Default profile agent with all Wayland features skipped.',
+      'es-ES': 'Agente de perfil por defecto con todas las características de Wayland omitidas.',
+    },
+  },
+  {
+    id: 'hermes-dev',
+    avatar: 'lucide:Terminal',
+    presetAgentType: 'hermes-dev',
+    category: 'run',
+    resourceDir: 'src/process/resources/assistant/dev-assistant',
+    ruleFiles: {
+      'en-US': 'dev.md',
+    },
+    nameI18n: {
+      'en-US': 'Hermes Dev',
+      'es-ES': 'Hermes Dev',
+    },
+    descriptionI18n: {
+      'en-US': 'Hermes Agent configured for development tasks.',
+      'es-ES': 'Agente Hermes configurado para tareas de desarrollo.',
     },
   },
   {

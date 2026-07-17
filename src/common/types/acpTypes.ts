@@ -59,6 +59,10 @@ export type AcpBackendAll =
   | 'cursor' // Cursor AI Agent CLI
   | 'kiro' // Kiro CLI (AWS)
   | 'hermes' // Hermes Agent CLI (Nous Research)
+  | 'hermes-homelab-ops'
+  | 'hermes-secretaria'
+  | 'hermes-default'
+  | 'hermes-dev'
   | 'snow' // Snow AI CLI
   | 'custom'; // User-configured custom ACP agent (extension adapters)
 
@@ -177,6 +181,21 @@ export interface AcpBackendConfig {
 
   /** Whether this backend requires authentication before use */
   authRequired?: boolean;
+
+  /** Whether to skip injecting connected provider API keys into this agent's environment */
+  skipProviderEnv?: boolean;
+
+  /** Whether to skip injecting user memory/vault context into this agent's chat session */
+  skipMemoryInjection?: boolean;
+
+  /** Whether to skip injecting Wayland's default assistant rules/presetContext */
+  skipRulesInjection?: boolean;
+
+  /** Whether to skip injecting Wayland's skills index */
+  skipSkillsInjection?: boolean;
+
+  /** Whether to disable built-in MCP servers for this agent */
+  disableBuiltinMcp?: boolean;
 
   /** Whether this backend is enabled and should appear in the UI */
   enabled?: boolean;
@@ -499,6 +518,9 @@ export const ACP_BACKENDS_ALL: Record<AcpBackendAll, AcpBackendConfig> = {
     supportsStreaming: false,
     acpArgs: ['acp'], // Kiro uses `kiro-cli acp` subcommand
     fluxCompat: 'vendor',
+    skipMemoryInjection: true,
+    skipRulesInjection: true,
+    skipSkillsInjection: true,
   },
   hermes: {
     id: 'hermes',
@@ -510,6 +532,60 @@ export const ACP_BACKENDS_ALL: Record<AcpBackendAll, AcpBackendConfig> = {
     supportsStreaming: false,
     acpArgs: ['acp'], // hermes uses the acp subcommand
     fluxCompat: 'setup',
+  },
+  'hermes-homelab-ops': {
+    id: 'hermes-homelab-ops',
+    name: 'Hermes Homelab Ops',
+    description: 'Hermes Agent configured for Homelab Operations',
+    cliCommand: 'hermes',
+    authRequired: false,
+    enabled: true,
+    supportsStreaming: false,
+    acpArgs: ['acp', '--profile', 'homelab-ops'],
+    fluxCompat: 'setup',
+    skipProviderEnv: true,
+    disableBuiltinMcp: true,
+    skipMemoryInjection: true,
+    skipRulesInjection: true,
+    skipSkillsInjection: true,
+  },
+  'hermes-secretaria': {
+    id: 'hermes-secretaria',
+    name: 'Hermes Secretaria',
+    description: 'Hermes Agent configured for secretaria duties',
+    cliCommand: 'hermes',
+    authRequired: false,
+    enabled: true,
+    supportsStreaming: false,
+    acpArgs: ['acp', '--profile', 'secretaria'],
+    fluxCompat: 'setup',
+  },
+  'hermes-dev': {
+    id: 'hermes-dev',
+    name: 'Hermes Dev',
+    description: 'Hermes Agent configured for development tasks',
+    cliCommand: 'hermes',
+    authRequired: false,
+    enabled: true,
+    supportsStreaming: false,
+    acpArgs: ['acp', '--profile', 'dev'],
+    fluxCompat: 'setup',
+  },
+  'hermes-default': {
+    id: 'hermes-default',
+    name: 'Hermes Default Profile',
+    description: 'Hermes Agent configured with default profile and all Wayland features bypassed',
+    cliCommand: 'hermes',
+    authRequired: false,
+    enabled: true,
+    supportsStreaming: false,
+    acpArgs: ['acp', '--profile', 'default'],
+    fluxCompat: 'setup',
+    skipProviderEnv: true,
+    disableBuiltinMcp: true,
+    skipMemoryInjection: true,
+    skipRulesInjection: true,
+    skipSkillsInjection: true,
   },
   snow: {
     id: 'snow',

@@ -17,7 +17,19 @@ import type { AcpInitializeResult } from './acpTypes';
 // detection reports `wcore`, while `resolveAvailableBackends` adds the
 // guaranteed fallback as `wayland-core`. Both are team-capable - list both so a
 // capability filter never drops the always-present fallback (#152).
-const KNOWN_TEAM_CAPABLE_BACKENDS = new Set(['gemini', 'claude', 'codex', 'wcore', 'wayland-core']);
+const KNOWN_TEAM_CAPABLE_BACKENDS = new Set([
+  'gemini',
+  'claude',
+  'codex',
+  'wcore',
+  'wayland-core',
+  'kiro',
+  'hermes',
+  'hermes-secretaria',
+  'hermes-dev',
+  'hermes-homelab-ops',
+  'hermes-default',
+]);
 
 /**
  * Check if an agent backend is team-capable.
@@ -187,4 +199,18 @@ export type ITeamMcpStatusEvent = {
   serverCount?: number;
   port?: number;
   error?: string;
+};
+
+export type TeamTask = {
+  id: string;
+  teamId: string;
+  subject: string;
+  description?: string;
+  status: 'pending' | 'in_progress' | 'verifying' | 'zombie' | 'completed' | 'failed' | 'deleted';
+  owner?: string;
+  blockedBy: string[];
+  blocks: string[];
+  metadata: Record<string, unknown>;
+  createdAt: number;
+  updatedAt: number;
 };
