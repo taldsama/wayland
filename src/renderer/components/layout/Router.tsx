@@ -65,6 +65,8 @@ const WikiDetailPage = React.lazy(() =>
   import('@renderer/pages/wiki/WikiDetailPage').then((m) => ({ default: m.WikiDetailPageRoute }))
 );
 
+const GoalYoloPage = React.lazy(() => import('@renderer/pages/goal/GoalYoloPage'));
+
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<AppLoader />}>
     <Component />
@@ -202,6 +204,9 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
             <Route path='/memory' element={withRouteFallback(MemoryPage)} />
             <Route path='/wiki' element={withRouteFallback(WikiHomePage)} />
             <Route path='/wiki/:slug' element={withRouteFallback(WikiDetailPage)} />
+
+            {/* Orchestration Panels */}
+            <Route path='/goal' element={withRouteFallback(GoalYoloPage)} />
           </Route>
           <Route path='*' element={<Navigate to={status === 'authenticated' ? '/guid' : '/login'} replace />} />
         </Routes>

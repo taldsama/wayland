@@ -16,10 +16,22 @@
  */
 
 import React from 'react';
-import { Brain, Clock, FolderKanban, Gauge, LayoutGrid, MessagesSquare, Search, Users, Workflow } from 'lucide-react';
+import {
+  Brain,
+  Clock,
+  FolderKanban,
+  Gauge,
+  LayoutGrid,
+  MessagesSquare,
+  Search,
+  Users,
+  Workflow,
+  Target,
+} from 'lucide-react';
 
 import type { SiderTooltipProps } from '@renderer/utils/ui/siderTooltip';
 import {
+  SiderGoalEntry,
   SiderAssistantsEntry,
   SiderMemoryEntry,
   SiderMissionControlEntry,
@@ -207,6 +219,22 @@ export const SIDER_NAV_ITEMS: SiderNavItem[] = [
         collapsed={ctx.collapsed}
         siderTooltipProps={ctx.siderTooltipProps}
         onClick={() => ctx.onTopZoneNav('/mission-control')}
+      />
+    ),
+  },
+  {
+    id: 'goal',
+    labelKey: 'goal.siderEntry',
+    defaultLabel: 'Goal YOLO',
+    icon: <Target size={16} />,
+    render: (ctx) => (
+      <SiderGoalEntry
+        key='goal'
+        isMobile={ctx.isMobile}
+        isActive={ctx.pathname.startsWith('/goal')}
+        collapsed={ctx.collapsed}
+        siderTooltipProps={ctx.siderTooltipProps}
+        onClick={() => ctx.onTopZoneNav('/goal')}
       />
     ),
   },

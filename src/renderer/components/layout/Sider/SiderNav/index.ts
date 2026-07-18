@@ -10,3 +10,4 @@ export { default as SiderSessionsEntry } from './SiderSessionsEntry';
 export { default as SiderTeamsEntry } from './SiderTeamsEntry';
 export { default as SiderToolbar } from './SiderToolbar';
 export { default as SiderWorkflowsEntry } from './SiderWorkflowsEntry';
+export { default as SiderGoalEntry } from './SiderGoalEntry';
