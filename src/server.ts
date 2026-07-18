@@ -20,6 +20,7 @@ import initStorage from './process/utils/initStorage';
 import { ExtensionRegistry } from './process/extensions';
 import { getChannelManager } from './process/channels';
 import { closeDatabase } from './process/services/database/export';
+import { ijfwSystemService } from './process/services/ijfwSystemService';
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 const ALLOW_REMOTE = process.env.ALLOW_REMOTE === 'true';
@@ -118,6 +119,27 @@ async function main(): Promise<void> {
     await importEnvKeysOnBoot();
   } catch (error) {
     console.error('[server] Env-key import failed:', error);
+  }
+
+  // Initialize IJFW system service (skip when disabled via env, e.g. E2E / CI / explicit opt-out)
+  const isCiRuntime = process.env.CI === 'true' || process.env.CI === '1' || process.env.GITHUB_ACTIONS === 'true';
+  const disableIjfw = isCiRuntime || process.env.WAYLAND_DISABLE_IJFW === '1' || process.env.WAYLAND_E2E_TEST === '1';
+  if (!disableIjfw) {
+    try {
+      await ijfwSystemService.applyPendingUpgrade();
+    } catch (err) {
+      console.error('[server] ijfw applyPendingUpgrade failed:', err);
+    }
+    try {
+      ijfwSystemService.startHealthWatcher();
+    } catch (err) {
+      console.error('[server] ijfw startHealthWatcher failed:', err);
+    }
+    setTimeout(() => {
+      void ijfwSystemService.bootstrap().catch((err) => {
+        console.error('[server] ijfw bootstrap failed:', err);
+      });
+    }, 5000);
   }
 
   // Start the WebServer
