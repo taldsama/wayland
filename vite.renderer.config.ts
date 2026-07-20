@@ -125,6 +125,7 @@ export default defineConfig({
       'remark-breaks',
       'rehype-raw',
       'rehype-katex',
+      'force-graph',
     ],
   },
 });

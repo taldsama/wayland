@@ -119,6 +119,24 @@ export const useConversationAgents = (): UseConversationAgentsResult => {
       seen.add(key);
       merged.push(agent);
     }
+
+    // Fallback: if no hermes presets arrived from config, inject them so the
+    // team picker always has candidates. This covers first-install scenarios
+    // where ConfigStorage('assistants') has not yet been seeded with the
+    // built-in hermes presets (#152).
+    const hermesFallback: AvailableAgent[] = [
+      { id: 'builtin-hermes-dev', name: 'Hermes Dev', backend: 'hermes-dev', presetAgentType: 'hermes-dev', isPreset: true, customAgentId: 'builtin-hermes-dev', avatar: 'lucide:Terminal', context: '', description: '', descriptionI18n: {}, nameI18n: { 'en-US': 'Hermes Dev' } },
+      { id: 'builtin-hermes-secretaria', name: 'Hermes Secretaria', backend: 'hermes-secretaria', presetAgentType: 'hermes-secretaria', isPreset: true, customAgentId: 'builtin-hermes-secretaria', avatar: 'lucide:BookOpen', context: '', description: '', descriptionI18n: {}, nameI18n: { 'en-US': 'Hermes Secretaria' } },
+      { id: 'builtin-hermes-default', name: 'Hermes Default Agent', backend: 'hermes-default', presetAgentType: 'hermes-default', isPreset: true, customAgentId: 'builtin-hermes-default', avatar: 'lucide:User', context: '', description: '', descriptionI18n: {}, nameI18n: { 'en-US': 'Hermes Default Agent' } },
+      { id: 'builtin-hermes-homelab-ops', name: 'Hermes Homelab Ops', backend: 'hermes-homelab-ops', presetAgentType: 'hermes-homelab-ops', isPreset: true, customAgentId: 'builtin-hermes-homelab-ops', avatar: 'lucide:Server', context: '', description: '', descriptionI18n: {}, nameI18n: { 'en-US': 'Hermes Homelab Ops' } },
+    ];
+    for (const fb of hermesFallback) {
+      if (!seen.has(fb.customAgentId)) {
+        seen.add(fb.customAgentId);
+        merged.push(fb);
+      }
+    }
+
     return merged;
   }, [presetConfigs, extensionAssistants]);
 

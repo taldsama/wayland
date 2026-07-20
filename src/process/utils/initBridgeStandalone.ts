@@ -47,6 +47,7 @@ import { initModelRegistryIpc } from '@process/providers/ipc/modelRegistryIpc';
 import { initProjectBridge } from '@process/bridge/projectBridge';
 import { initTeamBridge } from '@process/bridge/teamBridge';
 import { initSkillsBridge } from '@process/bridge/skillsBridge';
+import { initMemoryArchiveBridge, initPromotionSweep } from '@process/bridge/memoryArchiveBridge';
 import { SqliteTeamRepository } from '@process/team/repository/SqliteTeamRepository';
 import { TeamSessionService } from '@process/team/TeamSessionService';
 
@@ -96,6 +97,8 @@ export async function initBridgeStandalone(): Promise<void> {
   initTeamBridge(teamSessionService);
 
   initSkillsBridge();
+  initMemoryArchiveBridge();
+  initPromotionSweep();
 
   // Model-registry IPC powers the Models page + the model picker. The Electron
   // bridge wires this in `bridge/index.ts`; standalone must do it too or the

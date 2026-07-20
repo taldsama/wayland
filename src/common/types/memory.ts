@@ -8,6 +8,24 @@
 
 export type MemoryType = 'decision' | 'pattern' | 'observation' | 'session' | 'wiki' | 'preference';
 
+export type GraphNode = {
+  id: string;
+  label: string;
+  type: MemoryType | 'unresolved';
+  project?: string;
+  linkCount: number;
+};
+
+export type GraphEdge = {
+  source: string;
+  target: string;
+};
+
+export type GraphData = {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+};
+
 export type MemoryEntry = {
   id: string;
   type: MemoryType;

@@ -20,7 +20,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Tag, Tooltip } from '@arco-design/web-react';
+import { Button, Tag } from '@arco-design/web-react';
 import { Close, Copy, LinkOne, FileCode, Help, Edit, Delete } from '@icon-park/react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
@@ -370,19 +370,19 @@ const RightDrawer: React.FC<RightDrawerProps> = ({
           {/* Promotion score bar */}
           <div className={styles.scoreWrap} data-testid='drawer-score-wrap'>
             <div className={styles.scoreLabel}>
-              <span className={styles.scoreText} data-testid='drawer-score-text'>
+              <span className={styles.scoreText} data-testid='drawer-score-text' title={SCORE_TOOLTIP}>
                 {t('archive.drawer.promotionScore', 'Promotion score')} {entry.promotionScore}/100
                 {' - '}
                 {t('archive.drawer.autoPromotesAt', 'auto-promotes at {{n}}', { n: promotionThreshold })}
               </span>
-              <Tooltip content={SCORE_TOOLTIP} position='top'>
-                <Help
-                  theme='outline'
-                  size='13'
-                  style={{ cursor: 'help', opacity: 0.6 }}
-                  aria-label={t('archive.drawer.scoreFormula', 'Score formula')}
-                />
-              </Tooltip>
+              <span
+                className={styles.helpIcon}
+                title={SCORE_TOOLTIP}
+                style={{ cursor: 'help', opacity: 0.6, marginLeft: '4px' }}
+                aria-label={t('archive.drawer.scoreFormula', 'Score formula')}
+              >
+                <Help theme='outline' size='13' />
+              </span>
             </div>
             <div className={styles.scoreTrack} data-testid='drawer-score-track'>
               <div

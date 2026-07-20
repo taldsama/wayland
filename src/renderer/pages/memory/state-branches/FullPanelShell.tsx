@@ -30,7 +30,7 @@
 import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Input, Message, Modal } from '@arco-design/web-react';
 import type { RefInputType } from '@arco-design/web-react/es/Input/interface';
-import { Archive, Search, Import as ImportIcon, Settings2, Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Archive, Search, Import as ImportIcon, Settings2, Plus, ChevronDown, ChevronRight, GitGraph } from 'lucide-react';
 import { ipcBridge } from '@/common';
 import { formatModifierShortcut } from '@/renderer/utils/platform';
 import { memory as memoryBridge, ijfw as ijfwBridge } from '@/common/adapter/ipcBridge';
@@ -56,18 +56,15 @@ import type { TimeWindow } from '../components/TimeDropdown';
 import styles from './FullPanelShell.module.css';
 
 // ---------------------------------------------------------------------------
-// Lazy-load PromotionThresholdModal
+// Lazy-load PromotionThresholdModal and GraphView
 // ---------------------------------------------------------------------------
 
-type PromotionThresholdModalModule = { default: React.ComponentType<{ onClose: () => void }> };
-
 const PromotionThresholdModalLazy = lazy(
-  () =>
-    import('../components/PromotionThresholdModal').catch(
-      (): PromotionThresholdModalModule => ({
-        default: () => null,
-      })
-    ) as Promise<PromotionThresholdModalModule>
+  () => import('../components/PromotionThresholdModal')
+);
+
+const GraphViewLazy = lazy(
+  () => import('../components/GraphView')
 );
 
 // ---------------------------------------------------------------------------
@@ -140,6 +137,40 @@ const FullPanelShell: React.FC = () => {
   const [composerOpen, setComposerOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<(MemoryEntry & { body: string }) | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [showGraph, setShowGraph] = useState(() => {
+    try {
+      return localStorage.getItem('wayland.memory.showGraph') === '1';
+    } catch {
+      return true; // default to graph view
+    }
+  });
+
+  // Persist graph view toggle
+  useEffect(() => {
+    try {
+      localStorage.setItem('wayland.memory.showGraph', showGraph ? '1' : '0');
+    } catch {
+      // Ignore
+    }
+  }, [showGraph]);
+
+  // Listen for sidebar toggle (same tab — no reload needed)
+  useEffect(() => {
+    const handler = (): void => {
+      try {
+        setShowGraph(localStorage.getItem('wayland.memory.showGraph') === '1');
+      } catch {
+        // Ignore
+      }
+    };
+    window.addEventListener('storage', handler);
+    // Also listen for custom events from sidebar
+    window.addEventListener('memory:graph-toggle', handler);
+    return () => {
+      window.removeEventListener('storage', handler);
+      window.removeEventListener('memory:graph-toggle', handler);
+    };
+  }, []);
 
   const searchRef = useRef<RefInputType>(null);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -491,6 +522,16 @@ const FullPanelShell: React.FC = () => {
         </div>
 
         <div className={styles.topbarActions}>
+          {/* Graph toggle */}
+          <Button
+            type={showGraph ? 'primary' : 'text'}
+            size='small'
+            icon={<GitGraph size={15} aria-hidden />}
+            onClick={() => setShowGraph((v) => !v)}
+            data-testid='memory-btn-graph-toggle'
+            className={styles.iconBtn}
+            title={showGraph ? 'List view' : 'Graph view'}
+          />
           {/* Import button */}
           <Button
             type='text'
@@ -582,7 +623,18 @@ const FullPanelShell: React.FC = () => {
 
       {/* ---- Main area (1fr) ---- */}
       <div className={styles.main} data-testid='memory-body'>
-        {showEmptyHero ? (
+        {showGraph ? (
+          <div style={{ width: selectedId ? 'calc(100% - 480px)' : '100%', height: '100%', overflow: 'hidden', transition: 'width 0.25s ease' }}>
+            <Suspense fallback={<div className={styles.graphLoading}>Generating Knowledge Graph...</div>}>
+              <GraphViewLazy
+                filter={filter}
+                selectedId={selectedId ?? undefined}
+                onSelectNode={(id: string) => selectEntry(id)}
+                showUnresolved={false}
+              />
+            </Suspense>
+          </div>
+        ) : showEmptyHero ? (
           <EmptyStateHero onImportComplete={reload} onSearchChange={handleSearchChange} />
         ) : (
           <>
@@ -605,18 +657,21 @@ const FullPanelShell: React.FC = () => {
               />
             </div>
 
-            {/* Right drawer - push-content, 480px */}
-            <RightDrawer
-              entry={selected}
-              promotionThreshold={promotionThreshold}
-              onClose={clearSelection}
-              onPromote={handlePromote}
-              onOpenSource={handleOpenSource}
-              onCopy={handleCopy}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
           </>
+        )}
+
+        {/* Right drawer - push-content, 480px (shared by both list and graph views) */}
+        {selectedId && (
+          <RightDrawer
+            entry={selected}
+            promotionThreshold={promotionThreshold}
+            onClose={clearSelection}
+            onPromote={handlePromote}
+            onOpenSource={handleOpenSource}
+            onCopy={handleCopy}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         )}
       </div>
 

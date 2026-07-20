@@ -128,6 +128,12 @@
   color: var(--color-text-3);
 }
 
+.helpIcon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .scoreTrack {
   position: relative;
   height: 6px;

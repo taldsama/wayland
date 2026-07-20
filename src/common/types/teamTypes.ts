@@ -41,6 +41,10 @@ export function isTeamCapableBackend(
   cachedInitResults: Record<string, AcpInitializeResult> | null | undefined
 ): boolean {
   if (KNOWN_TEAM_CAPABLE_BACKENDS.has(backend)) return true;
+  // Auto-detect hermes presets by convention — any presetAgentType starting
+  // with 'hermes-' is team-capable without needing to be in the hardcoded set.
+  // This makes new hermes presets work automatically on first install.
+  if (backend.startsWith('hermes-')) return true;
   const initResult = cachedInitResults?.[backend];
   return initResult?.capabilities.mcpCapabilities.stdio === true;
 }

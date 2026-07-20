@@ -309,6 +309,9 @@ export class AcpConnection {
     child.stderr?.on('data', (data: Buffer) => {
       const chunk = data.toString();
       console.error(`[ACP ${backend} STDERR]:`, chunk);
+      try {
+        require('fs').appendFileSync(path.join(require('os').homedir(), 'hermes_child_stderr.log'), chunk);
+      } catch (err) {}
       if (stderrHead.length < STDERR_HEAD_MAX) {
         stderrHead += chunk;
         if (stderrHead.length > STDERR_HEAD_MAX) {

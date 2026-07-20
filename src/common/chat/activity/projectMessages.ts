@@ -135,6 +135,11 @@ const settleNodes = (nodes: ActivityNode[]): ActivityNode[] =>
 /**
  * Project a grouped tool_summary (mixed wcore tool_group + ACP acp_tool_call)
  * into one ordered ActivityStep[] - this REPLACES the old clunky "View Steps".
+ *
+ * #486 follow-up: tool_group messages persisted from old turns may carry
+ * stale 'running' status when the engine never delivered a completion frame.
+ * Settle them to 'done' on projection so the timeline never shows a forever-
+ * spinning circle in historical messages.
  */
 export const toolSummaryToSteps = (
   messages: Array<IMessageToolGroup | IMessageAcpToolCall>,
@@ -145,7 +150,7 @@ export const toolSummaryToSteps = (
     if (m.type === 'tool_group') nodes.push(...toolGroupToNodes(m.content));
     else nodes.push(acpToolCallToNode(m.content));
   }
-  return nodes.map((n) => nodeToStep(n, source));
+  return settleNodes(nodes).map((n) => nodeToStep(n, source));
 };
 
 /** Project a spawned sub_agent card (parsed inner subtree) into one sub_agent step. */
@@ -166,6 +171,7 @@ export const subAgentToStep = (content: IMessageSubAgent['content'], source?: Ac
   );
 };
 
-/** Project the live activity-tree card into steps. */
+/** Project the live activity-tree card into steps. Settles stale 'running'
+ * nodes to 'done' so historical messages never show a forever-spinning circle. */
 export const activityToSteps = (content: IMessageActivity['content'], source?: ActivitySource): ActivityStep[] =>
-  nodesToSteps(content.nodes, source);
+  nodesToSteps(settleNodes(content.nodes), source);

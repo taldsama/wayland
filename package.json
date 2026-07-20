@@ -117,6 +117,7 @@
     "@slack/bolt": "^4.7.0",
     "@slack/web-api": "^7.15.0",
     "@tiptap/extension-bubble-menu": "^3.23.4",
+    "@tiptap/extension-drag-handle": "^3.28.0",
     "@tiptap/extension-drag-handle-react": "^3.23.4",
     "@tiptap/extension-floating-menu": "^3.23.4",
     "@tiptap/extension-link": "^3.23.4",
@@ -161,6 +162,7 @@
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.1",
     "fix-path": "^4.0.0",
+    "force-graph": "^1.51.4",
     "google-auth-library": "^10.6.2",
     "grammy": "^1.39.3",
     "html-to-text": "^9.0.5",
@@ -353,5 +355,23 @@
     "officecli",
     "better-sqlite3",
     "electron"
-  ]
+  ],
+  "allowScripts": {
+    "@sentry/cli": true,
+    "github:WhiskeySockets/Baileys#01047debd81beb20da7b7779b08edcb06aa03770": true,
+    "better-sqlite3": true,
+    "core-js": true,
+    "electron": true,
+    "esbuild": true,
+    "electron-winstaller": true,
+    "keytar": true,
+    "node-pty": true,
+    "officecli": true,
+    "onnxruntime-node": true,
+    "protobufjs": true,
+    "sharp": true,
+    "tesseract.js": true,
+    "tree-sitter-bash": true,
+    "unrs-resolver": true
+  }
 }

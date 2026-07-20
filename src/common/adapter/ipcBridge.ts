@@ -279,9 +279,22 @@ export const application = {
   openDevTools: buildProvider<boolean, void>('open-dev-tools'), // Open/close DevTools, returns the resulting state
   isDevToolsOpened: buildProvider<boolean, void>('is-dev-tools-opened'), // Get current DevTools state
   systemInfo: buildProvider<
-    { cacheDir: string; workDir: string; logDir: string; platform: string; arch: string; userName: string },
+    {
+      cacheDir: string;
+      workDir: string;
+      logDir: string;
+      platform: string;
+      arch: string;
+      userName: string;
+      cpuUsage?: number;
+      memoryUsage?: number;
+    },
     void
   >('system.info'), // Get system info
+  fetchProxy: buildProvider<
+    { status: number; statusText: string; text?: string },
+    { url: string; options?: { method?: string; headers?: Record<string, string>; body?: string } }
+  >('app.fetch-proxy'),
   getPath: buildProvider<string, { name: 'desktop' | 'home' | 'downloads' }>('app.get-path'), // Get system path
   // One-click bug report (#464): capture the app window (needs no OS Screen-Recording
   // permission), copy it to the clipboard, and return diagnostics + versions to
@@ -2339,6 +2352,10 @@ export const team = {
       eventType?: import('@process/team/types').TeamEventType;
     }
   >('team.list-events'),
+  listTasks: buildProvider<
+    import('@process/team/types').TeamTask[],
+    { teamId: string }
+  >('team.list-tasks'),
   /**
    * W3c - Build-my-own AI-suggest. Pure server-side suggester scores the
    * provided specialist pool against the user's goal text and returns a
@@ -2750,6 +2767,11 @@ export const memory = {
   >('memory.read-source-context'),
   /** Fired when the file watcher triggers a re-index. */
   onIndexChanged: buildEmitter<IndexStats>('memory.index-changed'),
+  /** Fetch knowledge graph data containing nodes and wikilink connections. */
+  getGraphData: buildProvider<
+    import('@/common/types/memory').GraphData,
+    import('@/common/types/memory').ListFilter | void
+  >('memory.get-graph-data'),
   /** Import verbs - stubs until W1a wires the actual importers. */
   import: {
     claudeMem: buildProvider<{ count: number; errors: string[] }, void>('memory.import.claude-mem'),

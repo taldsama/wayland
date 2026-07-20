@@ -306,6 +306,7 @@ export default defineConfig(({ mode }) => {
           'remark-breaks',
           'rehype-raw',
           'rehype-katex',
+          'force-graph',
         ],
       },
     },
