@@ -1,9 +1,9 @@
 .graphContainer {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  background-color: #0d0d0d;
-  overflow: hidden;
+ position: relative;
+ width: 100%;
+ height: 100%;
+ background-color: #0f141d;
+ overflow: hidden;
 }
 
 .graph {
@@ -58,8 +58,104 @@
 }
 
 .tooltipLinks {
-  font-size: 10px;
-  color: #595959;
-  border-top: 1px solid #262626;
-  padding-top: 4px;
+ font-size: 10px;
+ color: #595959;
+ border-top: 1px solid #262626;
+ padding-top: 4px;
+}
+
+/* Leyenda de roles (C2) */
+.legend {
+ position: absolute;
+ top: 12px;
+ left: 12px;
+ z-index: 10;
+ display: flex;
+ align-items: center;
+ gap: 12px;
+ padding: 6px 12px;
+ border-radius: 8px;
+ background: rgba(15, 20, 29, 0.82);
+ border: 1px solid #2c3a4d;
+ backdrop-filter: blur(4px);
+ font-size: 10px;
+ letter-spacing: 0.5px;
+ color: #c9d4e4;
+ pointer-events: none;
+}
+.legendTitle {
+ font-weight: 700;
+ color: #8fa3bd;
+}
+.legendItem {
+ display: flex;
+ align-items: center;
+ gap: 5px;
+ text-transform: uppercase;
+}
+.legendDot {
+ width: 9px;
+ height: 9px;
+ border-radius: 50%;
+ display: inline-block;
+ flex-shrink: 0;
+}
+
+/* Toolbar nodo seleccionado (C3) */
+.nodeToolbar {
+ position: absolute;
+ bottom: 16px;
+ left: 50%;
+ transform: translateX(-50%);
+ z-index: 10;
+ display: flex;
+ align-items: center;
+ gap: 6px;
+ padding: 8px 12px;
+ border-radius: 10px;
+ background: rgba(15, 20, 29, 0.9);
+ border: 1px solid #3e4c5e;
+ box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+ font-size: 10px;
+ color: #c9d4e4;
+}
+.toolbarLabel {
+ font-weight: 700;
+ letter-spacing: 1px;
+ color: #8fa3bd;
+ text-transform: uppercase;
+}
+.toolbarSep {
+ margin-left: 6px;
+}
+.swatch {
+ width: 18px;
+ height: 18px;
+ border-radius: 50%;
+ border: 1px solid rgba(255, 255, 255, 0.2);
+ cursor: pointer;
+ padding: 0;
+ transition: transform 0.12s ease;
+}
+.swatch:hover {
+ transform: scale(1.2);
+}
+.toolbarBtn {
+ border: 1px solid #3e4c5e;
+ background: #232c3b;
+ color: #e8eef7;
+ border-radius: 6px;
+ padding: 3px 8px;
+ font-size: 11px;
+ font-weight: 700;
+ cursor: pointer;
+ transition: background 0.12s ease, border-color 0.12s ease;
+}
+.toolbarBtn:hover {
+ background: #3e4c5e;
+ border-color: #55677f;
+}
+.toolbarDanger:hover {
+ border-color: #d96c4f;
+ color: #f5b89f;
 }

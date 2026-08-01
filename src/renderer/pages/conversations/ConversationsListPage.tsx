@@ -6,10 +6,8 @@
 
 import { ipcBridge } from '@/common';
 import type { TChatConversation } from '@/common/config/storage';
-import type { IProject } from '@/common/types/project';
 import { clearPersistedDraftsForConversation } from '@/renderer/hooks/chat/useSendBoxDraft';
 import AssignToProjectModal from '@/renderer/pages/projects/components/AssignToProjectModal';
-import { useProjects } from '@/renderer/pages/projects/hooks/useProjects';
 import {
   getConversationPinnedAt,
   isConversationPinned,
@@ -21,21 +19,15 @@ import { MessageSquare, MessagesSquare, Plus } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import ConversationRow from './ConversationRow';
-import { type ConversationMenuAction } from './ConversationMenu';
+import type { ConversationMenuAction } from './ConversationMenu';
 import ResumeCard from './ResumeCard';
 import styles from './conversationCards.module.css';
 
 const DAY = 86_400_000;
-const RESUME_COUNT = 4;
-
 const startOfToday = (): number => {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 };
-
-const getProjectId = (conv: TChatConversation): string | undefined =>
-  (conv.extra as { projectId?: string } | undefined)?.projectId;
 
 /**
  * A full-width browse surface for every conversation. "Jump back in" cards
@@ -47,7 +39,6 @@ const getProjectId = (conv: TChatConversation): string | undefined =>
 const ConversationsListPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { projects } = useProjects();
   const [all, setAll] = useState<TChatConversation[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -59,8 +50,6 @@ const ConversationsListPage: React.FC = () => {
   const [renameBusy, setRenameBusy] = useState(false);
 
   const [assignProjectCtrl, assignProjectNode] = AssignToProjectModal.useModal({ conversationId: undefined });
-
-  const projectById = useMemo<Map<string, IProject>>(() => new Map(projects.map((p) => [p.id, p])), [projects]);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -110,11 +99,6 @@ const ConversationsListPage: React.FC = () => {
   const byActivityDesc = useCallback(
     (list: TChatConversation[]) => list.toSorted((a, b) => getActivityTime(b) - getActivityTime(a)),
     []
-  );
-
-  const resume = useMemo(
-    () => (query ? [] : byActivityDesc(searched).slice(0, RESUME_COUNT)),
-    [searched, query, byActivityDesc]
   );
 
   const pinnedList = useMemo(
@@ -253,22 +237,18 @@ const ConversationsListPage: React.FC = () => {
     [navigate, togglePin, assignProjectCtrl, confirmDelete]
   );
 
-  const renderRow = (conv: TChatConversation) => {
-    const projectId = getProjectId(conv);
-    return (
-      <ConversationRow
-        key={conv.id}
-        conversation={conv}
-        pinned={isConversationPinned(conv)}
-        project={projectId ? projectById.get(projectId) : undefined}
-        timeLabel={timeLabel(getActivityTime(conv))}
-        onOpen={() => navigate(`/conversation/${conv.id}`)}
-        onAction={(action) => handleAction(conv, action)}
-      />
-    );
-  };
+  const renderCard = (conv: TChatConversation) => (
+  <ResumeCard
+    key={conv.id}
+    conversation={conv}
+    pinned={isConversationPinned(conv)}
+    timeLabel={timeLabel(getActivityTime(conv))}
+    onOpen={() => navigate(`/conversation/${conv.id}`)}
+    onAction={(action) => handleAction(conv, action)}
+  />
+);
 
-  const isEmpty = !loading && searched.length === 0;
+const isEmpty = !loading && searched.length === 0;
 
   const newChatButton = (
     <button
@@ -315,47 +295,26 @@ const ConversationsListPage: React.FC = () => {
             </div>
           ) : (
             <div className='flex flex-col gap-24px'>
-              {/* Jump back in */}
-              {resume.length > 0 && (
-                <section className='flex flex-col gap-10px'>
-                  <span className={styles.sectionLabel}>
-                    {t('conversations.group.resume', { defaultValue: 'Jump back in' })}
-                  </span>
-                  <div className={styles.rail}>
-                    {resume.map((conv) => (
-                      <ResumeCard
-                        key={conv.id}
-                        conversation={conv}
-                        pinned={isConversationPinned(conv)}
-                        timeLabel={timeLabel(getActivityTime(conv))}
-                        onOpen={() => navigate(`/conversation/${conv.id}`)}
-                        onAction={(action) => handleAction(conv, action)}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )}
+              {/* Starred — todas como cards */}
+{pinnedList.length > 0 && (
+  <section className='flex flex-col gap-10px'>
+    <span className={styles.sectionLabel}>
+      {t('conversations.group.starred', { defaultValue: 'Starred' })}
+    </span>
+    <div className={styles.rail}>{pinnedList.map(renderCard)}</div>
+  </section>
+)}
 
-              {/* Starred */}
-              {pinnedList.length > 0 && (
-                <section className='flex flex-col gap-6px'>
-                  <span className={`${styles.sectionLabel} px-12px`}>
-                    {t('conversations.group.starred', { defaultValue: 'Starred' })}
-                  </span>
-                  <div className='flex flex-col'>{pinnedList.map(renderRow)}</div>
-                </section>
-              )}
-
-              {/* Date sections */}
-              {dateSections.map((section) => (
-                <section key={section.key} className='flex flex-col gap-6px'>
-                  <span className={`${styles.sectionLabel} px-12px`}>{section.label}</span>
-                  <div className='flex flex-col'>{section.items.map(renderRow)}</div>
-                </section>
-              ))}
-            </div>
-          )}
-        </Spin>
+{/* Date sections — todas como cards (mantiene separación today/yesterday/week/month/older) */}
+{dateSections.map((section) => (
+  <section key={section.key} className='flex flex-col gap-10px'>
+    <span className={styles.sectionLabel}>{section.label}</span>
+    <div className={styles.rail}>{section.items.map(renderCard)}</div>
+  </section>
+))}
+</div>
+)}
+</Spin>
       </div>
 
       {/* Rename modal */}
