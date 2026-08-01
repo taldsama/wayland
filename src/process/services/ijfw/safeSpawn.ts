@@ -71,9 +71,11 @@ export function __buildNpmCliCandidates(platform: NodeJS.Platform, env: NodeJS.P
 
   return [
     path.join(path.dirname(execPath), '..', 'libnode', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    '/usr/lib/node_modules/npm/bin/npm-cli.js',
     '/usr/local/lib/node_modules/npm/bin/npm-cli.js',
     '/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js',
   ];
+
 }
 
 /**

@@ -312,52 +312,47 @@ body[arco-theme='dark'] {
      hover (--bg-2) goes to #2a (p-grey-5), deepest fill (--bg-3) to #353535
      (p-grey-6). Border-base climbs to --p-grey-7 (#4d4d4d) so the hairline
      edge is unambiguously legible against the bumped card surface. */
-  --bg-base: #0a0a0a;
-  --bg-1: #222222;
-  --bg-2: #2a2a2a;
-  --bg-3: #353535;
-  --bg-4: #222222;
-  --bg-5: #2a2a2a;
-  --bg-6: #4d4d4d;
-  --bg-8: #777777;
-  --bg-9: #c0c0c0;
-  --bg-10: #f5f5f5;
+  --bg-base: #0d1322;
+  --bg-1: #141c2e;
+  --bg-2: #1b263e;
+  --bg-3: #24324f;
+  --bg-4: #141c2e;
+  --bg-5: #1b263e;
+  --bg-6: #324469;
+  --bg-8: #5c74a6;
+  --bg-9: #cbd5e1;
+  --bg-10: #f8fafc;
 
-  --bg-tint: #1a130f; /* warm dark tint for user message bubbles */
-  --bg-elevated: #222222;
-  --bg-hover: #1a1a1a;
-  --bg-active: #262626;
+  --bg-tint: #1c1917; /* warm amber dark tint for user message bubbles */
+  --bg-elevated: #141c2e;
+  --bg-hover: #1b263e;
+  --bg-active: #24324f;
 
   /* Text - dark */
-  --text-primary: #f5f5f5;
-  --text-secondary: #c0c0c0;
-  --text-disabled: #555555;
-  --text-muted: #9a9a9a; /* bumped from #7a (4.2:1) to pass WCAG AA on bg-base */
-  --text-dim: #6b6b6b;
-  /* Input placeholders need higher contrast than --text-muted; tuned for WCAG AA on tinted input backgrounds. */
-  --text-placeholder: #b8b8b8;
-  /* Form inputs get a solid background + visible border so the field boundary is clearly perceivable. */
-  --input-bg: #1c1c1c;
-  --input-border: #383838;
-  --input-border-focus: var(--brand);
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-disabled: #64748b;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --text-placeholder: #94a3b8;
+  --input-bg: #141c2e;
+  --input-border: #324469;
+  --input-border-focus: #f59e0b;
 
-  /* Borders - dark. Card surface bumped to #222 (Bible's --p-grey-4);
-     border climbs in lockstep to --p-grey-7 (#4d4d4d) so the edge stays
-     a confident 43-step delta from the card fill. Still strict-scale
-     Bible primitives (p-grey-6 / p-grey-7 / p-grey-8). */
-  --border-base: #4d4d4d;
-  --border-light: #353535;
-  --border-bright: #777777;
-  --border-mid: #4d4d4d;
+  /* Borders - dark */
+  --border-base: #324469;
+  --border-light: #24324f;
+  --border-bright: #475569;
+  --border-mid: #324469;
 
-  /* Brand - dark (same orange across modes by design) */
-  --brand: #ff6b35;
-  --brand-hover: #ff8255;
-  --brand-pressed: #cc5529;
-  --brand-light: #1f1612; /* warm tinted dark surface for brand-bg areas */
-  --brand-soft-bg: rgba(255, 107, 53, 0.06);
-  --brand-soft-border: rgba(255, 107, 53, 0.22);
-  --brand-glow: 0 0 0 1px rgba(255, 107, 53, 0.6), 0 0 24px rgba(255, 107, 53, 0.14), 0 8px 32px rgba(0, 0, 0, 0.5);
+  /* Brand - dark (Ámbar Neón & Dorado) */
+  --brand: #f59e0b;
+  --brand-hover: #fbbf24;
+  --brand-pressed: #d97706;
+  --brand-light: #271e11;
+  --brand-soft-bg: rgba(245, 158, 11, 0.08);
+  --brand-soft-border: rgba(245, 158, 11, 0.28);
+  --brand-glow: 0 0 0 1px rgba(245, 158, 11, 0.6), 0 0 24px rgba(245, 158, 11, 0.18), 0 8px 32px rgba(0, 0, 0, 0.5);
 
   /* Semantic - same family as light */
   --primary: #ff6b35;

@@ -244,3 +244,6 @@ installer/payload/
 # extraResources so no loose SKILL.md reaches the package.
 .skill-pack/
 src/process/channels/signal-cli-runtime/bin/signal-cli
+
+# git filter-branch internals
+.git-rewrite/

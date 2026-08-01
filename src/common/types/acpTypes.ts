@@ -197,6 +197,17 @@ export interface AcpBackendConfig {
   /** Whether to disable built-in MCP servers for this agent */
   disableBuiltinMcp?: boolean;
 
+  /** Whether to skip injecting the Wayland Constitution into this agent's system prompt */
+  skipConstitution?: boolean;
+
+  /**
+   * Keep all Wayland integrations (constitution, rules, skills, provider env,
+   * Flux) but never impose Wayland's model choice on the CLI. Blocks model
+   * re-imposition at session start and resume only; an explicit user pick from
+   * the model picker still goes through. Narrower than skipProviderEnv.
+   */
+  skipModelControl?: boolean;
+
   /** Whether this backend is enabled and should appear in the UI */
   enabled?: boolean;
 
@@ -532,6 +543,7 @@ export const ACP_BACKENDS_ALL: Record<AcpBackendAll, AcpBackendConfig> = {
     supportsStreaming: false,
     acpArgs: ['acp'], // hermes uses the acp subcommand
     fluxCompat: 'setup',
+    skipProviderEnv: true,
   },
   'hermes-homelab-ops': {
     id: 'hermes-homelab-ops',
@@ -559,6 +571,7 @@ export const ACP_BACKENDS_ALL: Record<AcpBackendAll, AcpBackendConfig> = {
     supportsStreaming: false,
     acpArgs: ['acp', '--profile', 'secretaria'],
     fluxCompat: 'setup',
+    skipProviderEnv: true,
   },
   'hermes-dev': {
     id: 'hermes-dev',
@@ -570,6 +583,9 @@ export const ACP_BACKENDS_ALL: Record<AcpBackendAll, AcpBackendConfig> = {
     supportsStreaming: false,
     acpArgs: ['acp', '--profile', 'dev'],
     fluxCompat: 'setup',
+    skipProviderEnv: true,
+    skipRulesInjection: true,
+    skipSkillsInjection: true,
   },
   'hermes-default': {
     id: 'hermes-default',
@@ -586,6 +602,7 @@ export const ACP_BACKENDS_ALL: Record<AcpBackendAll, AcpBackendConfig> = {
     skipMemoryInjection: true,
     skipRulesInjection: true,
     skipSkillsInjection: true,
+    skipConstitution: true,
   },
   snow: {
     id: 'snow',
@@ -610,6 +627,11 @@ export const ACP_BACKENDS_ALL: Record<AcpBackendAll, AcpBackendConfig> = {
 export const ACP_ENABLED_BACKENDS: Record<string, AcpBackendConfig> = Object.fromEntries(
   Object.entries(ACP_BACKENDS_ALL).filter(([_, config]) => config.enabled)
 );
+
+/** Look up the static registry entry for an arbitrary backend id, if any. */
+export function getStaticBackendConfig(backend: string): AcpBackendConfig | undefined {
+  return (ACP_BACKENDS_ALL as Record<string, AcpBackendConfig>)[backend];
+}
 
 // Currently enabled backend types
 export type AcpBackend = keyof typeof ACP_BACKENDS_ALL;
@@ -1156,7 +1178,8 @@ export type AcpModelInfoSourceDetail =
   | 'acp-models'
   | 'persisted-model'
   | 'codex-stream'
-  | 'claude-slots';
+  | 'claude-slots'
+  | 'hermes-config';
 
 export interface AcpModelInfo {
   /** Currently active model ID */

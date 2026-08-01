@@ -1537,8 +1537,7 @@ export interface ICreateConversationParams {
      * their bodies on the first turn (same field skills.add-to-conversation writes).
      */
     sessionSkills?: string[];
-    /**
-     * Per-conversation reasoning effort for effort-capable backends
+    /** Per-conversation reasoning effort for effort-capable backends
      * (Codex / WCore / Claude-ACP). Persisted on the conversation and read by
      * each backend's config builder on the next turn. Absent => backend default.
      */
@@ -1547,6 +1546,8 @@ export interface ICreateConversationParams {
     teamId?: string;
     /** Project ownership - stamps extra.projectId so the conversation lives under a project umbrella. */
     projectId?: string;
+    /** YOLO mode flag: marks this conversation as an autonomous goal-runner session */
+    yoloMode?: boolean;
   };
 }
 interface IResetConversationParams {

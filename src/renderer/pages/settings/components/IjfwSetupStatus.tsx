@@ -79,7 +79,8 @@ const IjfwSetupStatus: React.FC<IjfwSetupStatusProps> = ({ status, cliCount, hid
     }
     let disposed = false;
     void ipcBridge.ijfw.brainInvoke
-      .invoke({ verb: 'state' })
+      .invoke({ verb: 'memory_prelude' })
+
       .then((r) => {
         if (!disposed) setRuntimeReachable(!!r?.ok);
       })
@@ -143,7 +144,8 @@ const IjfwSetupStatus: React.FC<IjfwSetupStatusProps> = ({ status, cliCount, hid
     if (testState === 'running') return;
     setTestState('running');
     try {
-      const result = await ipcBridge.ijfw.brainInvoke.invoke({ verb: 'state' });
+      const result = await ipcBridge.ijfw.brainInvoke.invoke({ verb: 'memory_prelude' });
+
       setTestState(result?.ok ? 'pass' : 'fail');
     } catch {
       setTestState('fail');

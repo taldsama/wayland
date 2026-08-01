@@ -60,12 +60,12 @@ export function buildRolePrompt(params: BuildRolePromptParams): string {
 
   // Prepend Wayland Constitution + optional specialist overlay above the
   // role-prompt body (which already contains the optional sandbox-wrap and
-  // SYSTEM SANDBOX NOTICE). composePrompt returns '' when no Constitution
-  // file exists, in which case we fall back to the original wrapped body
-  // (preserves fresh-install behaviour). Same semantics as B1/B2/B3.
+  // SYSTEM SANDBOX NOTICE). In TEAMS mode, the Constitution is ALWAYS injected
+  // to ensure specialists adhere to safety and team cooperation standards.
   const composed = composePrompt({
     assistantId: agent.customAgentId,
     basePrompt: wrappedBody,
+    skipConstitution: false,
   }).text;
   return composed.length > 0 ? composed : wrappedBody;
 }

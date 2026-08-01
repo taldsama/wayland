@@ -753,6 +753,48 @@ class IjfwArchiveService {
       .slice(0, 20);
   }
 
+  async getGraphData(filter?: ListFilter): Promise<import('@/common/types/memory').GraphData> {
+    await this.init();
+    this.ensureRefs();
+    const { entries } = await this.listEntries(filter ?? {});
+    const nodes: import('@/common/types/memory').GraphNode[] = [];
+    const edges: import('@/common/types/memory').GraphEdge[] = [];
+    const nodeMap = new Map<string, import('@/common/types/memory').GraphNode>();
+
+    for (const e of entries) {
+      const node: import('@/common/types/memory').GraphNode = {
+        id: e.id,
+        label: e.summary,
+        type: e.type,
+        project: e.project,
+        referencedBy: e.referencedBy,
+        promotionScore: e.promotionScore,
+      };
+      nodes.push(node);
+      nodeMap.set(e.id, node);
+    }
+
+    // Connect nodes sharing tags or projects
+    for (let i = 0; i < entries.length; i++) {
+      for (let j = i + 1; j < entries.length; j++) {
+        const a = entries[i];
+        const b = entries[j];
+        const sharedTags = a.tags.filter((t) => b.tags.includes(t));
+        if (sharedTags.length > 0) {
+          edges.push({
+            source: a.id,
+            target: b.id,
+            label: sharedTags.join(', '),
+            weight: sharedTags.length,
+          });
+        }
+      }
+    }
+
+    return { nodes, edges };
+  }
+
+
   async getPromotionCandidates(threshold = 90): Promise<PromotionCandidates> {
     await this.init();
     this.ensureRefs();

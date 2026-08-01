@@ -78,9 +78,19 @@ export type SiderNavItem = {
  * Navigation visibility list; it defaults to visible (absent from the
  * hidden-set).
  */
+import { SiderConsciousnessEntry } from './SiderNav/SiderConsciousnessEntry';
+
 export const SIDER_NAV_ITEMS: SiderNavItem[] = [
   {
+    id: 'consciousness',
+    labelKey: 'consciousness.siderEntry',
+    defaultLabel: 'Consciousness HUD',
+    icon: <Target size={16} />,
+    render: (ctx) => <SiderConsciousnessEntry key='consciousness' ctx={ctx} />,
+  },
+  {
     id: 'sessions',
+
     labelKey: 'conversations.siderEntry',
     defaultLabel: 'Conversations',
     icon: <MessagesSquare size={16} />,

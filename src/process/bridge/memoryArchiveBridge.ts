@@ -144,6 +144,20 @@ export function initMemoryArchiveBridge(): void {
     }
   });
 
+  ipcBridge.memory.getGraphData.provider(async (rawFilter: unknown) => {
+    const parsed = listFilterSchema.safeParse(rawFilter ?? {});
+    if (!parsed.success) {
+      return { nodes: [], edges: [] };
+    }
+    try {
+      return await svc.getGraphData(parsed.data as ListFilter);
+    } catch (err) {
+      log.error('[memory-archive] getGraphData failed', { err });
+      return { nodes: [], edges: [] };
+    }
+  });
+
+
   ipcBridge.memory.getPromotionCandidates.provider(async () => {
     try {
       if (sweepHandle) {

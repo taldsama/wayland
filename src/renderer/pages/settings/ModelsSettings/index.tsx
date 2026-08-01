@@ -425,8 +425,6 @@ const ModelsSettingsInner: React.FC = () => {
       breadcrumb={[{ label: t('settings.modelsPage.crumbAiModels') }, { label: t('settings.modelsPage.title') }]}
       actions={headerActions}
     >
-      <FluxRouterHero connected={fluxConnected} onConnectKey={connectFluxKey} />
-
       <ConnectPanel
         detectedKeys={visibleDetected}
         onConnectKey={connectKey}

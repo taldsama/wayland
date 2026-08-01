@@ -58,8 +58,9 @@ export function setupBasicMiddleware(app: Express): void {
     csrf(
       CSRF_SECRET,
       ['POST', 'PUT', 'DELETE', 'PATCH'], // Protected methods
-      ['/login', '/api/auth/qr-login', '/channels/wecom/webhook'], // Excluded: login form, QR login, WeCom server callback (signed by WeCom)
+      ['/login', '/api/auth/qr-login', '/channels/wecom/webhook', '/api/teams/create', '/api/chat/prompt'], // Excluded: login form, QR login, WeCom server callback, CLI teams API, Voice prompt API
       [] // No service worker URLs
+
     )
   );
   app.use(attachCsrfToken); // Attach token to response headers

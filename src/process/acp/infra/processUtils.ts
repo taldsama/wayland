@@ -128,6 +128,14 @@ export function prepareCleanEnv(
       clean[key] = value;
     }
   }
-  if (customEnv) Object.assign(clean, customEnv);
+  if (customEnv) {
+    for (const [key, value] of Object.entries(customEnv)) {
+      if (value === '') {
+        delete clean[key];
+      } else {
+        clean[key] = value;
+      }
+    }
+  }
   return clean;
 }

@@ -486,6 +486,12 @@ export interface FirstMessageConfig {
    * real product data. Populate via `resolveCapabilitiesManifest()`.
    */
   capabilitiesManifest?: string;
+  /** Whether to skip injecting the Wayland Constitution + overlay */
+  skipConstitution?: boolean;
+  /** Whether to skip injecting presetContext/assistant rules */
+  skipRulesInjection?: boolean;
+  /** Whether to skip injecting skills index or skills content */
+  skipSkillsInjection?: boolean;
 }
 
 /**
@@ -523,13 +529,13 @@ async function tryComposeWorkflowProtocol(workflowSessionId: string | undefined)
 export async function buildSystemInstructions(config: FirstMessageConfig): Promise<string | undefined> {
   const instructions: string[] = [];
 
-  // Add preset context
-  if (config.presetContext) {
+  // Add preset context (unless skipRulesInjection is true)
+  if (!config.skipRulesInjection && config.presetContext) {
     instructions.push(config.presetContext);
   }
 
-  // Load and add skills content
-  if (config.enabledSkills && config.enabledSkills.length > 0) {
+  // Load and add skills content (unless skipSkillsInjection is true)
+  if (!config.skipSkillsInjection && config.enabledSkills && config.enabledSkills.length > 0) {
     const skillsContent = await loadSkillsContent(config.enabledSkills);
     if (skillsContent) {
       instructions.push(skillsContent);
@@ -565,10 +571,8 @@ export async function buildSystemInstructions(config: FirstMessageConfig): Promi
 
   const basePrompt = instructions.length === 0 ? '' : instructions.join('\n\n');
   // Prepend Wayland Constitution + optional specialist overlay (stable across
-  // turns so Anthropic/OpenAI prompt caches hit). composePrompt returns ''
-  // when no Constitution file exists, so this is a no-op for fresh installs
-  // and we preserve the previous "return undefined" behaviour.
-  const composed = composePrompt({ assistantId: config.presetAssistantId, basePrompt }).text;
+  // turns so Anthropic/OpenAI prompt caches hit).
+  const composed = composePrompt({ assistantId: config.presetAssistantId, basePrompt, skipConstitution: config.skipConstitution }).text;
   return composed.length === 0 ? undefined : composed;
 }
 
@@ -610,34 +614,28 @@ export async function prepareFirstMessageWithSkillsIndex(
   const instructions: string[] = [];
   let loadedSkills: SkillIndex[] = [];
 
-  // 1. Add preset rules
-  if (config.presetContext) {
+  // 1. Add preset rules (unless skipRulesInjection is true)
+  if (!config.skipRulesInjection && config.presetContext) {
     instructions.push(config.presetContext);
   }
 
-  // 2. Load skills INDEX (always-on set only: builtin + pinned + assistant enabledSkills)
-  // Use singleton to avoid repeated filesystem scans
-  const skillManager = AcpSkillManager.getInstance(config.enabledSkills);
-  // discoverSkills auto-loads builtin skills first
-  await skillManager.discoverSkills(config.enabledSkills, config.excludeBuiltinSkills);
+  // 2. Load skills INDEX (unless skipSkillsInjection is true)
+  if (!config.skipSkillsInjection) {
+    const skillManager = AcpSkillManager.getInstance(config.enabledSkills);
+    await skillManager.discoverSkills(config.enabledSkills, config.excludeBuiltinSkills);
 
-  const hasLib = await libraryIsNonEmpty();
+    const hasLib = await libraryIsNonEmpty();
 
-  // Only inject if there are any skills or a library advert is needed
-  if (skillManager.hasAnySkills() || hasLib) {
-    const excludeSet = new Set(config.excludeBuiltinSkills ?? []);
-    // Filter out excluded builtin skills - the singleton cache may not reflect excludeBuiltinSkills
-    const skillsIndex = skillManager.getSkillsIndex().filter((s) => !excludeSet.has(s.name));
-    loadedSkills = skillsIndex;
-    // getSkillsDir() already returns CLI-safe path (symlink on macOS)
-    const skillsDir = getSkillsDir();
-    const builtinSkillsCopyDir = getBuiltinSkillsCopyDir();
-    const builtinSkillsDir = builtinSkillsCopyDir + '/_builtin';
-    // Pass hasLib so the index text includes the wayland_search_skills discovery note
-    const indexText = buildSkillsIndexText(skillsIndex, hasLib);
+    if (skillManager.hasAnySkills() || hasLib) {
+      const excludeSet = new Set(config.excludeBuiltinSkills ?? []);
+      const skillsIndex = skillManager.getSkillsIndex().filter((s) => !excludeSet.has(s.name));
+      loadedSkills = skillsIndex;
+      const skillsDir = getSkillsDir();
+      const builtinSkillsCopyDir = getBuiltinSkillsCopyDir();
+      const builtinSkillsDir = builtinSkillsCopyDir + '/_builtin';
+      const indexText = buildSkillsIndexText(skillsIndex, hasLib);
 
-    // Tell Agent where skills files are located for on-demand reading
-    const skillsInstruction = `${indexText}
+      const skillsInstruction = `${indexText}
 
 [Skills Location]
 Skills are stored in three locations:
@@ -662,7 +660,8 @@ Do NOT use any built-in or external "schedule" capability, cloud routine, or sch
 
 If you find yourself about to escalate scheduling outside of Wayland or use a non-Wayland schedule skill, STOP and read ${builtinSkillsDir}/cron/SKILL.md first.`;
 
-    instructions.push(skillsInstruction);
+      instructions.push(skillsInstruction);
+    }
   }
 
   // 3. Inject Team Guide prompt when agent has team guide capability
@@ -693,10 +692,7 @@ If you find yourself about to escalate scheduling outside of Wayland or use a no
   }
 
   const basePrompt = instructions.length === 0 ? '' : instructions.join('\n\n');
-  // Prepend Wayland Constitution + optional specialist overlay above the
-  // existing rules content. Composer returns '' when no Constitution exists,
-  // preserving the previous "skip rules block entirely" behaviour.
-  const systemInstructions = composePrompt({ assistantId: config.presetAssistantId, basePrompt }).text;
+  const systemInstructions = composePrompt({ assistantId: config.presetAssistantId, basePrompt, skipConstitution: config.skipConstitution }).text;
   if (systemInstructions.length === 0) {
     return { content, loadedSkills };
   }

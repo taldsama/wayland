@@ -66,6 +66,8 @@ const WikiDetailPage = React.lazy(() =>
 );
 
 const GoalYoloPage = React.lazy(() => import('@renderer/pages/goal/GoalYoloPage'));
+const ConsciousnessPage = React.lazy(() => import('@renderer/pages/consciousness/ConsciousnessPage'));
+
 
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<AppLoader />}>
@@ -207,7 +209,9 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
 
             {/* Orchestration Panels */}
             <Route path='/goal' element={withRouteFallback(GoalYoloPage)} />
+            <Route path='/consciousness' element={withRouteFallback(ConsciousnessPage)} />
           </Route>
+
           <Route path='*' element={<Navigate to={status === 'authenticated' ? '/guid' : '/login'} replace />} />
         </Routes>
       </HashRouter>

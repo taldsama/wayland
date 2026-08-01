@@ -23,7 +23,7 @@ import type {
   AcpBackendConfig,
   AcpSessionConfigOption,
 } from '@/common/types/acpTypes';
-import { ACP_BACKENDS_ALL, getCurrentWrapperVersion, getFluxCompat } from '@/common/types/acpTypes';
+import { ACP_BACKENDS_ALL, getCurrentWrapperVersion, getFluxCompat, type AcpBackendAll } from '@/common/types/acpTypes';
 import { isFluxModelId } from '@/common/config/flux';
 import { ExtensionRegistry } from '@process/extensions';
 import { getDatabase } from '@process/services/database';
@@ -52,6 +52,7 @@ import {
 } from '@process/task/codexConfig';
 import { materializeFluxClaudeConfigDir } from '@process/task/claudeConfig';
 import { materializeFluxHermesHome } from '@process/task/hermesConfig';
+import { readHermesModelInfo } from '@process/task/hermesModels';
 import { app } from 'electron';
 import BaseAgentManager from './BaseAgentManager';
 import { IpcAgentEventEmitter } from './IpcAgentEventEmitter';
@@ -603,6 +604,66 @@ ${collectedResponses.join('\n')}`;
     return env;
   }
 
+  /** Skip flags that a custom/preset profile can persist in the `assistants` store. */
+  private static readonly SKIP_FLAG_KEYS = [
+    'skipProviderEnv',
+    'skipModelControl',
+    'skipConstitution',
+    'skipRulesInjection',
+    'skipSkillsInjection',
+    'skipMemoryInjection',
+    'disableBuiltinMcp',
+  ] as const;
+
+  /**
+   * Resolve the effective backend config for a launch, merging the skip flags a
+   * user persisted on a custom/preset profile (ConfigStorage 'assistants') over
+   * the static ACP_BACKENDS_ALL entry. The spawn/injection paths used to consult
+   * ONLY the static registry, so profiles added via the UI (id `custom-<ts>`,
+   * absent from the registry) had every skip silently ignored — Wayland kept
+   * injecting its provider keys + constitution into e.g. a custom Hermes. This
+   * makes those per-profile skips take effect while built-in backends are unchanged.
+   */
+  private async resolveBackendConfig(data: {
+    presetAssistantId?: string;
+    customAgentId?: string;
+    backend: AcpBackendAll;
+  }): Promise<AcpBackendConfig | undefined> {
+    const effectiveAgentId = (data.presetAssistantId || data.customAgentId || data.backend) as AcpBackendAll;
+    const base = ACP_BACKENDS_ALL[effectiveAgentId] || (data.backend ? ACP_BACKENDS_ALL[data.backend] : undefined);
+
+    let merged: AcpBackendConfig | undefined = base ? { ...base } : undefined;
+
+    // Backend-level user overrides (Settings → Agents edit on built-in CLIs).
+    const overrides = await ProcessConfig.get('acp.backendOverrides');
+    const backendOverride = data.backend ? overrides?.[data.backend] : undefined;
+    if (backendOverride) {
+      merged = merged ?? { id: data.backend, name: data.backend };
+      for (const key of AcpAgentManager.SKIP_FLAG_KEYS) {
+        const value = backendOverride[key];
+        if (typeof value === 'boolean') merged[key] = value;
+      }
+    }
+
+    const lookupId = data.presetAssistantId || data.customAgentId;
+    if (!lookupId) return merged ?? base;
+
+    const assistants = await ProcessConfig.get('assistants');
+    let record = assistants?.find((agent) => agent.id === lookupId);
+    if (!record && data.customAgentId) {
+      const customs = await ProcessConfig.get('acp.customAgents');
+      record = customs?.find((agent) => agent.id === lookupId);
+    }
+    if (!record) return merged ?? base;
+
+    merged = merged ?? { id: record.id, name: record.name ?? record.id };
+    for (const key of AcpAgentManager.SKIP_FLAG_KEYS) {
+      const value = record[key];
+      if (typeof value === 'boolean') merged[key] = value;
+    }
+    return merged;
+  }
+
   private async resolveAgentCliConfig(data: AcpAgentManagerData): Promise<{
     cliPath?: string;
     customArgs?: string[];
@@ -614,9 +675,12 @@ ${collectedResponses.join('\n')}`;
       : await this.resolveBuiltinBackendConfig(data);
 
     // Bridge connected-provider API keys (from the in-app model registry) into
-    // the spawned agent's env. A custom agent's explicit env wins over the
-    // auto-injected keys, which in turn win over the inherited shell env.
-    const providerEnv = await this.buildConnectedProviderEnv();
+    // the spawned agent's env. Skip if the effective backend configuration (static
+    // registry + persisted custom-profile flags) specifies skipProviderEnv — in that
+    // case we leave the CLI's native environment untouched (no injection, no blanking).
+    const backendConfig = await this.resolveBackendConfig(data);
+    this.resolvedBackendConfig = backendConfig;
+    const providerEnv = backendConfig?.skipProviderEnv ? {} : await this.buildConnectedProviderEnv();
     const mergedEnv: Record<string, string> = { ...providerEnv, ...resolved.customEnv };
 
     // Codex ignores manual Authorization headers and reads each HTTP MCP server's
@@ -633,66 +697,68 @@ ${collectedResponses.join('\n')}`;
 
     // Flux routing (openai-surface generic backends + claude via the anthropic
     // surface; codex/codebuddy route separately).
-    const decision = await this.computeFluxRouting(data.backend, data.currentModelId ?? undefined);
-    this.lastRouting = decision.routing;
-    if (decision.routing === 'flux') {
-      for (const k of decision.stripKeys) delete mergedEnv[k];
-      Object.assign(mergedEnv, decision.env);
+    if (!backendConfig?.skipProviderEnv) {
+      const decision = await this.computeFluxRouting(data.backend, data.currentModelId ?? undefined);
+      this.lastRouting = decision.routing;
+      if (decision.routing === 'flux') {
+        for (const k of decision.stripKeys) delete mergedEnv[k];
+        Object.assign(mergedEnv, decision.env);
 
-      // codex selects its provider from CODEX_HOME/config.toml, not from env.
-      // Point flux-routed codex spawns at a Wayland-scoped CODEX_HOME whose
-      // config selects model_provider=flux + flux-auto, so the user's real
-      // ~/.codex config stays native for non-flux model picks.
-      if (data.backend === 'codex') {
-        try {
-          const sandboxMode = normalizeCodexSandboxMode(data.sandboxMode);
-          const codexHome = await materializeFluxCodexHome(
-            app.getPath('userData'),
-            sandboxMode,
-            undefined,
-            undefined,
-            data.effort
-          );
-          mergedEnv.CODEX_HOME = codexHome;
-        } catch (err) {
-          mainWarn('[AcpAgentManager]', 'materializeFluxCodexHome failed', err);
+        // codex selects its provider from CODEX_HOME/config.toml, not from env.
+        // Point flux-routed codex spawns at a Wayland-scoped CODEX_HOME whose
+        // config selects model_provider=flux + flux-auto, so the user's real
+        // ~/.codex config stays native for non-flux model picks.
+        if (data.backend === 'codex') {
+          try {
+            const sandboxMode = normalizeCodexSandboxMode(data.sandboxMode);
+            const codexHome = await materializeFluxCodexHome(
+              app.getPath('userData'),
+              sandboxMode,
+              undefined,
+              undefined,
+              data.effort
+            );
+            mergedEnv.CODEX_HOME = codexHome;
+          } catch (err) {
+            mainWarn('[AcpAgentManager]', 'materializeFluxCodexHome failed', err);
+          }
         }
-      }
 
-      // claude's bridge only accepts the (non-SDK) `flux-auto` id when it is in
-      // the `availableModels` allowlist of <CLAUDE_CONFIG_DIR>/settings.json.
-      // Point flux-routed claude spawns at a Wayland-scoped CLAUDE_CONFIG_DIR
-      // (seeded from the user's real settings.json) that lists the Flux ids, so
-      // ANTHROPIC_MODEL=flux-auto resolves instead of falling back to the
-      // `default` slot (which the Flux Anthropic surface rejects). The user's
-      // real ~/.claude is never modified.
-      if (data.backend === 'claude') {
-        try {
-          mergedEnv.CLAUDE_CONFIG_DIR = await materializeFluxClaudeConfigDir(
-            app.getPath('userData'),
-            undefined,
-            data.effort
-          );
-        } catch (err) {
-          mainWarn('[AcpAgentManager]', 'materializeFluxClaudeConfigDir failed', err);
+        // claude's bridge only accepts the (non-SDK) `flux-auto` id when it is in
+        // the `availableModels` allowlist of <CLAUDE_CONFIG_DIR>/settings.json.
+        // Point flux-routed claude spawns at a Wayland-scoped CLAUDE_CONFIG_DIR
+        // (seeded from the user's real settings.json) that lists the Flux ids, so
+        // ANTHROPIC_MODEL=flux-auto resolves instead of falling back to the
+        // `default` slot (which the Flux Anthropic surface rejects). The user's
+        // real ~/.claude is never modified.
+        if (data.backend === 'claude') {
+          try {
+            mergedEnv.CLAUDE_CONFIG_DIR = await materializeFluxClaudeConfigDir(
+              app.getPath('userData'),
+              undefined,
+              data.effort
+            );
+          } catch (err) {
+            mainWarn('[AcpAgentManager]', 'materializeFluxClaudeConfigDir failed', err);
+          }
         }
-      }
 
-      // hermes selects its provider from <HERMES_HOME>/config.yaml, not from env.
-      // Point flux-routed hermes spawns at a Wayland-scoped HERMES_HOME whose
-      // config pins model.provider=custom at the Flux openai surface + flux-auto
-      // (reading FLUX_API_KEY at request time), so the user's real ~/.hermes
-      // config (and active profile) stays native for non-flux model picks.
-      if (data.backend === 'hermes') {
-        try {
-          // hermes ignores FLUX_API_KEY for a custom provider, so the connector
-          // writes the connected flux key inline into the scoped config.
-          mergedEnv.HERMES_HOME = await materializeFluxHermesHome(
-            app.getPath('userData'),
-            decision.env.FLUX_API_KEY ?? ''
-          );
-        } catch (err) {
-          mainWarn('[AcpAgentManager]', 'materializeFluxHermesHome failed', err);
+        // hermes selects its provider from <HERMES_HOME>/config.yaml, not from env.
+        // Point flux-routed hermes spawns at a Wayland-scoped HERMES_HOME whose
+        // config pins model.provider=custom at the Flux openai surface + flux-auto
+        // (reading FLUX_API_KEY at request time), so the user's real ~/.hermes
+        // config (and active profile) stays native for non-flux model picks.
+        if (data.backend === 'hermes') {
+          try {
+            // hermes ignores FLUX_API_KEY for a custom provider, so the connector
+            // writes the connected flux key inline into the scoped config.
+            mergedEnv.HERMES_HOME = await materializeFluxHermesHome(
+              app.getPath('userData'),
+              decision.env.FLUX_API_KEY ?? ''
+            );
+          } catch (err) {
+            mainWarn('[AcpAgentManager]', 'materializeFluxHermesHome failed', err);
+          }
         }
       }
     }
@@ -702,7 +768,7 @@ ${collectedResponses.join('\n')}`;
     // writing the user's own config.toml (#536). The clone copies their config
     // verbatim (model/provider/MCP/settings) + mirrors auth.json, overriding only
     // sandbox_mode. Flux-routed codex already got its own scoped CODEX_HOME above.
-    if (data.backend === 'codex' && decision.routing !== 'flux') {
+    if (data.backend === 'codex' && this.lastRouting !== 'flux') {
       try {
         const sandboxMode = normalizeCodexSandboxMode(data.sandboxMode);
         mergedEnv.CODEX_HOME = await materializeNativeCodexHome(app.getPath('userData'), sandboxMode);
@@ -715,7 +781,7 @@ ${collectedResponses.join('\n')}`;
     // from the bridge under subscription/OAuth auth, so an in-place set_model is
     // unreliable. Back the pick with ANTHROPIC_MODEL at spawn so the chosen slot
     // actually runs (#184). Flux routing already injected its own model above.
-    if (data.backend === 'claude' && decision.routing !== 'flux') {
+    if (data.backend === 'claude' && this.lastRouting !== 'flux') {
       const slot = claudeSlotForModelId(data.currentModelId);
       if (slot) {
         mergedEnv.ANTHROPIC_MODEL = slot;
@@ -818,6 +884,18 @@ ${collectedResponses.join('\n')}`;
 
   /** Routing decision for the most recent spawn - surfaced on request_trace (badge). */
   private lastRouting: RoutingDecision = 'unknown';
+  /** Cached effective backend config (static registry + persisted profile skips). */
+  private resolvedBackendConfig: AcpBackendConfig | undefined;
+
+  /** Wayland must not impose a model at session start/resume. */
+  private shouldSkipModelImposition(): boolean {
+    return Boolean(this.resolvedBackendConfig?.skipProviderEnv || this.resolvedBackendConfig?.skipModelControl);
+  }
+
+  /** Hermes static-catalog overlay applies ONLY to hermes* backends with skipProviderEnv. */
+  private usesHermesStaticCatalog(): boolean {
+    return Boolean(this.resolvedBackendConfig?.skipProviderEnv) && this.options.backend.startsWith('hermes');
+  }
 
   /**
    * Compute the Flux routing decision for a given backend + selected model using
@@ -1068,6 +1146,27 @@ ${collectedResponses.join('\n')}`;
       if (configOptions.length > 0) {
         void this.saveConfigOptions(configOptions);
       }
+      // Hermes (skipProviderEnv) emits its full multi-provider catalog — or an
+      // empty list — after set_model, which would replace the profile's native
+      // model list in the picker. Overlay the static profile catalog so the
+      // dropdown keeps showing the profile's models, keeping the reported
+      // current model when it belongs to the list.
+      if (this.usesHermesStaticCatalog()) {
+        const incoming = message.data as AcpModelInfo;
+        const staticInfo = readHermesModelInfo(this.options.backend);
+        if (staticInfo) {
+          const reported = incoming?.currentModelId ?? null;
+          const inList = (id: string | null | undefined) =>
+            id != null && staticInfo.availableModels.some((m) => m.id === id);
+          const currentId = inList(reported)
+            ? reported
+            : inList(this.persistedModelId)
+              ? this.persistedModelId
+              : staticInfo.currentModelId;
+          const label = staticInfo.availableModels.find((m) => m.id === currentId)?.label ?? currentId;
+          message = { ...message, data: { ...staticInfo, currentModelId: currentId, currentModelLabel: label } };
+        }
+      }
     }
 
     // Persist context usage to conversation extra for restore on page switch.
@@ -1302,7 +1401,7 @@ ${collectedResponses.join('\n')}`;
       }
     }
 
-    if (this.persistedModelId) {
+    if (this.persistedModelId && !this.shouldSkipModelImposition()) {
       const currentInfo = this.agent.getModelInfo();
       const isModelAvailable = currentInfo?.availableModels?.some((m) => m.id === this.persistedModelId);
       // A Flux model id (flux-auto, ...) on a Flux-capable backend is carried by
@@ -1424,7 +1523,7 @@ ${collectedResponses.join('\n')}`;
           acpSessionId: data.acpSessionId,
           acpSessionUpdatedAt: data.acpSessionUpdatedAt,
           acpWrapperVersion: data.acpWrapperVersion,
-          currentModelId: this.persistedModelId ?? undefined,
+          currentModelId: this.shouldSkipModelImposition() ? undefined : (this.persistedModelId ?? undefined),
           sessionMode: this.currentMode,
           pendingConfigOptions: data.pendingConfigOptions,
           // Per-conversation MCP scoping (#348): forward to loadBuiltinSessionMcpServers.
@@ -1558,12 +1657,16 @@ ${collectedResponses.join('\n')}`;
         // Symlinks are only created for temp workspaces; custom workspaces skip symlinks.
         // So custom workspaces or backends without native skill discovery need prompt injection.
         if (this.isFirstMessage) {
+          const backendConfig = this.resolvedBackendConfig;
+
           const isInTeam = Boolean((this.options as unknown as Record<string, unknown>).teamMcpStdioConfig);
           const useNativeSkills = this.resolveNativeSkillSupport() && !this.options.customWorkspace;
           if (useNativeSkills) {
             // Native skill discovery via workspace symlinks - inject preset rules + team guide
             const parts: string[] = [];
-            if (this.options.presetContext) parts.push(this.options.presetContext);
+            if (!backendConfig?.skipRulesInjection && this.options.presetContext) {
+              parts.push(this.options.presetContext);
+            }
             if (!isInTeam && (await shouldInjectTeamGuideMcp(this.options.backend))) {
               const [{ getTeamGuidePrompt }, { resolveLeaderAssistantLabel }] = await Promise.all([
                 import('@process/team/prompts/teamGuidePrompt.ts'),
@@ -1598,6 +1701,7 @@ ${collectedResponses.join('\n')}`;
             const rulesBody = composePrompt({
               assistantId: this.options.presetAssistantId || this.options.customAgentId,
               basePrompt: parts.join('\n\n'),
+              skipConstitution: backendConfig?.skipConstitution,
             }).text;
             if (rulesBody.length > 0) {
               contentToSend = `[Assistant Rules - You MUST follow these instructions]\n${rulesBody}\n\n[User Request]\n${contentToSend}`;
@@ -1611,23 +1715,25 @@ ${collectedResponses.join('\n')}`;
               enableTeamGuide: !isInTeam && (await shouldInjectTeamGuideMcp(this.options.backend)),
               backend: this.options.backend,
               presetAssistantId: this.options.presetAssistantId || this.options.customAgentId,
-              // Concierge-only here (no userText) to match WCore/Gemini and avoid
-              // double-injecting on a non-Concierge capability first message - the
-              // per-turn advert already covers non-Concierge capability intents.
               capabilitiesManifest: await resolveCapabilitiesManifest({
                 presetAssistantId: this.options.presetAssistantId || this.options.customAgentId,
                 agentKey: this.options.backend,
               }),
+              skipConstitution: backendConfig?.skipConstitution,
+              skipRulesInjection: backendConfig?.skipRulesInjection,
+              skipSkillsInjection: backendConfig?.skipSkillsInjection,
             });
             contentToSend = injectedContent;
           }
         }
 
+        const backendConfig = this.resolvedBackendConfig;
+
         // Per-turn skill auto-load (every genuine user turn, all backends).
         // Proactively surfaces the most relevant skills for this message and
         // inline-injects the single clear winner - works mid-chat, not just at
-        // session start. Skipped for hidden/silent system feedback turns.
-        if (!data.hidden && !data.silent) {
+        // session start. Skipped for hidden/silent system feedback turns, or if skipSkillsInjection is set.
+        if (!data.hidden && !data.silent && !backendConfig?.skipSkillsInjection) {
           try {
             // Rank against the original user text (not the rules-wrapped / augmented content).
             const rawUserText = data.content.includes(WAYLAND_FILES_MARKER)
@@ -1920,7 +2026,25 @@ ${collectedResponses.join('\n')}`;
       }
       return null;
     }
-    return this.agent.getModelInfo();
+    const liveInfo = this.agent.getModelInfo();
+    // Hermes (skipProviderEnv) must always surface its profile's native catalog.
+    // After a set_model the agent reports its full multi-provider catalog (or an
+    // empty list), which would reset the picker; always prefer the static list.
+    if (this.usesHermesStaticCatalog()) {
+      const staticInfo = readHermesModelInfo(this.options.backend);
+      if (staticInfo) {
+        const liveCurrent = liveInfo?.currentModelId ?? null;
+        const inList = (id: string | null) => id != null && staticInfo.availableModels.some((m) => m.id === id);
+        const currentId = inList(liveCurrent)
+          ? liveCurrent
+          : inList(this.persistedModelId)
+            ? this.persistedModelId
+            : staticInfo.currentModelId;
+        const label = staticInfo.availableModels.find((m) => m.id === currentId)?.label ?? currentId;
+        return { ...staticInfo, currentModelId: currentId, currentModelLabel: label };
+      }
+    }
+    return liveInfo;
   }
 
   /**
@@ -1938,6 +2062,27 @@ ${collectedResponses.join('\n')}`;
    * expose nothing.
    */
   static async getStaticModelInfo(backend: string): Promise<AcpModelInfo | null> {
+    // Hermes: read native profile config + model catalog offline (profile-aware).
+    if (backend.startsWith('hermes')) {
+      const modelInfo = readHermesModelInfo(backend);
+      if (!modelInfo?.availableModels?.length) return null;
+      try {
+        const cached = (await ProcessConfig.get('acp.cachedModels')) || {};
+        const existing = cached[backend];
+        await ProcessConfig.set('acp.cachedModels', {
+          ...cached,
+          [backend]: {
+            ...modelInfo,
+            currentModelId: existing?.currentModelId ?? modelInfo.currentModelId,
+            currentModelLabel: existing?.currentModelLabel ?? modelInfo.currentModelLabel,
+          },
+        });
+      } catch (error) {
+        mainWarn('[AcpAgentManager]', 'Failed to cache static hermes model info', error);
+      }
+      return modelInfo;
+    }
+
     if (backend !== 'claude') return null;
 
     // cc-switch users get richer per-provider ids; everyone else with the Claude
@@ -1988,6 +2133,25 @@ ${collectedResponses.join('\n')}`;
       }
     }
     if (!this.agent) return null;
+
+    // Backends with skipProviderEnv manage their own provider env, but an explicit
+    // user pick from the picker still reaches the agent via session/set_model.
+    // Init/resume imposition is blocked separately (extra.currentModelId +
+    // restorePersistedState), so this only fires on deliberate user action.
+    if (this.resolvedBackendConfig?.skipProviderEnv) {
+      const result = await this.agent.setModelByConfigOption(modelId);
+      this.persistedModelId = result?.currentModelId ?? modelId;
+      await this.saveModelId(this.persistedModelId);
+      // Cache the static profile catalog, not the agent's result (empty or the
+      // full multi-provider catalog), so cold starts keep the profile's models.
+      if (this.options.backend.startsWith('hermes')) {
+        const staticInfo = readHermesModelInfo(this.options.backend);
+        if (staticInfo) {
+          void this.cacheModelList({ ...staticInfo, currentModelId: this.persistedModelId });
+        }
+      }
+      return this.getModelInfo();
+    }
 
     // Detect a routing-boundary crossing: does the NEW model route differently
     // than what is currently live? `this.lastRouting` was set by the spawn that

@@ -310,3 +310,8 @@ function makeSpecialistCatalog(): SpecialistCatalog {
 export function disposeAllTeamSessions(): Promise<void> {
   return _teamSessionService?.stopAllSessions() ?? Promise.resolve();
 }
+
+export function getTeamSessionService(): TeamSessionService | null {
+  return _teamSessionService;
+}
+

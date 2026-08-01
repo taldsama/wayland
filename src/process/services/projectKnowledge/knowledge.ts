@@ -165,55 +165,9 @@ const MEMORY_BLOCK_MAX_ENTRIES = 50;
  * is the true source of truth for global-store membership.
  */
 export async function loadGlobalMemoryBlock(): Promise<string> {
-  const globalDir = path.join(os.homedir(), '.ijfw', 'memory');
-  const svc = getIjfwArchiveService();
-  let listed: Awaited<ReturnType<typeof svc.listEntries>>;
-  try {
-    // No `limit`: pull the full recency-sorted corpus so the global filter and
-    // the entry cap below both operate on global entries only, not on a corpus
-    // already truncated by the user's active per-project entries.
-    listed = await svc.listEntries({ sort: 'recent' });
-  } catch (err) {
-    console.warn('[projectKnowledge] global memory block: list failed:', err);
-    return '';
-  }
-
-  const globalEntries = listed.entries
-    .filter((e) => e.sourcePath.startsWith(globalDir + path.sep))
-    .slice(0, MEMORY_BLOCK_MAX_ENTRIES);
-  if (globalEntries.length === 0) return '';
-
-  const sections: string[] = [];
-  let used = 0;
-  for (const entry of globalEntries) {
-    // Stop before reading the next body once the remaining char budget is
-    // nearly exhausted: the heading + label overhead means a section needs room
-    // beyond its body, so once `used` is within one body-cap of the total cap we
-    // cannot fit another meaningful entry and should not read it (#256 perf).
-    if (used + MEMORY_ENTRY_CHAR_CAP > MEMORY_BLOCK_CHAR_CAP && used > 0) break;
-
-    let body = entry.bodyPreview;
-    try {
-      const full = await svc.getEntry(entry.id);
-      if (full?.body) body = full.body;
-    } catch {
-      // fall back to the preview already in hand
-    }
-    body = body.trim();
-    if (!body) continue;
-    if (body.length > MEMORY_ENTRY_CHAR_CAP) body = `${body.slice(0, MEMORY_ENTRY_CHAR_CAP)}\n\n…(truncated)`;
-    const heading = entry.summary.trim() || 'Untitled';
-    const section = `## ${heading}\n\n${body}`;
-    if (used + section.length > MEMORY_BLOCK_CHAR_CAP) break;
-    sections.push(section);
-    used += section.length;
-  }
-
-  if (sections.length === 0) return '';
-  const label = i18n.t('memory.injectedLabel', {
-    defaultValue: 'User memory (from Wayland Memory) - the user dropped or saved this; use it to answer questions about it',
-  });
-  return `[${label}]\n\n${sections.join('\n\n')}`;
+  // Desactivado: El contenido de la memoria IJFW no se inyecta automáticamente en el System Prompt
+  // para evitar agotar las cuotas de tokens (TPM/RPD). El agente consultará la memoria usando la herramienta MCP ijfw cuando lo requiera.
+  return '';
 }
 
 /** True for a Node error carrying an ENOENT-style "file not found" code. */

@@ -5,6 +5,8 @@ export interface ComposePromptOptions {
   assistantId?: string;
   /** Existing backend-specific system prompt. Appended below Constitution + overlay. */
   basePrompt?: string;
+  /** Whether to skip injecting the Wayland Constitution + overlay into the final prompt. */
+  skipConstitution?: boolean;
 }
 
 export interface ComposedPrompt {
@@ -29,9 +31,9 @@ export interface ComposedPrompt {
  * OpenAI prompt caches turn-to-turn.
  *
  * Composition order:
- *   Constitution
+ *   Constitution (if skipConstitution is false/undefined)
  *   \n\n---\n\n
- *   SpecialistOverlay (if file exists)
+ *   SpecialistOverlay (if file exists and skipConstitution is false/undefined)
  *   \n\n---\n\n
  *   basePrompt (if provided)
  *
@@ -43,13 +45,17 @@ export function composePrompt(opts?: ComposePromptOptions): ComposedPrompt {
   const basePrompt = opts?.basePrompt ?? '';
   let constitution = '';
   let overlay: string | null = null;
-  try {
-    const result = readConstitutionWithOverlay(opts?.assistantId);
-    constitution = result.constitution ?? '';
-    overlay = result.overlay;
-  } catch (err) {
-    console.error('[composePrompt] readConstitutionWithOverlay failed', err);
+
+  if (!opts?.skipConstitution) {
+    try {
+      const result = readConstitutionWithOverlay(opts?.assistantId);
+      constitution = result.constitution ?? '';
+      overlay = result.overlay;
+    } catch (err) {
+      console.error('[composePrompt] readConstitutionWithOverlay failed', err);
+    }
   }
+
   const parts = [constitution, overlay ?? '', basePrompt].filter((p) => p && p.length > 0);
   const text = parts.join('\n\n---\n\n');
   const approxTokens = Math.ceil(text.length / 4);

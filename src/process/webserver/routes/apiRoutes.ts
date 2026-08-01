@@ -37,6 +37,8 @@ import { registerConstitutionRoutes } from './constitutionRoutes';
 import { registerUsernameRoutes } from './usernameRoutes';
 import { registerFluxConnectRoutes } from './fluxConnectRoutes';
 import { registerMcpOAuthRoutes } from './mcpOAuthRoutes';
+import { registerTeamApiRoutes } from './teamApiRoutes';
+
 
 /** Temp directory used by multer disk storage - validated at runtime to prevent path traversal */
 const MULTER_TEMP_DIR = os.tmpdir();
@@ -756,8 +758,10 @@ export function registerApiRoutes(app: Express): void {
   registerUsernameRoutes(app, validateApiAccess);
   registerFluxConnectRoutes(app, validateApiAccess);
   registerMcpOAuthRoutes(app, validateApiAccess);
+  registerTeamApiRoutes(app, validateApiAccess);
 
   /**
+
    * Generic API endpoint
    * GET /api
    */

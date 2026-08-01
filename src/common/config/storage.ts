@@ -129,6 +129,28 @@ export interface IConfigStorageRefer {
   /** User-defined custom ACP agents (isPreset !== true, require defaultCliPath). */
   'acp.customAgents'?: AcpBackendConfig[];
   /**
+   * Per-backend user overrides for built-in ACP backends (opencode, kiro, ...)
+   * edited from Settings → Agents. Only skip/integration flags are honored;
+   * merged over ACP_BACKENDS_ALL by AcpAgentManager.resolveBackendConfig.
+   * Keyed by backend id — never stored in `assistants` (presets-only contract,
+   * see the initStorage assistants-split migration).
+   */
+  'acp.backendOverrides'?: Record<
+    string,
+    Partial<
+      Pick<
+        AcpBackendConfig,
+        | 'skipProviderEnv'
+        | 'skipModelControl'
+        | 'skipConstitution'
+        | 'skipRulesInjection'
+        | 'skipSkillsInjection'
+        | 'skipMemoryInjection'
+        | 'disableBuiltinMcp'
+      >
+    >
+  >;
+  /**
    * Agent keys the user hid from the Guid-page agent toolbar strip. Detected
    * agents whose key is listed here stay detected (and still appear on the
    * Agents settings page) but are removed from the toolbar. Keys use the same

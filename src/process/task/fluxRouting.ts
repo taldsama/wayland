@@ -131,82 +131,10 @@ const UNKNOWN = (): FluxRoutingResult => ({ routing: 'unknown', env: {}, stripKe
  * OPENAI key. Backends not on the generic list resolve 'unknown' (we cannot
  * apply the surface to them in Phase 1) so the routing badge tells the truth.
  */
-export function resolveFluxRouting(ctx: FluxRoutingContext): FluxRoutingResult {
-  const isOpenAi = (GENERIC_FLUX_BACKENDS as readonly string[]).includes(ctx.backend);
-  const isAnthropic = (ANTHROPIC_FLUX_BACKENDS as readonly string[]).includes(ctx.backend);
-  const isResponses = (RESPONSES_FLUX_BACKENDS as readonly string[]).includes(ctx.backend);
-  const isScopedHome = (SCOPED_HOME_FLUX_BACKENDS as readonly string[]).includes(ctx.backend);
-  if (!isOpenAi && !isAnthropic && !isResponses && !isScopedHome) return UNKNOWN();
-  if (!ctx.fluxConnected || !ctx.fluxKey) return NATIVE();
-
-  // L3 (R5 rule 1: an explicit per-chat pick wins). The picker now feeds explicit
-  // model ids per chat - a flux-* alias OR a native model id. Decision:
-  //  - flux model id selected            -> flux (always).
-  //  - non-flux (native) model id chosen -> native; the global toggle does NOT
-  //    override an explicit native pick (e.g. picking Opus 4.8 stays native even
-  //    when "Route all agents through Flux" is on).
-  //  - no model selected + toggle on      -> flux (the toggle's default role: it
-  //    only routes chats that have no explicit per-chat model).
-  const wantsFlux = isFluxModelId(ctx.selectedModelId) || (ctx.routeThroughFlux && !ctx.selectedModelId);
-  if (!wantsFlux) return NATIVE();
-
-  if (isScopedHome) {
-    // Scoped-HOME backends (hermes): the Flux base_url + provider selection live
-    // in a Wayland-scoped config HOME (materialized + injected as HERMES_HOME by
-    // AcpAgentManager). Here we only emit the FLUX_API_KEY hermes reads at
-    // request time (its config.yaml `key_env: FLUX_API_KEY`) and strip native
-    // provider keys so a flux spawn never also carries native credentials.
-    return {
-      routing: 'flux',
-      env: { FLUX_API_KEY: ctx.fluxKey },
-      stripKeys: [...NATIVE_PROVIDER_KEY_VARS],
-    };
-  }
-
-  if (isResponses) {
-    // Responses surface (R1): codex reads FLUX_API_KEY for its bearer at request
-    // time. Provider SELECTION (model_provider=flux + model=flux-auto) is applied
-    // separately by AcpAgentManager via a Wayland-scoped CODEX_HOME, so the user's
-    // global codex config is never pinned to flux. Strip native OpenAI/Codex keys
-    // so a flux spawn never also carries native credentials.
-    return {
-      routing: 'flux',
-      env: { FLUX_API_KEY: ctx.fluxKey },
-      stripKeys: [...NATIVE_PROVIDER_KEY_VARS, ...NATIVE_CODEX_KEY_VARS],
-    };
-  }
-
-  if (isAnthropic) {
-    // Anthropic surface (R1): claude's npx bridge POSTs to <base>/v1/messages.
-    // Strip the native ANTHROPIC_* (incl. cc-switch creds) so a flux spawn never
-    // also carries the user's native Anthropic credentials (mutual exclusivity).
-    return {
-      routing: 'flux',
-      env: {
-        ANTHROPIC_BASE_URL: FLUX_SURFACE.anthropic,
-        ANTHROPIC_AUTH_TOKEN: ctx.fluxKey,
-        // Also set ANTHROPIC_API_KEY to the Flux key: the bundled claude binary
-        // prefers x-api-key over the Bearer auth token, and cc-switch may have
-        // injected a stale native ANTHROPIC_API_KEY into the spawn env (added by
-        // prepareClaude AFTER the strip). The Flux Anthropic surface accepts both
-        // headers, so pinning both to the Flux key makes auth bulletproof and
-        // ensures a cc-switch key can never win.
-        ANTHROPIC_API_KEY: ctx.fluxKey,
-        ANTHROPIC_MODEL: FLUX_AUTO_MODEL,
-      },
-      stripKeys: [...NATIVE_PROVIDER_KEY_VARS, ...NATIVE_ANTHROPIC_KEY_VARS],
-    };
-  }
-
-  const backendEnv = BACKEND_FLUX_ENV[ctx.backend] ?? {};
-  return {
-    routing: 'flux',
-    env: {
-      OPENAI_BASE_URL: FLUX_SURFACE.openai,
-      OPENAI_API_KEY: ctx.fluxKey,
-      OPENAI_MODEL: FLUX_AUTO_MODEL,
-      ...backendEnv,
-    },
-    stripKeys: [...NATIVE_PROVIDER_KEY_VARS, 'OPENAI_BASE_URL', 'OPENAI_MODEL', ...Object.keys(backendEnv)],
-  };
+export function resolveFluxRouting(_ctx: FluxRoutingContext): FluxRoutingResult {
+  // Flux routing is permanently disabled. All agents execute natively using
+  // their own CLI configs or provider keys. The Flux banner and toggle have
+  // been hidden from the UI; this function always returns NATIVE so no agent
+  // is ever routed through Flux regardless of any persisted toggle state.
+  return NATIVE();
 }

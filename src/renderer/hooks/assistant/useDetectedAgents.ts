@@ -36,7 +36,7 @@ export const useDetectedAgents = () => {
   const availableBackends = useMemo<AvailableBackend[]>(
     () => {
       // Start with detected non-preset agents
-      const detected = rawAgents
+      const detected: AvailableBackend[] = rawAgents
         .filter((a) => !a.isPreset && a.backend !== 'remote')
         .map((a) => ({
           id: a.backend,

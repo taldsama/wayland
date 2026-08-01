@@ -13,12 +13,20 @@ export type GraphNode = {
   label: string;
   type: MemoryType | 'unresolved';
   project?: string;
-  linkCount: number;
+  linkCount?: number;
+  /** Count of other entries that reference this node */
+  referencedBy?: number;
+  /** Computed promotion score (0-100) for surfacing high-value memories */
+  promotionScore?: number;
 };
 
 export type GraphEdge = {
   source: string;
   target: string;
+  /** Shared tag names or relationship label */
+  label?: string;
+  /** Edge weight based on number of shared tags */
+  weight?: number;
 };
 
 export type GraphData = {

@@ -32,7 +32,7 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
   const fetchGraphData = async () => {
     setLoading(true);
     try {
-      const graphData = await ipcBridge.memory.getGraphData.invoke(filter);
+      const graphData = await ipcBridge.memory.getGraphData.invoke(filter as any);
       setData(graphData);
     } catch (err) {
       console.error('[GraphView] Failed to fetch graph data:', err);
@@ -93,7 +93,7 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
         links: filteredEdges.map((e) => ({ ...e })),
       };
 
-      const graph = ForceGraph()(containerRef.current)
+      const graph = new ForceGraph(containerRef.current!)
         .width(width)
         .height(height)
         .graphData(gData)
