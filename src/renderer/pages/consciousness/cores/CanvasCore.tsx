@@ -29,7 +29,7 @@ export const CanvasCore: React.FC<CoreProps> = ({ voiceStateRef, rotation, fps }
     let orbit = 0;
     let lastFrameTime = performance.now();
 
-    const colors = ['#ec4899', '#a5f3fc', '#38bdf8', '#fbbf24', '#c084fc', '#6ee7b7'];
+    const colors = ['#5f7190', '#8a9bb5', '#f0b429', '#f5c26b', '#4e6178', '#6b7c96'];
     const particles: Particle[] = [];
     const count = 1600;
 
@@ -95,9 +95,9 @@ export const CanvasCore: React.FC<CoreProps> = ({ voiceStateRef, rotation, fps }
       ctx.clearRect(0, 0, width, height);
 
       const grad = ctx.createRadialGradient(cx, cy, 30, cx, cy, 320);
-      grad.addColorStop(0, `rgba(137, 180, 250, ${anim.glow})`);
-      grad.addColorStop(0.5, 'rgba(20, 28, 46, 0.95)');
-      grad.addColorStop(1, '#0d1322');
+      grad.addColorStop(0, `rgba(240, 180, 41, ${anim.glow})`);
+      grad.addColorStop(0.5, 'rgba(24, 30, 40, 0.95)');
+      grad.addColorStop(1, '#0f141d');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
 

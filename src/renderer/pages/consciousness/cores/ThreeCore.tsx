@@ -17,14 +17,14 @@ function hexToVec3(hex: string): THREE.Vector3 {
 }
 
 const CONFIG = {
-  bgColor: '#0d1322',
-  atmoColor: '#a5f3fc',
-  atmoCount: 60,
-  atmoSize: 18,
-  pointSize: 55,
-  brightness: 1.45,
-  repelRadius: 0.727,
-  repelStrength: 3.3,
+ bgColor: '#0f141d',
+ atmoColor: '#f0b429',
+ atmoCount: 60,
+ atmoSize: 18,
+ pointSize: 55,
+ brightness: 1.45,
+ repelRadius: 0.727,
+ repelStrength: 3.3,
 };
 
 const VERTEX_SHADER = `
@@ -179,7 +179,7 @@ export const ThreeCore: React.FC<ThreeCoreProps> = ({ voiceStateRef, rotation, f
     container.appendChild(canvas);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0d1322);
+    scene.background = new THREE.Color(0x0f141d);
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 80);
     camera.position.set(0, 0, 6.8);
@@ -200,13 +200,13 @@ export const ThreeCore: React.FC<ThreeCoreProps> = ({ voiceStateRef, rotation, f
     const layerTypes = new Float32Array(TOTAL_POINTS);
     const layerColors = new Float32Array(TOTAL_POINTS * 3);
 
-    const cPinkLila = hexToVec3('#ec4899');
-    const cSoftPink = hexToVec3('#f472b6');
-    const cCore = hexToVec3('#a5f3fc');
-    const cTurquoise = hexToVec3('#38bdf8');
-    const cAmber = hexToVec3('#fbbf24');
-    const cLila = hexToVec3('#c084fc');
-    const cEmerald = hexToVec3('#6ee7b7');
+    const cPinkLila = hexToVec3('#4e6178');
+    const cSoftPink = hexToVec3('#6b7c96');
+    const cCore = hexToVec3('#e8eef7');
+    const cTurquoise = hexToVec3('#5f7190');
+    const cAmber = hexToVec3('#f0b429');
+    const cLila = hexToVec3('#8a9bb5');
+    const cEmerald = hexToVec3('#f5c26b');
 
     let pIndex = 0;
     const addPointsForLayer = (

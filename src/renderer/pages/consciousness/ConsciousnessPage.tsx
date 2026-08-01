@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
 import { useConsciousnessSettings } from '@/renderer/hooks/settings/useConsciousnessSettings';
-import { CanvasCore } from './cores/CanvasCore';
+import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
+import CanvasCore from './cores/CanvasCore';
+import { NavDock } from './components/NavDock';
 import { STATE_CONFIG } from './cores/types';
 import type { VoiceState } from './cores/types';
 
@@ -12,24 +14,26 @@ const SUBTITLE_FADE_MS = 700;
 const THINKING_SAFETY_MS = 30000;
 
 const CORE_NODES = [
-  { id: 'HERMES CORE', color: '#89b4fa', desc: 'Voice Core / Dispatcher' },
-  { id: 'SOL MIND', color: '#f9e2af', desc: 'Homelab & Infra Agent' },
-  { id: 'LUNA MIND', color: '#cba6f7', desc: 'Dev & Coding Specialist' },
-  { id: 'ECHO CORE', color: '#f38ba8', desc: 'Proactive Secretariat' },
+ { id: 'HERMES CORE', color: '#7f93b8', desc: 'Voice Core / Dispatcher' },
+ { id: 'SOL MIND', color: '#e3c98c', desc: 'Homelab Infra Agent' },
+ { id: 'LUNA MIND', color: '#a89fc4', desc: 'Dev Coding Specialist' },
+ { id: 'ECHO CORE', color: '#c08e9c', desc: 'Proactive Secretariat' },
 ];
 
 const dockBtn = (active: boolean) =>
-  `px-3.5 py-1.5 rounded-full text-[11px] font-bold tracking-widest border transition-all duration-200 ${
+ `px-3.5 py-1.5 rounded-full text-[11px] font-bold tracking-widest border transition-all duration-200 ${
     active
-      ? 'text-[#89dceb] bg-[#89dceb]/10 border-[#89dceb]/40 shadow-[0_0_12px_rgba(137,220,235,0.25)]'
-      : 'text-[#a6adc8] bg-transparent border-transparent hover:text-[#cdd6f4] hover:bg-[#313244]/50'
+      ? 'text-[#f0b429] bg-[#f0b429]/10 border-[#f0b429]/40 shadow-[0_0_12px_rgba(240,180,41,0.25)]'
+      : 'text-[#a8b6c9] bg-transparent border-transparent hover:text-[#e8eef7] hover:bg-[#3e4c5e]/50'
   }`;
 
 export const ConsciousnessPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [activeCore, setActiveCore] = useState('HERMES CORE');
+ const navigate = useNavigate();
+ const [activeCore, setActiveCore] = useState('HERMES CORE');
 
-  const { settings, update } = useConsciousnessSettings();
+ const layoutCtx = useLayoutContext();
+
+ const { settings, update } = useConsciousnessSettings();
 
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const voiceStateRef = useLatestRef(voiceState);
@@ -111,94 +115,53 @@ export const ConsciousnessPage: React.FC = () => {
   }, [update]);
 
   return (
-    <div className="relative w-full h-full bg-[#11111b] text-[#cdd6f4] flex flex-col justify-between overflow-hidden font-sans select-none">
-      {/* Top Header Bar Sci-Fi */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[#313244] bg-[#181825]/80 backdrop-blur">
+    <div className="relative w-full h-full bg-[#141b26] text-[#e8eef7] flex flex-col justify-between overflow-hidden font-sans select-none">
+    {/* Top Header Bar Sci-Fi */}
+    <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a3547] bg-[#1b2330]/80 backdrop-blur">
         <div className="flex items-center space-x-4">
-          <span className="text-[#a6e3a1] font-mono text-xs font-bold tracking-widest flex items-center">
-            <span className="w-2 h-2 rounded-full bg-[#a6e3a1] animate-ping mr-2"></span>
-            STATUS: ONLINE (CONSCIOUSNESS HUD)
+          <span className="text-[#f5c26b] font-mono text-xs font-bold tracking-widest flex items-center">
+          <span className="w-2 h-2 rounded-full bg-[#f5c26b] animate-ping mr-2"></span>
+          STATUS:ONLINE (CONSCIOUSNESS HUD)
           </span>
-          <span className="text-[#89b4fa] font-mono text-xs font-bold px-3 py-1 bg-[#313244] rounded-full border border-[#45475a]">
-            CORE: {activeCore}
+          <span className="text-[#e8eef7] font-mono text-xs font-bold px-3 py-1 bg-[#3e4c5e] rounded-full border border-[#55677f]">
+          CORE: {activeCore}
           </span>
-          {/* Semáforo de debug: refleja el voiceState actual (recibido por SSE) */}
-          <span className="flex items-center space-x-1.5 font-mono text-[10px] px-3 py-1 bg-[#1e1e2e] rounded-full border border-[#45475a]">
-            <span
-              title="idle"
-              className={`w-2.5 h-2.5 rounded-full transition-all ${
-                voiceState === 'idle' ? 'bg-[#a6e3a1] shadow-[0_0_8px_#a6e3a1]' : 'bg-[#313244]'
-              }`}
-            />
-            <span
-              title="thinking"
-              className={`w-2.5 h-2.5 rounded-full transition-all ${
-                voiceState === 'thinking' ? 'bg-[#cba6f7] shadow-[0_0_8px_#cba6f7]' : 'bg-[#313244]'
-              }`}
-            />
-            <span
-              title="speaking"
-              className={`w-2.5 h-2.5 rounded-full transition-all ${
-                voiceState === 'speaking' ? 'bg-[#89b4fa] shadow-[0_0_8px_#89b4fa]' : 'bg-[#313244]'
-              }`}
-            />
-            <span className="text-[#a6adc8] uppercase tracking-widest">{voiceState}</span>
+          {/* Semáforo debug: refleja voiceState actual (recibido por SSE)*/}
+          <span className="flex items-center space-x-1.5 font-mono text-[10px] px-3 py-1 bg-[#232c3b] rounded-full border border-[#55677f]">
+          <span
+          title="idle"
+          className={`w-2.5 h-2.5 rounded-full transition-all ${
+                         voiceState === 'idle' ? 'bg-[#c9a45c] shadow-[0_0_8px_#c9a45c]' : 'bg-[#313244]'
+                       }`}
+          />
+          <span
+          title="thinking"
+          className={`w-2.5 h-2.5 rounded-full transition-all ${
+                         voiceState === 'thinking' ? 'bg-[#e0951f] shadow-[0_0_8px_#e0951f]' : 'bg-[#313244]'
+                       }`}
+          />
+          <span
+          title="speaking"
+          className={`w-2.5 h-2.5 rounded-full transition-all ${
+                         voiceState === 'speaking' ? 'bg-[#dfe7f2] shadow-[0_0_8px_#dfe7f2]' : 'bg-[#313244]'
+                       }`}
+          />
+          <span className="text-[#a8b6c9] uppercase tracking-widest">{voiceState}</span>
           </span>
         </div>
 
-        {/* Botonera de Menú Navegación Directa a Wayland */}
-        <div className="flex items-center space-x-2 overflow-x-auto">
-          <button
-            onClick={() => navigate('/teams')}
-            className="px-3 py-1.5 bg-[#1e1e2e] hover:bg-[#313244] text-[#cba6f7] border border-[#cba6f7]/40 rounded-md text-xs font-bold transition flex items-center space-x-1"
-          >
-            <span>👥 TEAMS</span>
-          </button>
-          <button
-            onClick={() => navigate('/projects')}
-            className="px-3 py-1.5 bg-[#1e1e2e] hover:bg-[#313244] text-[#f9e2af] border border-[#f9e2af]/40 rounded-md text-xs font-bold transition flex items-center space-x-1"
-          >
-            <span>📁 PROJECTS</span>
-          </button>
-          <button
-            onClick={() => navigate('/workflows')}
-            className="px-3 py-1.5 bg-[#1e1e2e] hover:bg-[#313244] text-[#a6e3a1] border border-[#a6e3a1]/40 rounded-md text-xs font-bold transition flex items-center space-x-1"
-          >
-            <span>⚡ WORKFLOWS</span>
-          </button>
-          <button
-            onClick={() => navigate('/goal')}
-            className="px-3 py-1.5 bg-[#1e1e2e] hover:bg-[#313244] text-[#fab387] border border-[#fab387]/40 rounded-md text-xs font-bold transition flex items-center space-x-1"
-          >
-            <span>🎯 GOALS</span>
-          </button>
-          <button
-            onClick={() => navigate('/memory')}
-            className="px-3 py-1.5 bg-[#1e1e2e] hover:bg-[#313244] text-[#89dceb] border border-[#89dceb]/40 rounded-md text-xs font-bold transition flex items-center space-x-1"
-          >
-            <span>🧠 MEMORY</span>
-          </button>
-          <button
-            onClick={() => navigate('/conversations')}
-            className="px-3 py-1.5 bg-[#1e1e2e] hover:bg-[#313244] text-[#f5c2e7] border border-[#f5c2e7]/40 rounded-md text-xs font-bold transition flex items-center space-x-1"
-          >
-            <span>📜 CARDS GRID</span>
-          </button>
-          <button
-            onClick={() => navigate('/guid')}
-            className="px-3 py-1.5 bg-[#89b4fa] hover:bg-[#b4befe] text-[#11111b] rounded-md text-xs font-extrabold transition shadow-lg shadow-[#89b4fa]/20 flex items-center space-x-1"
-          >
-            <span>💬 CHAT</span>
-          </button>
-          <button
-            onClick={() => navigate('/settings')}
-            className="p-1.5 bg-[#1e1e2e] hover:bg-[#313244] text-[#cdd6f4] border border-[#45475a] rounded-md text-xs font-bold transition"
-            title="Settings"
-          >
-            <span>⚙️</span>
-          </button>
+        {/* TEMPORAL (Fase A1 debug): abre el sider actual para inspeccionar qué rescatar antes de eliminarlo (A3). */}
+        <button
+          onClick={() => layoutCtx?.setSiderCollapsed(false)}
+          title="Temporal: abre el menú de navegación actual (sider) para inspeccionar antes de su eliminación definitiva"
+          className="px-3 py-1.5 bg-[#1e1e2e] hover:bg-[#3e4c5e] text-[#f0b429] border border-dashed border-[#f0b429]/60 rounded-md text-xs font-bold transition flex items-center space-x-1 shrink-0"
+        >
+          <span>⚙ MENÚ DEBUG</span>
+        </button>
+
+        {/* Navegación integrada (Fase A2): NavDock data-driven con SEARCH + MISSION CONTROL placeholder */}
+        <NavDock />
         </div>
-      </div>
 
       {/* Main Center Area with Core Canvas and Overlay Floating Text */}
       <div className="relative flex-1 w-full h-full flex items-center justify-center">
@@ -207,7 +170,7 @@ export const ConsciousnessPage: React.FC = () => {
         ) : (
           <React.Suspense
             fallback={
-              <div className="absolute inset-0 flex items-center justify-center text-[#89dceb] font-mono text-sm tracking-widest">
+              <div className="absolute inset-0 flex items-center justify-center text-[#dfe7f2] font-mono text-sm tracking-widest">
                 CARGANDO NÚCLEO ELABORADO...
               </div>
             }
@@ -253,7 +216,7 @@ export const ConsciousnessPage: React.FC = () => {
         </div>
 
         {/* Dock de controles visuales (modo / rotación / fps) */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 bg-[#0f172a]/75 backdrop-blur-md border border-[#45475a]/60 rounded-full px-3 py-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 bg-[#1b2330]/75 backdrop-blur-md border border-[#55677f]/60 rounded-full px-3 py-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
           <button onClick={() => update('mode', '2d')} className={dockBtn(settings.mode === '2d')}>
             SIMPLE
           </button>
@@ -271,12 +234,12 @@ export const ConsciousnessPage: React.FC = () => {
       </div>
 
       {/* Bottom Status & Audio Wave Bar */}
-      <div className="px-6 py-3 border-t border-[#313244] bg-[#181825]/90 backdrop-blur flex items-center justify-between">
-        <div className="text-xs font-mono text-[#a6adc8]">
-          Hermes-Kokoro HTTP API Server: <span className="text-[#a6e3a1]">Connected (127.0.0.1:8642)</span>
-        </div>
-        <div className="flex items-center space-x-2 text-xs font-mono text-[#89dceb]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#89dceb] animate-pulse" />
+      <div className="px-6 py-3 border-t border-[#2a3547] bg-[#1b2330]/90 backdrop-blur flex items-center justify-between">
+      <div className="text-xs font-mono text-[#a8b6c9]">
+      Hermes-Kokoro HTTP API Server: <span className="text-[#f5c26b]">Connected (127.0.0.1:8642)</span>
+      </div>
+      <div className="flex items-center space-x-2 text-xs font-mono text-[#dfe7f2]">
+      <span className="w-1.5 h-1.5 rounded-full bg-[#f0b429] animate-pulse" />
           <span>Realtime Voice Streaming Ready</span>
         </div>
       </div>
