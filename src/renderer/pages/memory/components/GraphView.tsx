@@ -236,21 +236,51 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
       links: edges.map((e) => ({ ...e })),
     };
 
+
     if (!graphRef.current) {
       const graph = new ForceGraph(containerRef.current!)
         .width(width)
         .height(height)
         .graphData(gData)
         .backgroundColor('#0f141d')
-        .nodeId('id')
-        .nodeVal((node: any) => radiusOf(node.id, tierOf(node.id)))
-        .nodeColor((node: any) =>
-          node.id === selectedId ? '#ffffff' : prefs[node.id]?.color || TIER_COLORS[tierOf(node.id)]
-        )
-        .nodeLabel((node: any) => {
-          const typeLabel = node.type === 'unresolved' ? 'Phantom (Inexistent)' : node.type.toUpperCase();
-          const projectLabel = node.project ? `[${node.project}]` : '';
-          return `<div class="${styles.tooltip}">
+        .nodeId('id');
+      graphRef.current = graph;
+
+      const g = graphRef.current;
+      // Forces por clúster (C2)
+      const linkForce: any = g.d3Force('link');
+      if (linkForce) {
+        linkForce.distance((l: any) => {
+          const sTier = tierOf(idOf(l.source));
+          const tTier = tierOf(idOf(l.target));
+          if (sTier === 'log' || tTier === 'log') return 22;
+          if (sTier === 'sun' || tTier === 'sun') return 72;
+          return 42;
+        }).strength(0.55);
+      }
+      const charge: any = g.d3Force('charge');
+      if (charge) charge.strength(-90).distanceMax(900);
+      g.d3Force('center', null);
+      g.d3Force(
+        'x',
+        forceX((n: any) => (tierOf(n.id) === 'log' ? width * 0.86 : width * 0.5)).strength((n: any) => {
+          const t = tierOf(n.id);
+          return t === 'log' ? 0.9 : t === 'sun' ? 0.35 : t === 'planet' ? 0.18 : 0.08;
+        })
+      );
+      g.d3Force(
+        'y',
+        forceY((n: any) => (tierOf(n.id) === 'log' ? height * 0.14 : height * 0.5)).strength((n: any) => {
+          const t = tierOf(n.id);
+          return t === 'log' ? 0.9 : t === 'sun' ? 0.35 : t === 'planet' ? 0.18 : 0.08;
+        })
+      );
+
+      // Accessors de configuración
+      g.nodeLabel((node: any) => {
+        const typeLabel = node.type === 'unresolved' ? 'Phantom (Inexistent)' : node.type.toUpperCase();
+        const projectLabel = node.project ? `[${node.project}]` : '';
+        return `<div class="${styles.tooltip}">
             <div class="${styles.tooltipHeader}">
               <span class="${styles.nodeType}" style="color:${TYPE_COLORS[node.type]}">${typeLabel}</span>
               <span>${projectLabel}</span>
@@ -258,21 +288,9 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
             <div class="${styles.tooltipTitle}">${node.label}</div>
             <div class="${styles.tooltipLinks}">${node.linkCount || 0} connections · rol: ${tierOf(node.id)}</div>
           </div>`;
-        })
+      })
         .linkSource('source')
         .linkTarget('target')
-        .linkColor((l: any) => {
-          if (selectedId) {
-            return isIncident(l) ? '#ffffff' : 'rgba(38, 38, 38, 0.18)';
-          }
-          const sTier = tierOf(idOf(l.source));
-          const tTier = tierOf(idOf(l.target));
-          if (sTier === 'log' || tTier === 'log') return '#3a4a5e';
-          if (sTier === 'sun' || tTier === 'sun') return 'rgba(240, 180, 41, 0.55)';
-          return '#2c3a4d';
-        })
-        .linkWidth((l: any) => (selectedId && isIncident(l) ? 2.6 : 1.1))
-        .linkDirectionalParticles((l: any) => (selectedId && isIncident(l) ? 3 : 0))
         .linkDirectionalParticleSpeed(0.005)
         .linkDirectionalParticleWidth(1.8)
         .linkDirectionalParticleColor(() => '#f5c26b')
@@ -286,115 +304,12 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
           hoverNodeRef.current = node || null;
         });
 
-      // --- Fuerzas por clúster (C2): galaxia logs aislada, soles al centro ---
-      const linkForce: any = graph.d3Force('link');
-      if (linkForce) {
-        linkForce.distance((l: any) => {
-          const sTier = tierOf(idOf(l.source));
-          const tTier = tierOf(idOf(l.target));
-          if (sTier === 'log' || tTier === 'log') return 22;
-          if (sTier === 'sun' || tTier === 'sun') return 72;
-          return 42;
-        }).strength(0.55);
-      }
-      const charge: any = graph.d3Force('charge');
-      if (charge) charge.strength(-90).distanceMax(900);
-      graph.d3Force('center', null);
-      graph.d3Force(
-        'x',
-        forceX((n: any) => (tierOf(n.id) === 'log' ? width * 0.86 : width * 0.5)).strength((n: any) => {
-          const t = tierOf(n.id);
-          return t === 'log' ? 0.9 : t === 'sun' ? 0.35 : t === 'planet' ? 0.18 : 0.08;
-        })
-      );
-      graph.d3Force(
-        'y',
-        forceY((n: any) => (tierOf(n.id) === 'log' ? height * 0.14 : height * 0.5)).strength((n: any) => {
-          const t = tierOf(n.id);
-          return t === 'log' ? 0.9 : t === 'sun' ? 0.35 : t === 'planet' ? 0.18 : 0.08;
-        })
-      );
-
-      // --- Pintado por rol (sol con glow, satélite discreto, dim al seleccionar) ---
-      graph.nodeCanvasObject((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-        const tier = tierOf(node.id);
-        const r = radiusOf(node.id, tier);
-        const isSelected = node.id === selectedId;
-        const isHovered = hoverNodeRef.current?.id === node.id;
-        const color = isSelected ? '#ffffff' : prefs[node.id]?.color || TIER_COLORS[tier];
-        const dim = isDimNode(node.id);
-        const label = node.label;
-        const fontSize = Math.max(11, 13 / globalScale);
-        ctx.font = `${fontSize}px Sans-Serif`;
-
-        ctx.globalAlpha = dim ? 0.22 : 1;
-
-        // Glow para soles
-        if (tier === 'sun' && !isSelected) {
-          const glow = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, r * 3);
-          glow.addColorStop(0, 'rgba(240, 180, 41, 0.28)');
-          glow.addColorStop(1, 'rgba(240, 180, 41, 0)');
-          ctx.fillStyle = glow;
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, r * 3, 0, 2 * Math.PI);
-          ctx.fill();
-        }
-
-        // Nodo
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
-        if (node.type === 'unresolved') {
-          ctx.strokeStyle = TYPE_COLORS.unresolved;
-          ctx.lineWidth = 1;
-          ctx.setLineDash([2, 1]);
-          ctx.stroke();
-          ctx.fillStyle = 'rgba(89, 89, 89, 0.15)';
-          ctx.fill();
-          ctx.setLineDash([]);
-        } else {
-          ctx.fillStyle = color;
-          ctx.fill();
-        }
-
-        // Anillo blanco + halo para seleccionado
-        if (isSelected) {
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 1.8;
-          ctx.stroke();
-          ctx.globalAlpha = 0.35;
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, r + 8, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.globalAlpha = dim ? 0.22 : 1;
-        }
-
-        // Labels: soles siempre; planetas/satélites al acercar; hover/selección siempre
-        const showLabel =
-          tier === 'sun' || isSelected || isHovered || (globalScale > 0.7 && tier === 'planet') || (globalScale > 1.1 && tier === 'satellite') || tier === 'log';
-        if (showLabel) {
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.lineWidth = Math.max(2, fontSize / 5);
-          ctx.strokeStyle = 'rgba(10, 14, 20, 0.9)';
-          ctx.fillStyle = isSelected ? '#ffffff' : tier === 'sun' ? '#f5c26b' : '#c9d4e4';
-          const cleanLabel = label.length > 25 ? label.slice(0, 22) + '...' : label;
-          ctx.strokeText(cleanLabel, node.x, node.y + r + 4);
-          ctx.fillText(cleanLabel, node.x, node.y + r + 4);
-        }
-
-        ctx.globalAlpha = 1;
-      });
-
-      graphRef.current = graph;
-    } else {
-      // Actualización: datos + colores + tamaños sin reconstruir
-      graphRef.current.graphData(gData);
-      graphRef.current.nodeVal((node: any) => radiusOf(node.id, tierOf(node.id)));
-      graphRef.current.nodeColor((node: any) =>
+      // Tamaños/colores/links iniciales (sin rebuild)
+      g.nodeVal((node: any) => radiusOf(node.id, tierOf(node.id)));
+      g.nodeColor((node: any) =>
         node.id === selectedId ? '#ffffff' : prefs[node.id]?.color || TIER_COLORS[tierOf(node.id)]
       );
-      graphRef.current.linkColor((l: any) => {
+      g.linkColor((l: any) => {
         if (selectedId) {
           return isIncident(l) ? '#ffffff' : 'rgba(38, 38, 38, 0.18)';
         }
@@ -404,84 +319,158 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
         if (sTier === 'sun' || tTier === 'sun') return 'rgba(240, 180, 41, 0.55)';
         return '#2c3a4d';
       });
-      graphRef.current.linkWidth((l: any) => (selectedId && isIncident(l) ? 2.6 : 1.1));
-      graphRef.current.linkDirectionalParticles((l: any) => (selectedId && isIncident(l) ? 3 : 0));
-      graphRef.current.nodeCanvasObject((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-        /* repintado con closure fresco — reutiliza la misma lógica */
-        const tier = tierOf(node.id);
-        const r = radiusOf(node.id, tier);
-        const isSelected = node.id === selectedId;
-        const isHovered = hoverNodeRef.current?.id === node.id;
-        const color = isSelected ? '#ffffff' : prefs[node.id]?.color || TIER_COLORS[tier];
-        const dim = isDimNode(node.id);
-        const label = node.label;
-        const fontSize = Math.max(11, 13 / globalScale);
-        ctx.font = `${fontSize}px Sans-Serif`;
+      g.linkWidth((l: any) => (selectedId && isIncident(l) ? 2.6 : 1.1));
+      g.linkDirectionalParticles((l: any) => (selectedId && isIncident(l) ? 3 : 0));
+    }
+  }, [data, showUnresolved]);
+  useEffect(() => {
+    if (!containerRef.current || !data) return;
+    const width = containerRef.current.clientWidth;
+    const height = containerRef.current.clientHeight || 500;
 
-        ctx.globalAlpha = dim ? 0.22 : 1;
+    const visibleNodes = showUnresolved ? data.nodes : data.nodes.filter((n) => n.type !== 'unresolved');
+    const nodeIds = new Set(visibleNodes.map((n) => n.id));
+    const edges = data.edges.filter((e) => {
+      const s = idOf(e.source);
+      const t = idOf(e.target);
+      if (!nodeIds.has(s) || !nodeIds.has(t)) return false;
+      const sNode = data.nodes.find((n) => n.id === s);
+      const tNode = data.nodes.find((n) => n.id === t);
+      const sLog = sNode?.type === 'session';
+      const tLog = tNode?.type === 'session';
+      return sLog === tLog;
+    });
 
-        if (tier === 'sun' && !isSelected) {
-          const glow = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, r * 3);
-          glow.addColorStop(0, 'rgba(240, 180, 41, 0.28)');
-          glow.addColorStop(1, 'rgba(240, 180, 41, 0)');
-          ctx.fillStyle = glow;
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, r * 3, 0, 2 * Math.PI);
-          ctx.fill();
-        }
-
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
-        if (node.type === 'unresolved') {
-          ctx.strokeStyle = TYPE_COLORS.unresolved;
-          ctx.lineWidth = 1;
-          ctx.setLineDash([2, 1]);
-          ctx.stroke();
-          ctx.fillStyle = 'rgba(89, 89, 89, 0.15)';
-          ctx.fill();
-          ctx.setLineDash([]);
-        } else {
-          ctx.fillStyle = color;
-          ctx.fill();
-        }
-
-        if (isSelected) {
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 1.8;
-          ctx.stroke();
-          ctx.globalAlpha = 0.35;
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, r + 8, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.globalAlpha = dim ? 0.22 : 1;
-        }
-
-        const showLabel =
-          tier === 'sun' || isSelected || isHovered || (globalScale > 0.7 && tier === 'planet') || (globalScale > 1.1 && tier === 'satellite') || tier === 'log';
-        if (showLabel) {
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.lineWidth = Math.max(2, fontSize / 5);
-          ctx.strokeStyle = 'rgba(10, 14, 20, 0.9)';
-          ctx.fillStyle = isSelected ? '#ffffff' : tier === 'sun' ? '#f5c26b' : '#c9d4e4';
-          const cleanLabel = label.length > 25 ? label.slice(0, 22) + '...' : label;
-          ctx.strokeText(cleanLabel, node.x, node.y + r + 4);
-          ctx.fillText(cleanLabel, node.x, node.y + r + 4);
-        }
-
-        ctx.globalAlpha = 1;
-      });
+    const nodeById = new Map(visibleNodes.map((n) => [n.id, n]));
+    const degree = new Map<string, number>();
+    for (const e of edges) {
+      const s = idOf(e.source);
+      const t = idOf(e.target);
+      degree.set(s, (degree.get(s) || 0) + 1);
+      degree.set(t, (degree.get(t) || 0) + 1);
     }
 
-    return () => {
-      if (graphRef.current) {
-        graphRef.current._destructor?.();
-        graphRef.current = null;
-      }
+    const tierOf = (id: string): Tier => {
+      const n = nodeById.get(id);
+      if (!n) return 'satellite';
+      if (n.type === 'session') return 'log';
+      const d = degree.get(id) || 0;
+      if (d >= SUN_MIN_DEGREE) return 'sun';
+      if (d >= PLANET_MIN_DEGREE) return 'planet';
+      return 'satellite';
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    const radiusOf = (id: string, tier: Tier): number => {
+      const auto = 1 + Math.min(1.4, Math.sqrt(degree.get(id) || 0) * 0.22);
+      const mult = clamp(prefs[id]?.sizeMult ?? 1, SIZE_MIN, SIZE_MAX);
+      return clamp(TIER_BASE_RADIUS[tier] * auto * mult, 2, 26);
+    };
+
+    const neighborsOfSelected = new Set<string>();
+    if (selectedId) {
+      for (const e of edges) {
+        const s = idOf(e.source);
+        const t = idOf(e.target);
+        if (s === selectedId) neighborsOfSelected.add(t);
+        if (t === selectedId) neighborsOfSelected.add(s);
+      }
+    }
+    const isIncident = (l: { source: unknown; target: unknown }): boolean =>
+      !!selectedId && (idOf(l.source) === selectedId || idOf(l.target) === selectedId);
+    const isDimNode = (id: string): boolean =>
+      !!selectedId && id !== selectedId && !neighborsOfSelected.has(id);
+
+    const gData = {
+      nodes: visibleNodes.map((n) => ({ ...n })),
+      links: edges.map((e) => ({ ...e })),
+    };
+
+    const g = graphRef.current;
+    if (!g) return;
+    g.graphData(gData);
+    g.nodeVal((node: any) => radiusOf(node.id, tierOf(node.id)));
+    g.nodeColor((node: any) =>
+      node.id === selectedId ? '#ffffff' : prefs[node.id]?.color || TIER_COLORS[tierOf(node.id)]
+    );
+    g.linkColor((l: any) => {
+      if (selectedId) {
+        return isIncident(l) ? '#ffffff' : 'rgba(38, 38, 38, 0.18)';
+      }
+      const sTier = tierOf(idOf(l.source));
+      const tTier = tierOf(idOf(l.target));
+      if (sTier === 'log' || tTier === 'log') return '#3a4a5e';
+      if (sTier === 'sun' || tTier === 'sun') return 'rgba(240, 180, 41, 0.55)';
+      return '#2c3a4d';
+    });
+    g.linkWidth((l: any) => (selectedId && isIncident(l) ? 2.6 : 1.1));
+    g.linkDirectionalParticles((l: any) => (selectedId && isIncident(l) ? 3 : 0));
+    g.nodeCanvasObject((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const tier = tierOf(node.id);
+      const r = radiusOf(node.id, tier);
+      const isSelected = node.id === selectedId;
+      const isHovered = hoverNodeRef.current?.id === node.id;
+      const color = isSelected ? '#ffffff' : prefs[node.id]?.color || TIER_COLORS[tier];
+      const dim = isDimNode(node.id);
+      const label = node.label;
+      const fontSize = Math.max(11, 13 / globalScale);
+      ctx.font = `${fontSize}px Sans-Serif`;
+
+      ctx.globalAlpha = dim ? 0.22 : 1;
+
+      if (tier === 'sun' && !isSelected) {
+        const glow = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, r * 3);
+        glow.addColorStop(0, 'rgba(240, 180, 41, 0.28)');
+        glow.addColorStop(1, 'rgba(240, 180, 41, 0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, r * 3, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
+      if (node.type === 'unresolved') {
+        ctx.strokeStyle = TYPE_COLORS.unresolved;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 1]);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(89, 89, 89, 0.15)';
+        ctx.fill();
+        ctx.setLineDash([]);
+      } else {
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
+
+      if (isSelected) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, r + 8, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.globalAlpha = dim ? 0.22 : 1;
+      }
+
+      const showLabel =
+        tier === 'sun' || isSelected || isHovered || (globalScale > 0.7 && tier === 'planet') || (globalScale > 1.1 && tier === 'satellite') || tier === 'log';
+      if (showLabel) {
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.lineWidth = Math.max(2, fontSize / 5);
+        ctx.strokeStyle = 'rgba(10, 14, 20, 0.9)';
+        ctx.fillStyle = isSelected ? '#ffffff' : tier === 'sun' ? '#f5c26b' : '#c9d4e4';
+        const cleanLabel = label.length > 25 ? label.slice(0, 22) + '...' : label;
+        ctx.strokeText(cleanLabel, node.x, node.y + r + 4);
+        ctx.fillText(cleanLabel, node.x, node.y + r + 4);
+      }
+
+      ctx.globalAlpha = 1;
+    });
   }, [data, prefs, selectedId, showUnresolved]);
+
 
   return (
     <div className={styles.graphContainer}>

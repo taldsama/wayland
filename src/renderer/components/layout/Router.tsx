@@ -212,7 +212,7 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
             <Route path='/consciousness' element={withRouteFallback(ConsciousnessPage)} />
           </Route>
 
-          <Route path='*' element={<Navigate to={status === 'authenticated' ? '/guid' : '/login'} replace />} />
+          <Route path='*' element={<Navigate to={status === 'authenticated' ? '/consciousness' : '/login'} replace />} />
         </Routes>
       </HashRouter>
     </ToastProvider>

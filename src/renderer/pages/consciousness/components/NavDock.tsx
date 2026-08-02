@@ -13,7 +13,8 @@
  * TODO(A3): cuando se elimine el sider por completo, esta es la navegación
  * canónica del app.
  */
-import React from 'react';
+import React, { useState } from 'react';
+import { Modal } from '@arco-design/web-react';
 import { useNavigate } from 'react-router-dom';
 import ConversationSearchPopover from '@renderer/pages/conversation/GroupedHistory/ConversationSearchPopover';
 
@@ -57,18 +58,26 @@ interface NavDockProps {
 
 export const NavDock: React.FC<NavDockProps> = ({ className }) => {
   const navigate = useNavigate();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const navBtnBase = 'px-3 py-1.5 rounded-md text-xs font-bold transition flex items-center space-x-1 shrink-0';
 
   return (
+    <>
     <div className={`flex items-center space-x-2 overflow-x-auto ${className ?? ''}`}>
-      {/* SEARCH — popover de búsqueda por palabras clave en conversaciones */}
-      <ConversationSearchPopover
-        label="SEARCH"
-        fullWidth
-        buttonClassName="!h-30px !px-3 !py-1.5 !bg-[#232c3b] hover:!bg-[#3e4c5e] !text-[#8fb3c4] !border !border-solid !border-[#8fb3c4]/40 !rounded-md !text-xs !font-bold !shrink-0"
-      />
+            {/* SEARCH — botón que abre el modal de búsqueda por palabras clave */}
+      <button
+        type="button"
+        onClick={() => setSearchOpen(true)}
+        title="Buscar en conversaciones"
+        className={`${navBtnBase} bg-[#232c3b] hover:bg-[#3e4c5e] border`}
+        style={{ color: '#8fb3c4', borderColor: '#8fb3c466' }}
+      >
+        <span>🔍</span>
+        <span>SEARCH</span>
+      </button>
 
       {NAV_ITEMS.map((item) => {
-        const base = 'px-3 py-1.5 rounded-md text-xs font-bold transition flex items-center space-x-1 shrink-0';
+        
         if (item.primary) {
           return (
             <button
@@ -76,7 +85,7 @@ export const NavDock: React.FC<NavDockProps> = ({ className }) => {
               type="button"
               onClick={() => item.route && navigate(item.route)}
               title={item.title}
-              className={`${base} bg-[#f0b429] hover:bg-[#f5c26b] text-[#141b26] shadow-lg shadow-[#f0b429]/25`}
+              className={`${navBtnBase} bg-[#f0b429] hover:bg-[#f5c26b] text-[#141b26] shadow-lg shadow-[#f0b429]/25`}
             >
               <span>{item.icon}</span>
               <span>{item.label}</span>
@@ -90,7 +99,7 @@ export const NavDock: React.FC<NavDockProps> = ({ className }) => {
               type="button"
               disabled
               title={item.title}
-              className={`${base} opacity-50 cursor-not-allowed bg-[#232c3b] border border-dashed relative`}
+              className={`${navBtnBase} opacity-50 cursor-not-allowed bg-[#232c3b] border border-dashed relative`}
               style={{ color: item.accent, borderColor: `${item.accent}66` }}
             >
               <span>{item.icon}</span>
@@ -107,7 +116,7 @@ export const NavDock: React.FC<NavDockProps> = ({ className }) => {
             type="button"
             onClick={() => item.route && navigate(item.route)}
             title={item.title}
-            className={`${base} bg-[#232c3b] hover:bg-[#3e4c5e] hover:-translate-y-px border`}
+            className={`${navBtnBase} bg-[#232c3b] hover:bg-[#3e4c5e] hover:-translate-y-px border`}
             style={{ color: item.accent, borderColor: `${item.accent}66` }}
           >
             <span>{item.icon}</span>
@@ -116,6 +125,18 @@ export const NavDock: React.FC<NavDockProps> = ({ className }) => {
         );
       })}
     </div>
+
+      {/* Modal búsqueda de conversaciones por palabras clave */}
+      <Modal
+        title="Buscar en conversaciones"
+        visible={searchOpen}
+        onCancel={() => setSearchOpen(false)}
+        footer={null}
+        style={{ borderRadius: '12px' }}
+      >
+        <ConversationSearchPopover label="SEARCH" fullWidth />
+      </Modal>
+    </>
   );
 };
 
