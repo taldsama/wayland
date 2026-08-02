@@ -14,6 +14,7 @@ import log from 'electron-log';
 import { z } from 'zod';
 import { ipcBridge } from '@/common';
 import { getIjfwArchiveService } from '@process/services/memory/ijfwArchiveService';
+import { getMemoryGraphData } from '@process/services/memory/graphDataProvider';
 import { promoteEntry, undoPromotion } from '@process/services/memory/wikiWriter';
 import { startPromotionSweep } from '@process/services/memory/promotionSweep';
 import { readSourceContext } from '@process/services/memory/sourceReader';
@@ -150,7 +151,10 @@ export function initMemoryArchiveBridge(): void {
       return { nodes: [], edges: [] };
     }
     try {
-      return await svc.getGraphData(parsed.data as ListFilter);
+      // Graph por WIKILINKS reales (provider dedicado): conecta soles/planetas/
+      // satélites + galaxia logs. El método svc.getGraphData (tags compartidos)
+      // produce cero edges con la bóveda actual (tags vacíos).
+      return await getMemoryGraphData(parsed.data as ListFilter);
     } catch (err) {
       log.error('[memory-archive] getGraphData failed', { err });
       return { nodes: [], edges: [] };

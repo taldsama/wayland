@@ -185,15 +185,16 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
       ? data.nodes
       : data.nodes.filter((n) => n.type !== 'unresolved');
     const nodeIds = new Set(visibleNodes.map((n) => n.id));
+    // Nodo log: tipo session O el hub virtual de la galaxia logs
+    const isLogNode = (n?: GraphNode): boolean =>
+      n?.type === 'session' || n?.id === 'logs-galaxy-hub';
     const edges = data.edges.filter((e) => {
       const s = idOf(e.source);
       const t = idOf(e.target);
       if (!nodeIds.has(s) || !nodeIds.has(t)) return false;
       const sNode = data.nodes.find((n) => n.id === s);
       const tNode = data.nodes.find((n) => n.id === t);
-      const sLog = sNode?.type === 'session';
-      const tLog = tNode?.type === 'session';
-      return sLog === tLog; // corta edges log<->no-log: galaxias aisladas
+      return isLogNode(sNode) === isLogNode(tNode); // corta edges log<->no-log: galaxias aisladas
     });
 
     const nodeById = new Map(visibleNodes.map((n) => [n.id, n]));
@@ -208,7 +209,7 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
     const tierOf = (id: string): Tier => {
       const n = nodeById.get(id);
       if (!n) return 'satellite';
-      if (n.type === 'session') return 'log';
+      if (n.type === 'session' || n.id === 'logs-galaxy-hub') return 'log';
       const d = degree.get(id) || 0;
       if (d >= SUN_MIN_DEGREE) return 'sun';
       if (d >= PLANET_MIN_DEGREE) return 'planet';
