@@ -152,12 +152,24 @@ const SourcePanel: React.FC<SourcePanelProps> = ({ path, line, autoExpand = fals
       });
   }, [path, line]);
 
-  // Auto-expand: fetch immediately on mount
+  //Auto-expand: fetch immediately on mount
   useEffect(() => {
     if (autoExpand) {
       fetchSource();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoExpand, fetchSource]);
+
+  // Re-fetch cuando cambia la entrada seleccionada (path/line) SI el panel
+  // está abierto — evita mostrar el texto de la nota anterior.
+  const openRef = useRef(open);
+  openRef.current = open;
+  useEffect(() => {
+    if (openRef.current) {
+      fetchSource();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, line, fetchSource]);
 
   const handleToggle = useCallback(() => {
     const next = !open;
