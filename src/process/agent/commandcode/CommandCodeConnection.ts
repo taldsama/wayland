@@ -82,6 +82,8 @@ export class CommandCodeConnection {
         'json',
         '--permission-mode',
         'auto-accept',
+        '--model',
+        'deepseek/deepseek-v4-flash',
         '--session',
         sessionId,
       ];
