@@ -17,9 +17,10 @@ import {
   createAcpAgent,
   createOpenClawAgent,
   createNanobotAgent,
+  createCommandCodeAgent,
   createRemoteAgent,
   createWCoreAgent,
-} from '@process/utils/initAgent';
+  } from '@process/utils/initAgent';
 
 /**
  * Concrete implementation of IConversationService.
@@ -237,6 +238,10 @@ export class ConversationServiceImpl implements IConversationService {
       }
       case 'nanobot': {
         conversation = await createNanobotAgent(params as any);
+        break;
+      }
+      case 'command-code': {
+        conversation = await createCommandCodeAgent(params as any);
         break;
       }
       case 'remote': {

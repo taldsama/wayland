@@ -24,6 +24,7 @@ import AcpChat from '../platforms/acp/AcpChat';
 import ChatLayout from './ChatLayout';
 import ChatSider from './ChatSider';
 import NanobotChat from '../platforms/nanobot/NanobotChat';
+import CommandCodeChat from '../platforms/commandcode/CommandCodeChat';
 import OpenClawChat from '../platforms/openclaw/OpenClawChat';
 import RemoteChat from '../platforms/remote/RemoteChat';
 import GeminiChat from '../platforms/gemini/GeminiChat';
@@ -502,7 +503,16 @@ const ChatConversation: React.FC<{
             key={conversation.id}
             conversation_id={conversation.id}
             workspace={conversation.extra?.workspace}
-            cronJobId={(conversation.extra as { cronJobId?: string })?.cronJobId}
+            cronJobId={(conversation.extra as { cronJobId?: string } | undefined)?.cronJobId}
+          />
+        );
+      case 'command-code':
+        return (
+          <CommandCodeChat
+            key={conversation.id}
+            conversation_id={conversation.id}
+            workspace={conversation.extra?.workspace}
+            cronJobId={(conversation.extra as { cronJobId?: string } | undefined)?.cronJobId}
           />
         );
       case 'remote':

@@ -24,7 +24,7 @@ export interface ConversationContextValue {
   /**
    * Conversation type
    */
-  type: 'gemini' | 'acp' | 'codex' | 'openclaw-gateway' | 'nanobot' | 'remote' | 'wcore';
+  type: 'gemini' | 'acp' | 'codex' | 'openclaw-gateway' | 'nanobot' | 'command-code' | 'remote' | 'wcore';
 
   /**
    * Cron job ID (if this conversation was created by a scheduled task)

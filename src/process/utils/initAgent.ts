@@ -395,6 +395,37 @@ export const createNanobotAgent = async (options: ICreateConversationParams): Pr
   };
 };
 
+export const createCommandCodeAgent = async (options: ICreateConversationParams): Promise<TChatConversation> => {
+  const { extra } = options;
+  const { workspace, customWorkspace } = await buildWorkspaceWidthFiles(
+    `command-code-temp-${Date.now()}`,
+    extra.workspace,
+    extra.defaultFiles,
+    extra.customWorkspace
+  );
+
+  await setupWorkspaceSkills(workspace, customWorkspace, !!extra.projectId, {
+    agentType: 'command-code',
+    enabledSkills: extra.enabledSkills,
+    extraSkillPaths: extra.extraSkillPaths,
+    excludeBuiltinSkills: extra.excludeBuiltinSkills,
+  });
+
+  return {
+    type: 'command-code',
+    extra: {
+      workspace,
+      customWorkspace,
+      enabledSkills: extra.enabledSkills,
+      presetAssistantId: extra.presetAssistantId,
+    },
+    createTime: Date.now(),
+    modifyTime: Date.now(),
+    name: workspace,
+    id: uuid(),
+  };
+};
+
 export const createRemoteAgent = async (options: ICreateConversationParams): Promise<TChatConversation> => {
   const { extra } = options;
   const { workspace, customWorkspace } = await buildWorkspaceWidthFiles(

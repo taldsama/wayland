@@ -7,7 +7,7 @@
 // src/process/task/agentTypes.ts
 
 // 'wcore' targets the Wayland-Core Rust engine.
-export type AgentType = 'gemini' | 'acp' | 'openclaw-gateway' | 'nanobot' | 'remote' | 'wcore';
+export type AgentType = 'gemini' | 'acp' | 'openclaw-gateway' | 'nanobot' | 'command-code' | 'remote' | 'wcore';
 export type AgentStatus = 'pending' | 'running' | 'finished';
 
 export interface BuildConversationOptions {

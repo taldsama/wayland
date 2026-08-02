@@ -11,6 +11,7 @@ import type {
   DetectedAgent,
   GeminiDetectedAgent,
   NanobotDetectedAgent,
+  CommandCodeDetectedAgent,
   OpenClawDetectedAgent,
   RemoteDetectedAgent,
 } from '@/common/types/detectedAgent';
@@ -127,6 +128,17 @@ class AgentRegistry {
         backend: 'nanobot',
         cliPath: 'nanobot',
       } satisfies NanobotDetectedAgent);
+    }
+
+    if (acpDetector.isCliAvailable('command-code') || acpDetector.isCliAvailable('commandcode')) {
+      agents.push({
+        id: 'command-code',
+        name: 'Command Code',
+        kind: 'command-code',
+        available: true,
+        backend: 'command-code',
+        cliPath: acpDetector.isCliAvailable('command-code') ? 'command-code' : 'commandcode',
+      } satisfies CommandCodeDetectedAgent);
     }
 
     return agents;

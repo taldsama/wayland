@@ -20,6 +20,7 @@ const useOpenClawDraft = getSendBoxDraftHook('openclaw-gateway', {
   uploadFile: [],
 });
 const useNanobotDraft = getSendBoxDraftHook('nanobot', { _type: 'nanobot', atPath: [], content: '', uploadFile: [] });
+const useCommandCodeDraft = getSendBoxDraftHook('command-code', { _type: 'command-code', atPath: [], content: '', uploadFile: [] });
 const useRemoteDraft = getSendBoxDraftHook('remote', { _type: 'remote', atPath: [], content: '', uploadFile: [] });
 const useWCoreDraft = getSendBoxDraftHook('wcore', { _type: 'wcore', atPath: [], content: '', uploadFile: [] });
 
@@ -93,6 +94,7 @@ const TeamChatEmptyState: React.FC<Props> = ({ conversationId, isLeader = true }
   const geminiDraft = useGeminiDraft(conversationId);
   const wcoreDraft = useWCoreDraft(conversationId);
   const nanobotDraft = useNanobotDraft(conversationId);
+  const commandCodeDraft = useCommandCodeDraft(conversationId);
   const remoteDraft = useRemoteDraft(conversationId);
   const openClawDraft = useOpenClawDraft(conversationId);
   const setContentByKind = {
@@ -100,6 +102,7 @@ const TeamChatEmptyState: React.FC<Props> = ({ conversationId, isLeader = true }
     gemini: (text: string) => geminiDraft.mutate((prev) => ({ ...prev, content: text })),
     wcore: (text: string) => wcoreDraft.mutate((prev) => ({ ...prev, content: text })),
     nanobot: (text: string) => nanobotDraft.mutate((prev) => ({ ...prev, content: text })),
+    'command-code': (text: string) => commandCodeDraft.mutate((prev) => ({ ...prev, content: text })),
     remote: (text: string) => remoteDraft.mutate((prev) => ({ ...prev, content: text })),
     'openclaw-gateway': (text: string) => openClawDraft.mutate((prev) => ({ ...prev, content: text })),
   } satisfies Record<DetectedAgentKind, (text: string) => void>;

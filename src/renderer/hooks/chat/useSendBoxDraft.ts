@@ -28,19 +28,25 @@ type Draft =
       uploadFile: string[];
     }
   | {
-      _type: 'openclaw-gateway';
-      content: string;
-      atPath: Array<string | FileOrFolderItem>;
-      uploadFile: string[];
-    }
-  | {
-      _type: 'nanobot';
-      content: string;
-      atPath: Array<string | FileOrFolderItem>;
-      uploadFile: string[];
-    }
-  | {
-      _type: 'remote';
+   _type: 'openclaw-gateway';
+   content: string;
+   atPath: Array<string | FileOrFolderItem>;
+   uploadFile: string[];
+ }
+ | {
+   _type: 'nanobot';
+   content: string;
+   atPath: Array<string | FileOrFolderItem>;
+   uploadFile: string[];
+ }
+ | {
+   _type: 'command-code';
+   content: string;
+   atPath: Array<string | FileOrFolderItem>;
+   uploadFile: string[];
+ }
+ | {
+   _type: 'remote';
       content: string;
       atPath: Array<string | FileOrFolderItem>;
       uploadFile: string[];
@@ -65,6 +71,7 @@ const store: SendBoxDraftStore = {
   codex: new Map(),
   'openclaw-gateway': new Map(),
   nanobot: new Map(),
+  'command-code': new Map(),
   remote: new Map(),
   wcore: new Map(),
 };

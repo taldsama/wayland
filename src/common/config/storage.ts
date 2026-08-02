@@ -675,8 +675,27 @@ export type TChatConversation =
       'model'
     >
   | Omit<
-      IChatConversation<
-        'remote',
+    IChatConversation<
+      'command-code',
+      {
+        workspace?: string;
+        customWorkspace?: boolean;
+        enabledSkills?: string[];
+        activeMcpServers?: string[];
+        loadedSkills?: Array<{ name: string; description: string }>;
+        presetAssistantId?: string;
+        pinned?: boolean;
+        pinnedAt?: number;
+        isHealthCheck?: boolean;
+        cronJobId?: string;
+        projectId?: string;
+      }
+    >,
+    'model'
+  >
+  | Omit<
+    IChatConversation<
+      'remote',
         {
           workspace?: string;
           customWorkspace?: boolean;

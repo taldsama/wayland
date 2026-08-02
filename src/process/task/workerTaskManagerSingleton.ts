@@ -16,6 +16,7 @@ import { GeminiAgentManager } from './GeminiAgentManager';
 import AcpAgentManager from './AcpAgentManager';
 import OpenClawAgentManager from './OpenClawAgentManager';
 import NanoBotAgentManager from './NanoBotAgentManager';
+import CommandCodeAgentManager from './CommandCodeAgentManager';
 import RemoteAgentManager from './RemoteAgentManager';
 import { WCoreManager } from './WCoreManager';
 
@@ -54,6 +55,16 @@ agentFactory.register('openclaw-gateway', (conv, opts) => {
 agentFactory.register('nanobot', (conv, opts) => {
   const c = conv as any;
   return new NanoBotAgentManager({
+    ...c.extra,
+    conversation_id: c.id,
+    yoloMode: opts?.yoloMode,
+  }) as unknown as ReturnType<typeof agentFactory.create>;
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+agentFactory.register('command-code', (conv, opts) => {
+  const c = conv as any;
+  return new CommandCodeAgentManager({
     ...c.extra,
     conversation_id: c.id,
     yoloMode: opts?.yoloMode,

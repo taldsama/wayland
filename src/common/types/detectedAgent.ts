@@ -24,7 +24,7 @@ export type RemoteAgentProtocol = 'openclaw' | 'zeroclaw' | 'acp';
 export type RemoteAgentAuthType = 'bearer' | 'password' | 'none';
 
 /** Execution engine kinds - each uses a different protocol or runtime. */
-export type DetectedAgentKind = 'gemini' | 'acp' | 'remote' | 'wcore' | 'openclaw-gateway' | 'nanobot';
+export type DetectedAgentKind = 'gemini' | 'acp' | 'remote' | 'wcore' | 'openclaw-gateway' | 'nanobot' | 'command-code';
 
 /** Kind-specific fields mapping */
 type KindFields = {
@@ -73,7 +73,12 @@ type KindFields = {
     /** Resolved CLI binary path */
     cliPath?: string;
   };
-};
+
+  'command-code': {
+    /** Resolved CLI binary path */
+    cliPath?: string;
+  };
+  };
 
 /**
  * Detected execution engine.
@@ -96,6 +101,7 @@ export type GeminiDetectedAgent = DetectedAgent<'gemini'>;
 export type RemoteDetectedAgent = DetectedAgent<'remote'>;
 export type WCoreDetectedAgent = DetectedAgent<'wcore'>;
 export type NanobotDetectedAgent = DetectedAgent<'nanobot'>;
+export type CommandCodeDetectedAgent = DetectedAgent<'command-code'>;
 export type OpenClawDetectedAgent = DetectedAgent<'openclaw-gateway'>;
 
 // Type guard - narrows a generic DetectedAgent to a specific kind
