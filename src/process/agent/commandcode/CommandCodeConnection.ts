@@ -6,6 +6,7 @@
 
 import { spawn } from 'child_process';
 import path from 'node:path';
+import fs from 'node:fs';
 import os from 'node:os';
 import { getEnhancedEnv } from '@process/utils/shellEnv';
 
@@ -14,21 +15,28 @@ import { getEnhancedEnv } from '@process/utils/shellEnv';
  * and streams NDJSON events.
  *
  * Command: command-code "<message>" --print --output-format json
- *          --permission-mode auto-accept --session <id>
+ *          --permission-mode auto-accept [--session <realSessionId>]
  *
- * Output is NDJSON: lines like
- *   {"type":"event","event":{"type":"text_delta","delta":"..."}}
- *   {"type":"result","finalText":"...","error":"..."}
- * We accumulate text_delta deltas and resolve with the final text.
+ * IMPORTANT: --session does NOT accept arbitrary ids. It only accepts either
+ * an existing .jsonl transcript path or a real session-id returned by a
+ * previous run (run_start event). Passing a random conversation id makes the
+ * process exit immediately with "Process exited unexpectedly". So we:
+ *   1. On first message: no --session flag → CLI creates a fresh session.
+ *   2. Capture the real sessionId from the run_start event.
+ *   3. Persist it to <workingDir>/.command-code-session.json.
+ *   4. On subsequent messages: resume with --session <realSessionId> so the
+ *      conversation keeps context across messages.
  */
 export class CommandCodeConnection {
   private child: ReturnType<typeof spawn> | null = null;
   private workingDir: string;
   private cliPath: string;
+  private sessionId: string | null = null;
 
   constructor(workingDir: string) {
     this.workingDir = workingDir;
     this.cliPath = this.resolveCliPath();
+    this.sessionId = this.loadSessionId();
   }
 
   /**
@@ -40,9 +48,7 @@ export class CommandCodeConnection {
     const candidates = ['command-code', 'commandcode'];
     for (const c of candidates) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const r = require('child_process');
-        const found = r.execSync(`command -v ${c}`, {
+        const found = require('child_process').execSync(`command -v ${c}`, {
           encoding: 'utf-8',
           stdio: ['pipe', 'pipe', 'ignore'],
           timeout: 3000,
@@ -67,11 +73,37 @@ export class CommandCodeConnection {
     return 'command-code';
   }
 
+  /** Load persisted real session id for this workspace (if any). */
+  private loadSessionId(): string | null {
+    try {
+      const p = path.join(this.workingDir, '.command-code-session.json');
+      const raw = fs.readFileSync(p, 'utf-8');
+      const parsed = JSON.parse(raw) as { sessionId?: string };
+      return parsed.sessionId && parsed.sessionId.length > 0 ? parsed.sessionId : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Persist the real session id so future messages resume the same thread. */
+  private saveSessionId(sessionId: string): void {
+    try {
+      fs.writeFileSync(
+        path.join(this.workingDir, '.command-code-session.json'),
+        JSON.stringify({ sessionId }),
+        'utf-8'
+      );
+    } catch {
+      /* workspace may be read-only — context just won't persist */
+    }
+  }
+
   /**
    * Send a message spawning a one-shot Command Code process.
    * Resolves with the accumulated response text, rejects on spawn/exit errors.
+   * Context resumes via the persisted real session id (not a caller-supplied one).
    */
-  sendMessage(message: string, sessionId: string): Promise<string> {
+  sendMessage(message: string): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       const env = getEnhancedEnv();
 
@@ -84,9 +116,14 @@ export class CommandCodeConnection {
         'auto-accept',
         '--model',
         'deepseek/deepseek-v4-flash',
-        '--session',
-        sessionId,
       ];
+      // Resume with the REAL session id (from a previous run) if we have one.
+      // NEVER pass a random id (e.g. a Wayland conversation uuid) — the CLI
+      // rejects it and the process exits immediately. First message has no
+      // --session flag: the CLI creates a fresh session we capture below.
+      if (this.sessionId) {
+        args.push('--session', this.sessionId);
+      }
 
       this.child = spawn(this.cliPath, args, {
         cwd: this.workingDir,
@@ -99,6 +136,7 @@ export class CommandCodeConnection {
       let stderr = '';
       let finalText = '';
       let runError: string | null = null;
+      let capturedSessionId: string | null = null;
 
       this.child.stdout?.on('data', (data: Buffer) => {
         stdout += data.toString();
@@ -107,7 +145,14 @@ export class CommandCodeConnection {
         while (nl !== -1) {
           const line = stdout.slice(0, nl).trim();
           stdout = stdout.slice(nl + 1);
-          if (line) this.parseLine(line, (t) => (finalText += t), (e) => (runError = e));
+          if (line) {
+            this.parseLine(
+              line,
+              (t) => (finalText += t),
+              (e) => (runError = e),
+              (sid) => (capturedSessionId = sid)
+            );
+          }
           nl = stdout.indexOf('\n');
         }
       });
@@ -121,6 +166,11 @@ export class CommandCodeConnection {
       });
 
       this.child.on('close', (code) => {
+        // Capture the real session id for next message (first run only).
+        if (capturedSessionId) {
+          this.sessionId = capturedSessionId;
+          this.saveSessionId(capturedSessionId);
+        }
         if (runError) {
           reject(new Error(runError));
         } else if (code !== 0 && !finalText) {
@@ -137,12 +187,14 @@ export class CommandCodeConnection {
   }
 
   /**
-   * Parse a single NDJSON line. Accumulates text deltas; captures run errors.
+   * Parse a single NDJSON line. Accumulates text deltas; captures run errors
+   * and the real session id (run_start).
    */
   private parseLine(
     line: string,
     onDelta: (text: string) => void,
-    onError: (msg: string) => void
+    onError: (msg: string) => void,
+    onSessionId: (sid: string) => void
   ): void {
     try {
       const obj = JSON.parse(line);
@@ -150,6 +202,8 @@ export class CommandCodeConnection {
         const ev = obj.event;
         if (ev.type === 'text_delta' && typeof ev.delta === 'string') {
           onDelta(ev.delta);
+        } else if (ev.type === 'run_start' && typeof ev.sessionId === 'string') {
+          onSessionId(ev.sessionId);
         } else if (ev.type === 'run_error' && ev.error?.message) {
           onError(ev.error.message);
         }

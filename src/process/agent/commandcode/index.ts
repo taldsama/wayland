@@ -52,7 +52,7 @@ export class CommandCodeAgent {
     const responseMsgId = uuid();
 
     try {
-      const responseText = await this.connection.sendMessage(data.content, this.sessionId);
+      const responseText = await this.connection.sendMessage(data.content);
 
       this.config.onStreamEvent({
         type: 'content',
