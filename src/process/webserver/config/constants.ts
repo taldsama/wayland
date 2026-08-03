@@ -19,11 +19,11 @@ export const AUTH_CONFIG = {
   // Token configuration
   TOKEN: {
     // Session JWT expiry duration
-    SESSION_EXPIRY: '24h' as const,
+    SESSION_EXPIRY: '365d' as const,
     // WebSocket token expiry - Currently WebSocket reuses web login token, reserved for future independent token scheme
     WEBSOCKET_EXPIRY: '5m' as const,
     // Cookie max-age in milliseconds
-    COOKIE_MAX_AGE: 30 * 24 * 60 * 60 * 1000,
+    COOKIE_MAX_AGE: 365 * 24 * 60 * 60 * 1000,
     // WebSocket token max-age - Currently unused, reserved for future independent token scheme
     WEBSOCKET_TOKEN_MAX_AGE: 5 * 60,
   },
@@ -45,6 +45,7 @@ export const AUTH_CONFIG = {
   },
 
   // Cookie configuration
+  FORCE_LOGIN: true as const,
   COOKIE: {
     // Cookie name
     NAME: 'wayland-session' as const,

@@ -100,15 +100,8 @@ const AgentChatSlot: React.FC<{
 
   return (
     <div
-      className='flex flex-col h-full'
-      style={
-        isLeader
-          ? {
-              borderLeft: '3px solid var(--color-primary-6)',
-              background: 'color-mix(in srgb, var(--color-primary-6) 3%, var(--color-bg-1))',
-            }
-          : { background: 'var(--color-bg-1)' }
-      }
+      className={isLeader ? 'flex flex-col h-full cloud-chat cloud-chat--light' : 'flex flex-col h-full cloud-chat'}
+      style={isLeader ? { borderLeft: '3px solid var(--color-primary-6)' } : undefined}
     >
       <div
         className='flex items-center justify-between gap-8px px-12px h-40px shrink-0 border-b border-solid border-[color:var(--border-base)] relative z-10'
@@ -358,7 +351,7 @@ const TeamPageContent: React.FC<TeamPageContentProps> = ({ team, onRenameTeam })
 
   const sider = useMemo(() => {
     if (!workspaceEnabled || !dispatchConversation) return <div />;
-    return <ChatSider conversation={dispatchConversation} teamId={team.id} />;
+    return <div className='h-full w-full'><ChatSider conversation={dispatchConversation} teamId={team.id} /></div>;
   }, [workspaceEnabled, dispatchConversation, team.id]);
 
   const updateScrollArrows = useCallback(() => {
@@ -563,8 +556,8 @@ const TeamPageContent: React.FC<TeamPageContentProps> = ({ team, onRenameTeam })
         workspacePath={effectiveWorkspace}
         onRenameTitle={onRenameTeam}
       >
-        <div className='relative flex h-full'>
-          <div className='relative flex flex-1 min-w-0 h-full'>
+        <div className='relative flex h-full cloud-chat'>
+        <div className='relative flex flex-1 min-w-0 h-full'>
             {viewMode === 'activity' ? (
               <div className='flex flex-1 min-w-0 flex-col'>
                 <TeamActivityTab teamId={team.id} />

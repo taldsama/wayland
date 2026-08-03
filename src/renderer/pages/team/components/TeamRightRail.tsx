@@ -275,7 +275,7 @@ const TeamRightRail: React.FC<Props> = ({
       <aside
         data-testid='team-right-rail'
         data-collapsed='true'
-        className='w-36px shrink-0 h-full flex flex-col items-center justify-start gap-12px py-12px border-l border-solid border-[color:var(--border-base)] bg-[color:var(--color-bg-2)] cursor-pointer hover:bg-[color:var(--color-fill-2)] transition-colors'
+        className='w-36px shrink-0 h-full flex flex-col items-center justify-start gap-12px py-12px border-l border-solid border-[color:var(--border-base)] cursor-pointer hover:bg-[color:var(--color-fill-2)] transition-colors'
         onClick={toggleCollapsed}
         aria-label={expandLabel}
         title={expandLabel}
@@ -323,7 +323,7 @@ const TeamRightRail: React.FC<Props> = ({
     <aside
       data-testid='team-right-rail'
       data-collapsed='false'
-      className='w-260px shrink-0 h-full flex flex-col overflow-y-auto border-l border-solid border-[color:var(--border-base)] bg-[color:var(--color-bg-2)] p-16px gap-16px'
+      className='w-260px shrink-0 h-full flex flex-col overflow-y-auto border-l border-solid border-[color:var(--border-base)] p-16px gap-16px'
     >
       <section data-testid='team-right-rail-teammates'>
         <div className='flex items-center justify-between mb-8px'>

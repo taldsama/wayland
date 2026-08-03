@@ -14,12 +14,43 @@
 }
 
 @keyframes app-grad-flow {
-  0%, 100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
+ 0%, 100% {
+  background-position: 0% 50%;
+ }
+ 50% {
+  background-position: 100% 50%;
+ }
+}
+
+/* Team cloud "detail" gradients static dark base TWO small drifting
+ cloud/smudgeblobs (one top, one bottom). blobs background
+ DETAILS: most panel keeps plain dark background color.
+ .cloud-chat dark base dark BLUE smudges (agent chat columns, leader lighter variant)
+ NOTE: background-size must EXCEED 100% (150%) so animating
+ background-position has room to slide the blobs -> real motion.
+*/
+.cloud-chat {
+ background-repeat: no-repeat;
+ background-size: 150% 150%, 150% 150%;
+}
+.cloud-chat {
+ background-color: var(--color-bg-1);
+ background-image:
+  radial-gradient(ellipse 80% 22% at 25% 15%, rgba(66,133,244,0.30) 0%, transparent 100%),
+  radial-gradient(ellipse 80% 22% at 75% 85%, rgba(37,99,235,0.24) 0%, transparent 100%);
+ animation: cloud-drift 26s ease-in-out infinite;
+}
+.cloud-chat--light {
+ background-color: #26283a;
+}
+
+@keyframes cloud-drift {
+ 0%, 100% {
+  background-position: 0% 0%, 100% 100%;
+ }
+ 50% {
+  background-position: 28% 20%, 72% 80%;
+ }
 }
 
 .app-shell {
