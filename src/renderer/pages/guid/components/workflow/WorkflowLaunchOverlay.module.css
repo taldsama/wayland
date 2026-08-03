@@ -11,7 +11,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg-1);
+  background: transparent;
   opacity: 1;
   transition: opacity 250ms ease-out;
   pointer-events: all;

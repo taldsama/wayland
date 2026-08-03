@@ -20,7 +20,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph from 'force-graph';
-import { forceX, forceY } from 'd3-force';
+import { forceCollide, forceX, forceY } from 'd3-force';
 import { ipcBridge } from '@/common';
 import type { GraphData, GraphNode, ListFilter } from '@/common/types/memory';
 import styles from './GraphView.module.css';
@@ -48,30 +48,30 @@ const TYPE_COLORS: Record<string, string> = {
 const SUN_MIN_DEGREE = 5;
 const PLANET_MIN_DEGREE = 2;
 
-/* Paleta por rol (referencia Obsidian). */
+/* Paleta por rol (referencia exacta a la captura de Obsidian del usuario). */
 const TIER_COLORS: Record<Tier, string> = {
-  sun: '#f0b429',
-  planet: '#a89fc4',
-  satellite: '#5f7190',
-  log: '#4e6178',
+  sun: '#e28743', // Naranja cálido (Usuario, Negocio)
+  planet: '#a855f7', // Violeta / Púrpura brillante (Hermes, Herramientas, Proyectos)
+  satellite: '#cbd5e1', // Gris plateado / Blanco azulado claro (README, Satélites)
+  log: '#64748b', // Gris azulado discreto (Logs)
 };
 
 const TIER_BASE_RADIUS: Record<Tier, number> = {
-  sun: 7.5,
-  planet: 4.5,
-  satellite: 2.8,
-  log: 3,
+  sun: 8.5,
+  planet: 5.5,
+  satellite: 3.2,
+  log: 3.5,
 };
 
 const COLOR_SWATCHES = [
-  '#f0b429',
-  '#a89fc4',
-  '#5f7190',
-  '#4e6178',
-  '#e8eef7',
-  '#d96c4f',
-  '#6ba292',
-  '#c08e9c',
+  '#e28743',
+  '#a855f7',
+  '#cbd5e1',
+  '#64748b',
+  '#38bdf8',
+  '#ef4444',
+  '#10b981',
+  '#f59e0b',
 ];
 
 const SIZE_MIN = 0.4;
@@ -81,6 +81,8 @@ const SIZE_STEP = 0.2;
 interface NodePrefs {
   color?: string;
   sizeMult?: number;
+  /** Manual sun override: true = forzar sol, false = nunca sol, undefined = automático */
+  sunOverride?: boolean;
 }
 const PREFS_KEY = 'wayland.memoryGraph.nodePrefs.v1';
 
@@ -100,6 +102,7 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<any>(null);
   const hoverNodeRef = useRef<GraphNode | null>(null);
+  const centeredRef = useRef(false);
   const [data, setData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(false);
   const [prefs, setPrefs] = useState<Record<string, NodePrefs>>(loadPrefs);
@@ -158,34 +161,14 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
-  // Handle Resize
-  useEffect(() => {
-    if (!containerRef.current || !graphRef.current) return;
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        if (graphRef.current) {
-          graphRef.current.width(width).height(height);
-        }
-      }
-    });
-    resizeObserver.observe(containerRef.current);
-    return () => resizeObserver.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
-
   // Datos derivados: filtrado de nodos/edges + clasificación por rol.
   const derive = useMemo(() => {
     if (!data) return null;
-    const width = containerRef.current?.clientWidth ?? 0;
-    const height = containerRef.current?.clientHeight || 500;
 
     const visibleNodes = showUnresolved
       ? data.nodes
       : data.nodes.filter((n) => n.type !== 'unresolved');
     const nodeIds = new Set(visibleNodes.map((n) => n.id));
-    // Nodo log: tipo session O el hub virtual de la galaxia logs
     const isLogNode = (n?: GraphNode): boolean =>
       n?.type === 'session' || n?.id === 'logs-galaxy-hub';
     const edges = data.edges.filter((e) => {
@@ -194,7 +177,7 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
       if (!nodeIds.has(s) || !nodeIds.has(t)) return false;
       const sNode = data.nodes.find((n) => n.id === s);
       const tNode = data.nodes.find((n) => n.id === t);
-      return isLogNode(sNode) === isLogNode(tNode); // corta edges log<->no-log: galaxias aisladas
+      return isLogNode(sNode) === isLogNode(tNode);
     });
 
     const nodeById = new Map(visibleNodes.map((n) => [n.id, n]));
@@ -210,7 +193,10 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
       const n = nodeById.get(id);
       if (!n) return 'satellite';
       if (n.type === 'session' || n.id === 'logs-galaxy-hub') return 'log';
-      const d = degree.get(id) || 0;
+      const ov = prefs[id]?.sunOverride;
+      if (ov === true) return 'sun';
+      if (ov === false) return 'satellite';
+      const d = degree.get(id) ?? 0;
       if (d >= SUN_MIN_DEGREE) return 'sun';
       if (d >= PLANET_MIN_DEGREE) return 'planet';
       return 'satellite';
@@ -248,107 +234,198 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
     };
   }, [data, showUnresolved, selectedId, prefs]);
 
-  // Inicialización UNA vez (fuerzas, tooltips, handlers) + graphData() solo
-  // cuando cambian los datos. Selección/prefs NO tocan este efecto.
+  // 1. Inicialización de la instancia de ForceGraph UNA SOLA VEZ al montar
   useEffect(() => {
-    if (!containerRef.current || !data || !derive) return;
-    const width = containerRef.current.clientWidth;
-    const height = containerRef.current.clientHeight || 500;
+    if (!containerRef.current || graphRef.current) return;
 
-    const { gData, tierOf, radiusOf, isIncident, isDimNode } = derive;
+    const width = containerRef.current.clientWidth || 800;
+    const height = containerRef.current.clientHeight || 600;
 
-    if (!graphRef.current) {
-      const graph = new ForceGraph(containerRef.current!)
-        .width(width)
-        .height(height)
-        .graphData(gData)
-        .backgroundColor('#0f141d')
-        .nodeId('id')
-        .linkSource('source')
-        .linkTarget('target')
-        .linkDirectionalParticleSpeed(0.005)
-        .linkDirectionalParticleWidth(1.8)
-        .linkDirectionalParticleColor(() => '#f5c26b')
-        .onNodeClick((node: any) => {
-          if (node.type !== 'unresolved') {
-            onSelectNode(node.id);
-          }
-        })
-        .onNodeHover((node: any) => {
-          containerRef.current!.style.cursor = node ? 'pointer' : ('' as any);
-          hoverNodeRef.current = node || null;
-        });
-
-      // Fuerzas por clúster (C2)
-      const linkForce: any = graph.d3Force('link');
-      if (linkForce) {
-        linkForce
-          .distance((l: any) => {
-            const sTier = tierOf(idOf(l.source));
-            const tTier = tierOf(idOf(l.target));
-            if (sTier === 'log' || tTier === 'log') return 22;
-            if (sTier === 'sun' || tTier === 'sun') return 72;
-            return 42;
-          })
-          .strength(0.55);
-      }
-      const charge: any = graph.d3Force('charge');
-      if (charge) charge.strength(-90).distanceMax(900);
-      graph.d3Force('center', null);
-      graph.d3Force(
-        'x',
-        forceX((n: any) => (tierOf(n.id) === 'log' ? width * 0.86 : width * 0.5)).strength(
-          (n: any) => {
-            const t = tierOf(n.id);
-            return t === 'log' ? 0.9 : t === 'sun' ? 0.35 : t === 'planet' ? 0.18 : 0.08;
-          }
-        )
-      );
-      graph.d3Force(
-        'y',
-        forceY((n: any) => (tierOf(n.id) === 'log' ? height * 0.14 : height * 0.5)).strength(
-          (n: any) => {
-            const t = tierOf(n.id);
-            return t === 'log' ? 0.9 : t === 'sun' ? 0.35 : t === 'planet' ? 0.18 : 0.08;
-          }
-        )
-      );
-
-      graph.nodeLabel((node: any) => {
-        const typeLabel = node.type === 'unresolved' ? 'Phantom (Inexistent)' : node.type.toUpperCase();
-        const projectLabel = node.project ? `[${node.project}]` : '';
-        return `<div class="${styles.tooltip}">
-            <div class="${styles.tooltipHeader}">
-              <span class="${styles.nodeType}" style="color:${TYPE_COLORS[node.type]}">${typeLabel}</span>
-              <span>${projectLabel}</span>
-            </div>
-            <div class="${styles.tooltipTitle}">${node.label}</div>
-            <div class="${styles.tooltipLinks}">${node.linkCount || 0} connections · rol: ${tierOf(node.id)}</div>
-          </div>`;
+    const graph = new ForceGraph(containerRef.current)
+      .width(width)
+      .height(height)
+      .backgroundColor('#0f141d')
+      .nodeId('id')
+      .linkSource('source')
+      .linkTarget('target')
+      .linkDirectionalParticleSpeed(0.005)
+      .linkDirectionalParticleWidth(1.8)
+      .linkDirectionalParticleColor(() => '#f5c26b')
+      .onNodeClick((node: any) => {
+        if (node.type !== 'unresolved') {
+          onSelectNode(node.id);
+        }
+      })
+      .onNodeHover((node: any) => {
+        if (containerRef.current) {
+          containerRef.current.style.cursor = node ? 'pointer' : '';
+        }
+        hoverNodeRef.current = node ?? null;
       });
 
-      graphRef.current = graph;
-    }
-
-    // Datos nuevos: actualizar sim SIN recolocar (fuerzas ya configuradas)
-    const g = graphRef.current;
-    try {
-      g.graphData(gData);
-    } catch {
-      /* ignorar */
-    }
-
-    // Accessors completos (dependen de derive actual)
-    applyAccessors(g, derive);
+    graphRef.current = graph;
 
     return () => {
       if (graphRef.current) {
-        graphRef.current._destructor?.();
+        try {
+          graphRef.current._destructor?.();
+        } catch {
+          /* ignorar */
+        }
         graphRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 2. Handle Resize robustamente
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 100 && height > 100 && graphRef.current) {
+          graphRef.current.width(width).height(height);
+        }
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // 3. Cargar datos en la simulación física (SOLO cuando data o showUnresolved cambien)
+  useEffect(() => {
+    const g = graphRef.current;
+    if (!g || !derive) return;
+
+    const { gData, tierOf } = derive;
+
+    g.nodeLabel((node: any) => {
+      const typeLabel = node.type === 'unresolved' ? 'Phantom (Inexistent)' : node.type.toUpperCase();
+      const projectLabel = node.project ? `[${node.project}]` : '';
+      return `<div class="${styles.tooltip}">
+          <div class="${styles.tooltipHeader}">
+            <span class="${styles.nodeType}" style="color:${TYPE_COLORS[node.type]}">${typeLabel}</span>
+            <span>${projectLabel}</span>
+          </div>
+          <div class="${styles.tooltipTitle}">${node.label}</div>
+          <div class="${styles.tooltipLinks}">${node.linkCount || 0} connections · rol: ${tierOf(node.id)}</div>
+        </div>`;
+    });
+
+    try {
+      g.graphData(gData);
+    } catch (err) {
+      console.error('[GraphView] Error applying graphData:', err);
+    }
+
+    applyForces(g, derive);
+    applyAccessors(g, derive);
+
+    // Centrado de cámara (zoomToFit) SOLO la primera vez que entran datos de la memoria
+    if (gData.nodes.length > 0 && !centeredRef.current) {
+      let attempts = 0;
+      const fitCamera = () => {
+        attempts++;
+        const w = containerRef.current?.clientWidth ?? 0;
+        const h = containerRef.current?.clientHeight ?? 0;
+        if (w > 100 && h > 100 && graphRef.current) {
+          try {
+            graphRef.current.zoomToFit(400, 50);
+            centeredRef.current = true;
+          } catch {
+            /* ignorar */
+          }
+        } else if (attempts < 15) {
+          requestAnimationFrame(fitCamera);
+        }
+      };
+
+      const timer = setTimeout(fitCamera, 200);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, showUnresolved]);
+
+  // 4. Selección y personalización (prefs): SOLO re-aplica accessors (colores, tamaños, resaltados)
+  // SIN tocar graphData() ni zoomToFit() -> la cámara, zoom y física permanecen 100% quietas y fluidas.
+  useEffect(() => {
+    const g = graphRef.current;
+    if (!g || !derive) return;
+    applyAccessors(g, derive);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, prefs]);
+
+  const applyForces = (g: any, d: NonNullable<typeof derive>): void => {
+    const { tierOf, radiusOf } = d;
+    const width = containerRef.current?.clientWidth || 800;
+    const height = containerRef.current?.clientHeight || 600;
+
+    // Física estilo Obsidian: los racimos (clusters) orbitan sus hubs
+    // y los hubs se separan ampliamente en la escena global.
+    g.d3Force('center', null);
+
+    const linkForce: any = g.d3Force('link');
+    if (linkForce) {
+      linkForce
+        .distance((l: any) => {
+          const sTier = tierOf(idOf(l.source));
+          const tTier = tierOf(idOf(l.target));
+          // Logs: su propia galaxia aislada
+          if (sTier === 'log' || tTier === 'log') return 45;
+          // Hub↔Hub (Sol/Planeta ↔ Sol/Planeta): MUY lejos para separar racimos
+          if ((sTier === 'sun' || sTier === 'planet') && (tTier === 'sun' || tTier === 'planet')) return 280;
+          // Satélite ↔ Hub: Cerca (mantiene la constelación orbitando su hub)
+          return 75;
+        })
+        .strength((l: any) => {
+          const sTier = tierOf(idOf(l.source));
+          const tTier = tierOf(idOf(l.target));
+          if ((sTier === 'sun' || sTier === 'planet') && (tTier === 'sun' || tTier === 'planet')) return 0.03;
+          return 0.45;
+        });
+    }
+
+    // Repulsión ManyBody: fuerte entre hubs, suave entre satélites
+    const charge: any = g.d3Force('charge');
+    if (charge) {
+      charge
+        .strength((n: any) => {
+          const t = tierOf(n.id);
+          if (t === 'sun') return -750;
+          if (t === 'planet') return -300;
+          if (t === 'log') return -120;
+          return -90;
+        })
+        .distanceMin(15)
+        .distanceMax(2200);
+    }
+
+    // Colisión física para evitar solapamientos visuales
+    g.d3Force(
+      'collide',
+      forceCollide((n: any) => {
+        const r = radiusOf(n.id, tierOf(n.id));
+        return r + 14;
+      }).iterations(2)
+    );
+
+    // Fuerza x/y SOLO para logs (galaxia aislada esquina); resto 0.
+    g.d3Force(
+      'x',
+      forceX((n: any) => (tierOf(n.id) === 'log' ? width * 0.86 : width * 0.5)).strength(
+        (n: any) => (tierOf(n.id) === 'log' ? 0.8 : 0)
+      )
+    );
+    g.d3Force(
+      'y',
+      forceY((n: any) => (tierOf(n.id) === 'log' ? height * 0.14 : height * 0.5)).strength(
+        (n: any) => (tierOf(n.id) === 'log' ? 0.8 : 0)
+      )
+    );
+  };
 
   // Selección / prefs: SOLO accessors, sin graphData → sim y cámara quietas
   useEffect(() => {
@@ -369,15 +446,15 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
     );
     g.linkColor((l: any) => {
       if (selectedId) {
-        return isIncident(l) ? '#ffffff' : 'rgba(38, 38, 38, 0.18)';
+        return isIncident(l) ? '#ffffff' : 'rgba(148, 163, 184, 0.08)';
       }
       const sTier = tierOf(idOf(l.source));
       const tTier = tierOf(idOf(l.target));
-      if (sTier === 'log' || tTier === 'log') return '#3a4a5e';
-      if (sTier === 'sun' || tTier === 'sun') return 'rgba(240, 180, 41, 0.55)';
-      return '#2c3a4d';
+      if (sTier === 'log' || tTier === 'log') return 'rgba(100, 116, 139, 0.25)';
+      if (sTier === 'sun' || tTier === 'sun') return 'rgba(226, 135, 67, 0.35)';
+      return 'rgba(148, 163, 184, 0.2)';
     });
-    g.linkWidth((l: any) => (selectedId && isIncident(l) ? 2.6 : 1.1));
+    g.linkWidth((l: any) => (selectedId && isIncident(l) ? 2.0 : 0.8));
     g.linkDirectionalParticles((l: any) => (selectedId && isIncident(l) ? 3 : 0));
 
     g.nodeCanvasObject((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -394,29 +471,19 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
       ctx.globalAlpha = dim ? 0.22 : 1;
 
       if (tier === 'sun' && !isSelected) {
-        const glow = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, r * 3);
-        glow.addColorStop(0, 'rgba(240, 180, 41, 0.28)');
-        glow.addColorStop(1, 'rgba(240, 180, 41, 0)');
+        const glow = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, r * 2.2);
+        glow.addColorStop(0, 'rgba(226, 135, 67, 0.22)');
+        glow.addColorStop(1, 'rgba(226, 135, 67, 0)');
         ctx.fillStyle = glow;
         ctx.beginPath();
-        ctx.arc(node.x, node.y, r * 3, 0, 2 * Math.PI);
+        ctx.arc(node.x, node.y, r * 2.2, 0, 2 * Math.PI);
         ctx.fill();
       }
 
       ctx.beginPath();
       ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
-      if (node.type === 'unresolved') {
-        ctx.strokeStyle = TYPE_COLORS.unresolved;
-        ctx.lineWidth = 1;
-        ctx.setLineDash([2, 1]);
-        ctx.stroke();
-        ctx.fillStyle = 'rgba(89, 89, 89, 0.15)';
-        ctx.fill();
-        ctx.setLineDash([]);
-      } else {
-        ctx.fillStyle = color;
-        ctx.fill();
-      }
+      ctx.fillStyle = color;
+      ctx.fill();
 
       if (isSelected) {
         ctx.strokeStyle = '#ffffff';
@@ -442,7 +509,13 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
         ctx.textBaseline = 'top';
         ctx.lineWidth = Math.max(2, fontSize / 5);
         ctx.strokeStyle = 'rgba(10, 14, 20, 0.9)';
-        ctx.fillStyle = isSelected ? '#ffffff' : tier === 'sun' ? '#f5c26b' : '#c9d4e4';
+        ctx.fillStyle = isSelected
+          ? '#ffffff'
+          : tier === 'sun'
+          ? '#f59e0b'
+          : tier === 'planet'
+          ? '#e9d5ff'
+          : '#cbd5e1';
         const cleanLabel = label.length > 25 ? label.slice(0, 22) + '...' : label;
         ctx.strokeText(cleanLabel, node.x, node.y + r + 4);
         ctx.fillText(cleanLabel, node.x, node.y + r + 4);
@@ -541,6 +614,36 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
           >
             AUTO
           </button>
+
+          <span className={`${styles.toolbarLabel} ${styles.toolbarSep}`}>ROL</span>
+          <button
+            type="button"
+            className={`${styles.toolbarBtn} ${styles.toolbarSun}`}
+            title="Forzar este nodo como SOL (centro de su galaxia)"
+            onClick={() => savePref(selectedNode.id, { sunOverride: true })}
+          >
+            ☀ HACER SOL
+          </button>
+          <button
+            type="button"
+            className={styles.toolbarBtn}
+            title="Quitar override: volver a rol automático"
+            onClick={() => {
+              const p = { ...prefs[selectedNode.id] };
+              delete p.sunOverride;
+              savePref(selectedNode.id, p);
+            }}
+          >
+            AUTO ROL
+          </button>
+          <button
+            type="button"
+            className={styles.toolbarBtn}
+            title="Evitar que este nodo sea sol (nunca centro)"
+            onClick={() => savePref(selectedNode.id, { sunOverride: false })}
+          >
+            NO SOL
+          </button>
           <button
             type="button"
             className={`${styles.toolbarBtn} ${styles.toolbarDanger}`}
@@ -549,10 +652,10 @@ export const GraphView: React.FC<GraphViewProps> = ({ filter, selectedId, onSele
           >
             RESET
           </button>
-        </div>
-      )}
-    </div>
-  );
-};
+          </div>
+          )}
+          </div>
+          );
+          };
 
 export default GraphView;

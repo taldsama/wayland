@@ -156,6 +156,15 @@
  border-color: #55677f;
 }
 .toolbarDanger:hover {
- border-color: #d96c4f;
- color: #f5b89f;
+  border-color: #d96c4f;
+  color: #f5b89f;
+}
+.toolbarSun {
+  border-color: #f0b429;
+  background: #3d2f0e;
+  color: #f5c26b;
+}
+.toolbarSun:hover {
+  background: #5a4618;
+  border-color: #f5c26b;
 }

@@ -212,7 +212,8 @@ const Layout: React.FC<{
   );
 
   const location = useLocation();
-  const workspaceAvailable =
+   const isConsciousnessRoute = location.pathname.startsWith('/consciousness');
+   const workspaceAvailable =
     location.pathname.startsWith('/conversation/') || (TEAM_MODE_ENABLED && location.pathname.startsWith('/team/'));
   const collapsedRef = useRef(collapsed);
   const lastCssRef = useRef('');
@@ -553,14 +554,14 @@ const Layout: React.FC<{
         value={{ isMobile, isNarrow, isTouch, siderCollapsed: true, setSiderCollapsed: noopSetSiderCollapsed }}
       >
         <NavigationHistoryProvider>
-          <div className='app-shell app-shell--popout flex flex-col size-full min-h-0'>
-            <Titlebar workspaceAvailable={workspaceAvailable} />
-            <div className='bg-1 layout-content flex flex-col flex-1 min-h-0'>
-              <Outlet />
-              {multiAgentContextHolder}
-              {directorySelectionContextHolder}
-            </div>
-          </div>
+<div className={`app-shell app-shell--popout flex flex-col size-full min-h-0`}>
+			<Titlebar workspaceAvailable={workspaceAvailable} />
+			<div className={`${isConsciousnessRoute ? "bg-1" : "app-grad-bg"} layout-content flex flex-col flex-1 min-h-0`}>
+				<Outlet />
+				{multiAgentContextHolder}
+				{directorySelectionContextHolder}
+			</div>
+		</div>
         </NavigationHistoryProvider>
       </LayoutContext.Provider>
     );
@@ -680,10 +681,10 @@ const Layout: React.FC<{
             </ArcoLayout.Sider>
 
             <ArcoLayout.Content
-              className={'bg-1 layout-content flex flex-col min-h-0'}
-              onClick={() => {
-                if (isMobile && !collapsed) setCollapsed(true);
-              }}
+            				className={`${isConsciousnessRoute ? 'bg-1' : 'app-grad-bg'} layout-content flex flex-col min-h-0`}
+            				onClick={() => {
+            					if (isMobile && !collapsed) setCollapsed(true);
+            				}}
               style={
                 isMobile
                   ? {

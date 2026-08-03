@@ -630,7 +630,7 @@ const FullPanelShell: React.FC = () => {
                 filter={filter}
                 selectedId={selectedId ?? undefined}
                 onSelectNode={(id: string) => selectEntry(id)}
-                showUnresolved={false}
+                showUnresolved={true}
               />
             </Suspense>
           </div>

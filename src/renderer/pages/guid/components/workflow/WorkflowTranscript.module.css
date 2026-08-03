@@ -83,7 +83,7 @@
 }
 
 .panelDone {
-  background: var(--color-bg-1);
+  background: transparent;
 }
 
 .panelErrored {
