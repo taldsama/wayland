@@ -7,15 +7,19 @@
 
 /* Global animated gradient background (Task 0). */
 .app-grad-bg {
-  background: linear-gradient(135deg, #191920 0%, #1c1e26 50%, #191920 100%);
-  background-size: 220% 220%;
   background-color: var(--color-bg-1);
-  animation: app-grad-flow 28s ease-in-out infinite;
+   background-image: linear-gradient(135deg, #191920 0%, #1c1e26 50%, #191920 100%);
+   background-size: 220% 220%;
+   animation: app-grad-flow 28s ease-in-out infinite;
 }
 
 @keyframes app-grad-flow {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
 }
 
 .app-shell {
