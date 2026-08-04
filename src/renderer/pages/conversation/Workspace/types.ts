@@ -96,4 +96,42 @@ export type ExtractNodeKeyFn = (node: NodeInstance | null | undefined) => string
 export type GetPathSeparatorFn = (targetPath: string) => string;
 export type FindNodeByKeyFn = (list: IDirOrFile[], key: string) => IDirOrFile | null;
 
-export type WorkspaceTab = 'files' | 'changes' | 'terminal';
+export type WorkspaceTab = 'files' | 'changes' | 'terminal' | 'activity';
+
+/**
+ * One tool call entry shown in the Activity tab timeline.
+ */
+export interface ActivityToolCall {
+  /** Stable merge key (callId / msg_id). */
+  id: string;
+  /** Tool display name, e.g. "web-search", "write-file", "bash". */
+  name: string;
+  /** Rich detail: command, description, file diff etc. (rendered collapsed). */
+  detail?: string;
+  status: 'running' | 'done' | 'failed';
+  /** Agent that executed the call (from sub_agent/activity subtree when known). */
+  agent?: string;
+  /** Conversation this call belongs to (team aggregation uses this). */
+  conversationId?: string;
+  /** Epoch ms when call was first observed. */
+  startTime?: number;
+  /** Epoch ms when call finished (when known). */
+  endTime?: number;
+}
+
+export interface ActivityTask {
+  id: string;
+  title: string;
+  startTime: number;
+  kind: 'prompt' | 'ritual';
+  calls: ActivityToolCall[];
+  running: boolean;
+}
+
+export interface ActivityCounters {
+  calls: number;
+  tokens: number;
+  costUsd: number;
+  prompts: number;
+  waitingReplies: number;
+}

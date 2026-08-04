@@ -25,6 +25,7 @@ import WorkspaceContextMenu from './components/WorkspaceContextMenu';
 import WorkspaceDialogs from './components/WorkspaceDialogs';
 import WorkspaceTabBar from './components/WorkspaceTabBar';
 import TerminalPanel from './components/terminal/TerminalPanel';
+import AgentActivityPanel from './components/AgentActivityPanel';
 import { useTerminalEnabled } from './hooks/useTerminalEnabled';
 import WorkspaceToolbar from './components/WorkspaceToolbar';
 import { useFileChanges } from './hooks/useFileChanges';
@@ -623,8 +624,14 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
             <TerminalPanel conversationId={conversation_id} cwd={workspace} />
           </FlexFullContainer>
         )}
-      </div>
-    </>
+  {/* Agent Activity tab: tool calls grouped per human prompt */}
+  {!isWorkspaceCollapsed && activeTab === 'activity' && (
+    <FlexFullContainer containerClassName='overflow-y-auto'>
+      <AgentActivityPanel conversationId={conversation_id} />
+    </FlexFullContainer>
+  )}
+</div>
+</>
   );
 };
 

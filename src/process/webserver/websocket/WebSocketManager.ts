@@ -62,8 +62,9 @@ export class WebSocketManager {
   /**
    * Setup connection handler
    */
-  setupConnectionHandler(onMessage: (name: string, data: any, ws: WebSocket) => void): void {
+  setupConnectionHandler(onMessage: (name: string, data: any, ws: WebSocket, clientIp: string | null) => void): void {
     this.wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
+    const clientIp = req.socket.remoteAddress ?? null;
       // AUDIT-05 F19: register a SINGLE message handler from the start so
       // there is no window during which messages arrive but no listener is
       // attached. Until auth completes, the handler buffers the raw payload;
@@ -92,7 +93,7 @@ export class WebSocketManager {
 
       // AUDIT ONLY: capture the direct socket peer. Not used in any allow/deny.
       this.addClient(ws, token!, req.socket.remoteAddress ?? null);
-      processMessage = this.buildMessageProcessor(ws, onMessage);
+      processMessage = this.buildMessageProcessor(ws, onMessage, clientIp);
       this.setupCloseHandler(ws);
       this.setupErrorHandler(ws);
       authDone = true;
@@ -157,8 +158,8 @@ export class WebSocketManager {
    */
   private buildMessageProcessor(
     ws: WebSocket,
-    onMessage: (name: string, data: any, ws: WebSocket) => void
-  ): (rawData: Buffer) => void {
+    onMessage: (name: string, data: any, ws: WebSocket, clientIp: string | null) => void,
+clientIp: string | null): (rawData: Buffer) => void {
     return (rawData: Buffer) => {
       try {
         // WS-POSTAUTH-DISPATCH: defense-in-depth bound on the synchronous parse.
@@ -191,7 +192,7 @@ export class WebSocketManager {
         }
 
         // Forward other messages to bridge system
-        onMessage(name, data, ws);
+        onMessage(name, data, ws, clientIp);
       } catch {
         try {
           ws.send(

@@ -1,0 +1,272 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.header {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.countersRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.counterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-1, #e8e8e8);
+  white-space: nowrap;
+}
+
+.counterIcon {
+  display: inline-flex;
+  color: var(--color-text-3, #9a9a9a);
+}
+
+.counterValue {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.loopButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: var(--color-text-2, #c8c8c8);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.loopButton:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.loopDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #666;
+}
+
+.loop_auto {
+  border-color: rgba(56, 189, 100, 0.5);
+  color: #4ade80;
+}
+
+.loop_auto .loopDot {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.7);
+}
+
+.loop_stopping {
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #fbbf24;
+}
+
+.loop_stopping .loopDot {
+  background: #f59e0b;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.loop_standby {
+  opacity: 0.75;
+}
+
+.timeline {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.empty {
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-3, #9a9a9a);
+}
+
+.taskBlock {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.taskHeader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.taskHeader:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.taskDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+}
+
+.taskDot_running {
+  background: #f59e0b;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.taskTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-text-1, #e8e8e8);
+}
+
+.taskMeta {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-3, #9a9a9a);
+  flex-shrink: 0;
+}
+
+.taskChevron {
+  display: inline-flex;
+  color: var(--color-text-3, #9a9a9a);
+  flex-shrink: 0;
+}
+
+.taskCalls {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.taskEmpty {
+  padding: 8px 10px;
+  font-size: 11.5px;
+  color: var(--color-text-3, #9a9a9a);
+}
+
+.toolRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: default;
+}
+
+.toolRow:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.toolStatus {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-text-3, #9a9a9a);
+}
+
+.toolStatus_running {
+  color: #f59e0b;
+}
+
+.toolStatus_done {
+  color: #22c55e;
+}
+
+.toolStatus_failed {
+  color: #ef4444;
+}
+
+.toolName {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-1, #e8e8e8);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+}
+
+.toolAgent {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: var(--color-text-3, #9a9a9a);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.toolTime {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--color-text-4, #777);
+  font-variant-numeric: tabular-nums;
+}
+
+.toolChevron {
+  display: inline-flex;
+  color: var(--color-text-4, #777);
+  flex-shrink: 0;
+}
+
+.toolDetail {
+  padding: 0 10px 8px 29px;
+}
+
+.toolDetailPre {
+  margin: 0;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--color-text-2, #c8c8c8);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 180px;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}

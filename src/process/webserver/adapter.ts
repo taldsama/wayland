@@ -35,7 +35,7 @@ export function initWebAdapter(wss: WebSocketServer): void {
 
   // Setup WebSocket message handler to forward messages to bridge emitter.
   // C1: reject any name not in the bridge allowlist before dispatching.
-  wsManager.setupConnectionHandler((name, data, _ws) => {
+  wsManager.setupConnectionHandler((name, data, _ws, clientIp) => {
     if (!isAllowedInboundName(name)) {
       console.error('[adapter] Rejected disallowed WebSocket bridge event:', name);
       return;
@@ -44,10 +44,13 @@ export function initWebAdapter(wss: WebSocketServer): void {
     // local trusted user. Apply the remote-reduced allowlist on top of the
     // inbound allowlist so a token-holding remote client cannot drive
     // fs.*/shell.*/skill-mutation/mcp-mutation/hub/app write/exec providers.
-    if (!isAllowedForRemote(name)) {
-      console.error('[adapter] Rejected remote-forbidden WebSocket bridge event:', name);
-      return;
-    }
+  // LOCALHOST BYPASS: same-machine browser (WebUI on this PC) is as
+  // trusted as the Electron IPC path - files/workspace must open.
+  const isLocalhost = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1';
+  if (!isLocalhost && !isAllowedForRemote(name)) {
+    console.error('[adapter] Rejected remote-forbidden WebSocket bridge event:', name);
+    return;
+  }
     const emitter = getBridgeEmitter();
     if (emitter) {
       emitter.emit(name, data);

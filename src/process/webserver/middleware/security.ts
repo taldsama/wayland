@@ -74,11 +74,11 @@ export const authenticatedActionLimiter = rateLimit({
  * tiny-csrf provides req.csrfToken() method to generate tokens
  */
 export function attachCsrfToken(req: Request, res: Response, next: NextFunction): void {
-  // tiny-csrf provides req.csrfToken() method
   if (typeof req.csrfToken === 'function') {
     const token = req.csrfToken();
     res.setHeader(CSRF_HEADER_NAME, token);
     res.locals.csrfToken = token;
+    res.cookie(CSRF_COOKIE_NAME, token, SECURITY_CONFIG.CSRF.COOKIE_OPTIONS);
   }
   next();
 }

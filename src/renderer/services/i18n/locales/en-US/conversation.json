@@ -214,13 +214,27 @@
     "terminal": {
       "tab": "Terminal",
       "exited": "[process exited]",
-      "disabled": "Terminal mode is off. Enable it in Settings to use the terminal.",
-      "unsupported": "This agent has no terminal view yet.",
-      "missingCli": "The agent's command-line tool is not installed or not on PATH. Install it, then reopen this tab.",
-      "atCapacity": "Too many terminals are open. Close one and try again.",
-      "notFound": "This chat could not be found."
+      "disabled": "Terminal mode off. Enable Settings use terminal.",
+      "unsupported": "This agent terminal view yet.",
+      "missingCli": "The agent's command-line tool not installed not PATH. Install it, then reopen tab.",
+      "atCapacity": "Too many terminals open. Close one try again.",
+      "notFound": "This chat not found."
+    },
+    "activity": {
+      "tab": "Activity",
+      "calls": "Tool calls",
+      "tokens": "Tokens",
+      "prompts": "Human prompts",
+      "waitingReplies": "Waiting replies",
+      "autoOn": "Auto-loop ON",
+      "stopping": "Finishing turn…",
+      "standby": "Standby",
+      "untitled": "(untitled)",
+      "emptyTask": "No tool calls",
+      "loading": "Loading activity…",
+      "empty": "No tool calls yet"
     }
-  },
+    },
   "minimap": {
     "searchAria": "Search conversation",
     "searchHint": "Click here to search keywords",

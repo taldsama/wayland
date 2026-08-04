@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Check, ChevronDown, ChevronRight, GitBranch, TerminalSquare } from 'lucide-react';
+import { Activity, Check, ChevronDown, ChevronRight, GitBranch, TerminalSquare } from 'lucide-react';
 import { Badge, Dropdown, Tabs } from '@arco-design/web-react';
 import type { TFunction } from 'i18next';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -204,6 +204,15 @@ const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = ({
           }
         />
       )}
+  <Tabs.TabPane
+    key='activity'
+    title={
+      <span className='flex items-center gap-4px'>
+        <Activity size={13} className='shrink-0' />
+        {t('conversation.workspace.activity.tab')}
+      </span>
+    }
+  />
     </Tabs>
   );
 };
