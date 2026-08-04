@@ -13,6 +13,7 @@ import {
   Clock,
   Coins,
   Users,
+  Wrench,
   XCircle,
 } from 'lucide-react';
 import type { TFunction } from 'i18next';
@@ -138,9 +139,15 @@ export default function AgentActivityPanel({ conversationId }: AgentActivityPane
         <div className={styles.countersRow}>
           <CounterChip
             icon={<ActivityIcon size={13} />}
-            label={t('conversation.workspace.activity.calls', { defaultValue: 'Tool calls' })}
-            value={counters.calls}
+            label={t('conversation.workspace.activity.api', { defaultValue: 'API (turns + calls)' })}
+            value={counters.api}
           />
+    <CounterChip
+      icon={<Wrench size={13} />}
+      label={t('conversation.workspace.activity.tools', { defaultValue: 'Tool calls' })}
+      value={counters.calls}
+    />
+
           <CounterChip
             icon={<Coins size={13} />}
             label={t('conversation.workspace.activity.tokens', { defaultValue: 'Tokens' })}

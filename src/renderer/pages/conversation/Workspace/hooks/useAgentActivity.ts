@@ -85,6 +85,17 @@ function extractToolCalls(m: TMessage, baseTs: number): ActivityToolCall[] {
         },
       ];
     }
+  case 'text': {
+    const c = m.content as { content?: unknown; teammateMessage?: boolean };
+    if (!c.teammateMessage) return [];
+    return [{
+      id: String(m.msg_id ?? m.id),
+      name: 'team_send_message',
+      detail: String(c.content ?? '').slice(0, 120),
+      status: 'done',
+      startTime: ts,
+    }];
+  }
     case 'acp_tool_call':
     case 'codex_tool_call': {
       const u = (m.content as { update?: { toolCallId?: string; status?: string; title?: string; kind?: string } }).update;
@@ -171,6 +182,7 @@ const EMPTY_COUNTERS: ActivityCounters = {
   costUsd: 0,
   prompts: 0,
   waitingReplies: 0,
+  api: 0,
 };
 
 export type UseAgentActivityReturn = {
@@ -190,7 +202,8 @@ export function useAgentActivity(conversationId?: string): UseAgentActivityRetur
   const recomputeCounters = useCallback((list: ActivityTask[], waitingReplies: number) => {
     let calls = 0;
     for (const t of list) calls += t.calls.length;
-    countersRef.current = { ...countersRef.current, calls, prompts: list.filter((t) => t.kind === 'prompt').length, waitingReplies };
+    const prompts = list.filter((t) => t.kind === 'prompt').length;
+  countersRef.current = { ...countersRef.current, calls, prompts, waitingReplies, api: prompts + calls };
     setCounters({ ...countersRef.current });
   }, []);
 

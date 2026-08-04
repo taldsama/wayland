@@ -218,7 +218,7 @@ export class TeamSession extends EventEmitter {
         type: 'text',
         position: 'right',
         conversation_id: agent.conversationId,
-        content: { content },
+        content: { content, teammateMessage: true },
         createdAt: Date.now(),
       };
       addMessage(agent.conversationId, userMessage);

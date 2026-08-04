@@ -134,4 +134,6 @@ export interface ActivityCounters {
   costUsd: number;
   prompts: number;
   waitingReplies: number;
+  /** API activity total: human turns + tool calls (costs API quota). */
+  api: number;
 }
