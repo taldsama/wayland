@@ -33,6 +33,13 @@ const STATUS_ICON = {
   failed: XCircle,
 } as const;
 
+function tagSpan(call: ActivityToolCall): React.ReactNode {
+  const nm = call.name ? call.name.toLowerCase() : '';
+  if (nm.indexOf('mcp__wayland_team') >= 0 || nm.indexOf('team_') >= 0) {
+    return <span className={styles.toolTag_team}>team</span>;
+  }
+  return null;
+}
 function formatTime(ts?: number): string {
   if (!ts) return '';
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -66,7 +73,7 @@ function ToolRow({ call, t }: { call: ActivityToolCall; t: TFunction }) {
       <span className={`${styles.toolStatus} ${styles[`toolStatus_${call.status}`]}`}>
         <Icon size={12} />
       </span>
-      <span className={styles.toolName}>{call.name}</span>
+      {tagSpan(call)}<span className={styles.toolName}>{call.name}</span>
       {call.agent ? <span className={styles.toolAgent}>{call.agent}</span> : null}
       <span className={styles.toolTime}>{formatTime(call.startTime)}</span>
       {call.detail ? (

@@ -232,9 +232,11 @@
       "untitled": "(untitled)",
       "emptyTask": "No tool calls",
       "loading": "Loading activity…",
-      "empty": "No tool calls yet"
+      "empty": "No tool calls yet",
+      "api": "API calls",
+      "tools": "Tool calls"
     }
-    },
+  },
   "minimap": {
     "searchAria": "Search conversation",
     "searchHint": "Click here to search keywords",
