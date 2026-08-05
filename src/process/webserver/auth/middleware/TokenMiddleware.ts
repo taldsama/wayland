@@ -64,6 +64,16 @@ interface ValidationStrategy {
 /**
  * JSON Validation Strategy - Return JSON format error response
  */
+/** Loopback peer: same-machine WebUI browser acts as the trusted local
+ * user without session cookie (matches WS localhost bypass). Loopback is
+ * the operator's own machine; LAN/remote still require login. */
+function isLoopbackPeer(req: Request): boolean {
+  const ip: string | undefined = req.socket?.remoteAddress;
+  if (!ip) return false;
+  const v = ip.trim().toLowerCase().replace('::ffff:', '');
+  return v === '127.0.0.1' || v === '::1' || v.startsWith('127.');
+}
+
 class JsonValidationStrategy implements ValidationStrategy {
   handleUnauthorized(res: Response): void {
     res.status(403).json({ success: false, error: 'Access denied. Please login first.' });
@@ -115,10 +125,18 @@ export const createAuthMiddleware = (type: 'json' | 'html' = 'json') => {
     // 1. Extract token
     const token = TokenExtractor.extract(req);
 
-    if (!token) {
-      strategy.handleUnauthorized(res);
+    if (!token){
+    // Loopback WebUI (localhost) is the operator's own machine: act as
+    // trusted local user without forcing login (matches WebSocket
+    // localhost bypass). Remote/LAN callers must authenticate.
+    if (isLoopbackPeer(req)){
+      req.user = { id: 'local', username: 'local' };
+      next();
       return;
     }
+    strategy.handleUnauthorized(res);
+    return;
+  }
 
     // 2. Verify token
     const decoded = await AuthService.verifyToken(token);
