@@ -411,12 +411,21 @@ catch (e) {
     const unsubTurn = ipcBridge.conversation.turnCompleted.on((evt) => {
       if (evt.sessionId !== conversationId) return;
       if (evt.state === 'ai_waiting_input') {
-        const list = tasksRef.current;
-        if (list.length > 0) {
-          list[list.length - 1].running = false;
-          tasksRef.current = [...list];
-          setTasks(tasksRef.current);
-        }
+        // Turn finished cleanly, so no tool call can still be executing.
+        // The ACP backend does not emit a final tool_call update for
+        // every tool (read/write/patch stay 'pending' forever in the DB),
+        // so promote lingering 'running' calls to 'done'. Failed/cancelled
+        // calls keep their status. Previously only the last task's
+        // `running` flag was cleared, leaving counters at 0/N.
+        const list = tasksRef.current.map((task) => ({
+          ...task,
+          running: false,
+          calls: task.calls.map((c) =>
+            c.status === 'running' ? { ...c, status: 'done' as const } : c
+          ),
+        }));
+        tasksRef.current = list;
+        setTasks(list);
       }
       void loadTokens(conversationId);
     });
