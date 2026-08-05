@@ -58,7 +58,7 @@ const TeamHeaderBadges: React.FC<Props> = ({ agents, launcher, team, eligibility
 
   // Show the Promote CTA only when not yet standing AND eligibility predicate
   // says the team has earned it. Parent owns the modal open state.
-  const showPromoteCta = !isStanding && eligibility?.eligible === true && Boolean(onPromoteClick);
+  const showPromoteCta = !isStanding && Boolean(onPromoteClick);
 
   return (
     <div data-testid='team-header-badges' className='flex items-center gap-8px'>
@@ -97,6 +97,15 @@ const TeamHeaderBadges: React.FC<Props> = ({ agents, launcher, team, eligibility
           type='outline'
           onClick={onPromoteClick}
           data-testid='team-header-promote'
+          title={
+            eligibility && !eligibility.eligible
+              ? t('teams.standing.promoteHint', {
+                  defaultValue: 'Faltan {{sessions}} sesiones y {{days}} días para standing',
+                  sessions: eligibility.sessionsRemaining,
+                  days: eligibility.daysRemaining,
+                })
+              : undefined
+          }
           style={{ borderRadius: 6, fontSize: 11, paddingInline: 8 }}
         >
           {t('teams.standing.promoteCta', { defaultValue: 'Promote to Standing' })}
