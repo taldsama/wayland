@@ -197,6 +197,8 @@ export function useAgentActivity(conversationId?: string): UseAgentActivityRetur
   const [counters, setCounters] = useState<ActivityCounters>(EMPTY_COUNTERS);
   const [loading, setLoading] = useState(false);
   const tasksRef = useRef<ActivityTask[]>([]);
+const messagesRef = useRef<TMessage[]>([]);
+
   const countersRef = useRef<ActivityCounters>(EMPTY_COUNTERS);
 
   const recomputeCounters = useCallback((list: ActivityTask[], waitingReplies: number) => {
@@ -240,6 +242,8 @@ export function useAgentActivity(conversationId?: string): UseAgentActivityRetur
   }, [recomputeCounters]);
 
   const ingestMessages = useCallback((messages: TMessage[]) => {
+  messagesRef.current = [...messages];
+
     const sorted = [...messages].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
     const built: ActivityTask[] = [];
     let current: ActivityTask | null = null;
@@ -301,15 +305,28 @@ export function useAgentActivity(conversationId?: string): UseAgentActivityRetur
         fromMs: 0,
         toMs: Date.now(),
       });
-      const row = (agg ?? []).find((a) => a.key === cid);
-      if (row) {
-        countersRef.current = {
-          ...countersRef.current,
-          tokens: row.tokensTotal ?? 0,
-          costUsd: row.costUsd ?? 0,
-        };
-        setCounters({ ...countersRef.current });
-      }
+  const row= (agg ?? []).find((a) => a.key === cid);
+  if (row && (row.tokensTotal ?? 0) > 0) {
+    countersRef.current = {
+      ...countersRef.current,
+      tokens: row.tokensTotal ?? 0,
+      costUsd: row.costUsd ?? 0,
+    };
+    setCounters({ ...countersRef.current });
+  } else {
+    // Remote agents (Hermes/OmniRoute) do not report usage through the
+    // gateway, so cost_events stays empty and the tokens chip reads 0.
+    // Fallback: estimate tokens from stored message content (~4 chars/token).
+    const totalChars = messagesRef.current.reduce((acc, m) => {
+      const content = (m.content as { content?: string } | null)?.content;
+      return acc + (content ? content.length : 0);
+    }, 0);
+    countersRef.current = {
+      ...countersRef.current,
+      tokens: Math.max(0, Math.round(totalChars / 4)),
+    };
+    setCounters({ ...countersRef.current });
+  }
     } catch (e) {
       console.warn('[useAgentActivity] cost.byConversation failed', e);
     }
