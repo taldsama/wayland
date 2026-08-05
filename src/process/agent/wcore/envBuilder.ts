@@ -222,13 +222,16 @@ function mapProvider(model: TProviderWithModel): WCoreProvider {
     anthropic: 'anthropic',
     bedrock: 'bedrock',
     'gemini-vertex-ai': 'vertex',
-    // Gemini uses OpenAI-compatible endpoint
-    gemini: 'openai',
-    // custom / new-api default to OpenAI-compatible protocol
+    // Gemini native Generative Language API (W11) round-trips
+    // thought_signature. OpenAI-compat shim loses it (HTTP 400 on
+    // function calls, gemini-3.x). Route to native provider.
+    gemini: 'gemini',
+    // custom / new-api default OpenAI-compatible protocol
     custom: 'openai',
     'new-api': 'openai',
   };
-  return mapping[model.platform] ?? 'openai';
+  return mapping[model.platform] || 'openai';
+    return mapping[model.platform] || 'openai';
 }
 
 const GEMINI_OPENAI_COMPAT_PATH = '/v1beta/openai';
@@ -537,7 +540,22 @@ export function buildSpawnConfig(
       break;
     }
 
-    case 'bedrock': {
+  case 'gemini': {
+    // Native Gemini Generative Language API (W11). Uses API key
+    // directly, endpoint https://generativelanguage.googleapis.com
+    // which round-trips thought_signature on function calls.
+const key = model.apiKey?.trim();
+if (key) {
+env.GEMINI_API_KEY = key;
+} else {
+missingRequiredApiKey = true;
+requiredKeyEnvVar = 'GEMINI_API_KEY';
+}
+if (model.baseUrl) args.push('--base-url', stripTrailingV1(model.baseUrl));
+break;
+}
+
+ case 'bedrock': {
       const bc = (model as TProviderWithModel & { bedrockConfig?: any }).bedrockConfig;
       if (bc) {
         if (bc.region) env.AWS_REGION = bc.region;
