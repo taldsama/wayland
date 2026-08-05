@@ -32,9 +32,11 @@ type Props = {
   eligibility?: StandingEligibility;
   onPromoteClick?: () => void;
   onDemote?: () => void;
+  autoLoop?: boolean;
+  onToggleAutoLoop?: () => void;
 };
 
-const TeamHeaderBadges: React.FC<Props> = ({ agents, launcher, team, eligibility, onPromoteClick, onDemote }) => {
+const TeamHeaderBadges: React.FC<Props> = ({ agents, launcher, team, eligibility, onPromoteClick, onDemote, autoLoop, onToggleAutoLoop }) => {
   const { t } = useTranslation();
   const bundleStanding = launcher?._standing === true;
   const userPromoted = team?.promotedToStanding === true;
@@ -108,6 +110,22 @@ const TeamHeaderBadges: React.FC<Props> = ({ agents, launcher, team, eligibility
           {rollupText}
         </span>
       )}
+      {onToggleAutoLoop ? (
+        <Button
+          size='mini'
+          type={autoLoop ? 'primary' : 'outline'}
+          onClick={onToggleAutoLoop}
+          data-testid='team-header-autoloop'
+          title={t('teams.autoloop.title', {
+            defaultValue: 'Reanuda automáticamente el turno del líder al terminar',
+          })}
+          style={{ borderRadius: 6, fontSize: 11, paddingInline: 8 }}
+        >
+          {autoLoop
+            ? t('teams.autoloop.on', { defaultValue: 'Auto-loop ON' })
+            : t('teams.autoloop.off', { defaultValue: 'Auto-loop' })}
+        </Button>
+      ) : null}
     </div>
   );
 };

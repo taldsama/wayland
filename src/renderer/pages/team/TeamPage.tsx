@@ -6,6 +6,11 @@ import useSWR, { useSWRConfig } from 'swr';
 import { useAuth } from '@renderer/hooks/context/AuthContext';
 import { useLayoutContext } from '@renderer/hooks/context/LayoutContext';
 import { ipcBridge } from '@/common';
+import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
+import {
+  CHAT_CONTINUE_EVENT,
+  type ChatContinueDetail,
+} from '@/renderer/pages/conversation/Messages/components/MessageActions';
 import type { TeamAgent, TTeam } from '@/common/types/teamTypes';
 import type { IProvider, TChatConversation, TProviderWithModel } from '@/common/config/storage';
 import { useAssistantList } from '@/renderer/hooks/assistant';
@@ -476,6 +481,35 @@ const TeamPageContent: React.FC<TeamPageContentProps> = ({ team, onRenameTeam })
   const eligibility = useStandingEligibility(team);
   const [promoteModalVisible, setPromoteModalVisible] = useState(false);
   const [promoteLoading, setPromoteLoading] = useState(false);
+  const [autoLoop, setAutoLoop] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(`wl:autoloop:${team?.id ?? ''}`) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const autoLoopRef = useLatestRef(autoLoop);
+  useEffect(() => {
+    try {
+      localStorage.setItem(`wl:autoloop:${team?.id ?? ''}`, autoLoop ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, [autoLoop, team?.id]);
+  useEffect(() => {
+    if (!leaderConversationId) return;
+    const unsub = ipcBridge.conversation.turnCompleted.on((evt) => {
+      if (!autoLoopRef.current) return;
+      if (evt.sessionId !== leaderConversationId) return;
+      if (evt.state !== 'ai_waiting_input') return;
+      window.dispatchEvent(
+        new CustomEvent<ChatContinueDetail>(CHAT_CONTINUE_EVENT, {
+          detail: { conversationId: leaderConversationId },
+        })
+      );
+    });
+    return unsub;
+  }, [leaderConversationId]);
 
   const handlePromoteClick = useCallback(() => setPromoteModalVisible(true), []);
   const handlePromoteCancel = useCallback(() => setPromoteModalVisible(false), []);
@@ -531,9 +565,11 @@ const TeamPageContent: React.FC<TeamPageContentProps> = ({ team, onRenameTeam })
         eligibility={eligibility}
         onPromoteClick={handlePromoteClick}
         onDemote={handleDemote}
+      autoLoop={autoLoop}
+      onToggleAutoLoop={() => setAutoLoop((v) => !v)}
       />
     ),
-    [agents, launcher, team, eligibility, handlePromoteClick, handleDemote]
+    [agents, launcher, team, eligibility, handlePromoteClick, handleDemote, autoLoop]
   );
 
   return (

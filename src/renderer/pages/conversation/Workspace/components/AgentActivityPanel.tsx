@@ -17,15 +17,9 @@ import {
   XCircle,
 } from 'lucide-react';
 import type { TFunction } from 'i18next';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
-import {
-  CHAT_CONTINUE_EVENT,
-  type ChatContinueDetail,
-} from '@/renderer/pages/conversation/Messages/components/MessageActions';
-import { ipcBridge } from '@/common';
 import { useAgentActivity } from '../hooks/useAgentActivity';
 import type { ActivityCounters, ActivityTask, ActivityToolCall } from '../types';
 import styles from './activity.module.css';
@@ -135,40 +129,12 @@ function TaskBlock({ task, t }: { task: ActivityTask; t: TFunction }) {
   );
 }
 
-function stopLabel(state: 'auto' | 'stopping' | 'standby', t: TFunction): string {
-  if (state === 'auto') {
-    return t('conversation.workspace.activity.autoOn', { defaultValue: 'Auto-loop ON' });
-  }
-  if (state === 'stopping') {
-    return t('conversation.workspace.activity.stopping', { defaultValue: 'Finishing turn…' });
-  }
-  return t('conversation.workspace.activity.standby', { defaultValue: 'Standby' });
-}
-
 export default function AgentActivityPanel({ conversationId }: AgentActivityPanelProps) {
   const { t } = useTranslation();
   const { tasks, counters, loading } = useAgentActivity(conversationId);
-  const [autoLoop, setAutoLoop] = useState(false);
-  const autoLoopRef = useLatestRef(autoLoop);
-
-  // Auto-loop: when turn completes with ai_waiting_input and Auto-loop ON,
-  // dispatch continue directive so the active sendbox resumes the live turn
-  // (same engine transcript, no restart). Mirrors the Continue banner flow.
-  useEffect(() => {
-    const unsub = ipcBridge.conversation.turnCompleted.on((evt) => {
-      if (!autoLoopRef.current) return;
-      if (evt.sessionId !== conversationId) return;
-      if (evt.state !== 'ai_waiting_input') return;
-      window.dispatchEvent(new CustomEvent<ChatContinueDetail>(CHAT_CONTINUE_EVENT, {
-        detail: { conversationId },
-      }));
-    });
-    return unsub;
-  }, [conversationId]);
-
+  
   const running = tasks.some((x) => x.running);
-  const loopState: 'auto' | 'stopping' | 'standby' = autoLoop ? 'auto' : running ? 'stopping' : 'standby';
-
+  
   return (
     <div className={styles.root}>
       <div className={styles.header}>
@@ -200,15 +166,7 @@ export default function AgentActivityPanel({ conversationId }: AgentActivityPane
             value={counters.waitingReplies}
           />
         </div>
-        <button
-          type="button"
-          className={`${styles.loopButton} ${styles[`loop_${loopState}`]}`}
-          onClick={() => setAutoLoop((v) => !v)}
-          data-testid="activity-autoloop"
-        >
-          <span className={styles.loopDot} />
-          <span>{stopLabel(loopState, t)}</span>
-        </button>
+        
       </div>
 
       <div className={styles.timeline}>
