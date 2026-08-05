@@ -300,25 +300,39 @@ const messagesRef = useRef<TMessage[]>([]);
   }, [recomputeCounters]);
 
   const loadTokens = useCallback(async (cid: string) => {
-    try {
-      const agg = await ipcBridge.cost.byConversation.invoke({
-        fromMs: 0,
-        toMs: Date.now(),
-      });
-  const row= (agg ?? []).find((a) => a.key === cid);
-  if (row && (row.tokensTotal ?? 0) > 0) {
-    countersRef.current = {
-      ...countersRef.current,
-      tokens: row.tokensTotal ?? 0,
-      costUsd: row.costUsd ?? 0,
-    };
-    setCounters({ ...countersRef.current });
-  } else {
-    // Remote agents (Hermes/OmniRoute) do not report usage through the
-    // gateway, so cost_events stays empty and the tokens chip reads 0.
-    // Fallback: estimate tokens from stored message content (~4 chars/token).
+  try {
+    const agg = await ipcBridge.cost.byConversation.invoke({
+      fromMs: 0,
+      toMs: Date.now(),
+    });
+    const row = (agg ?? []).find((a) => a.key === cid);
+    // Prefer real recorded cost_events (wcore/acp managers) when present.
+    if (row && (row.tokensTotal > 0 || row.costUsd > 0)) {
+      countersRef.current = {
+        ...countersRef.current,
+        tokens: row.tokensTotal > 0 ? row.tokensTotal : 0,
+        costUsd: row.costUsd > 0 ? row.costUsd : 0,
+      };
+      setCounters({ ...countersRef.current });
+      return;
+    }
+    // Remote/gateway agents persist real usage in conversation.extra.lastTokenUsage
+    // (cost_events stays empty). Use those exact numbers before char-estimate.
+    const conv = await ipcBridge.conversation.get.invoke({ id: cid });
+    const lastTu = (conv && conv.extra && typeof conv.extra === 'object' && conv.extra !== null)
+      ? (conv.extra as { lastTokenUsage?: { totalTokens?: number } | null }).lastTokenUsage
+      : undefined;
+    if (lastTu && typeof lastTu.totalTokens === 'number' && lastTu.totalTokens > 0) {
+      countersRef.current = {
+        ...countersRef.current,
+        tokens: lastTu.totalTokens,
+      };
+      setCounters({ ...countersRef.current });
+      return;
+    }
+    // No recorded usage at all: estimate from stored message content (~4 chars/token).
     const totalChars = messagesRef.current.reduce((acc, m) => {
-      const content = (m.content as { content?: string } | null)?.content;
+      const content = (m.content as { content?: string | null } | null)?.content;
       return acc + (content ? content.length : 0);
     }, 0);
     countersRef.current = {
@@ -327,7 +341,7 @@ const messagesRef = useRef<TMessage[]>([]);
     };
     setCounters({ ...countersRef.current });
   }
-    } catch (e) {
+catch (e) {
       console.warn('[useAgentActivity] cost.byConversation failed', e);
     }
   }, []);

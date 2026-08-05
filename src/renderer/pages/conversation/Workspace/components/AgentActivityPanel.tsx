@@ -17,8 +17,15 @@ import {
   XCircle,
 } from 'lucide-react';
 import type { TFunction } from 'i18next';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
+import {
+  CHAT_CONTINUE_EVENT,
+  type ChatContinueDetail,
+} from '@/renderer/pages/conversation/Messages/components/MessageActions';
+import { ipcBridge } from '@/common';
 import { useAgentActivity } from '../hooks/useAgentActivity';
 import type { ActivityCounters, ActivityTask, ActivityToolCall } from '../types';
 import styles from './activity.module.css';
@@ -33,12 +40,14 @@ const STATUS_ICON = {
   failed: XCircle,
 } as const;
 
-function tagSpan(call: ActivityToolCall): React.ReactNode {
+function isTeamCall(call: ActivityToolCall): boolean {
   const nm = call.name ? call.name.toLowerCase() : '';
-  if (nm.indexOf('mcp__wayland_team') >= 0 || nm.indexOf('team_') >= 0) {
-    return <span className={styles.toolTag_team}>team</span>;
-  }
-  return null;
+  return nm.indexOf('mcp__wayland_team') >= 0 || nm.indexOf('team_') >= 0;
+}
+
+function tagSpan(call: ActivityToolCall): React.ReactNode {
+  if (!isTeamCall(call)) return null;
+  return <span className={styles.toolTag_team}>team</span>;
 }
 function formatTime(ts?: number): string {
   if (!ts) return '';
@@ -74,7 +83,11 @@ function ToolRow({ call, t }: { call: ActivityToolCall; t: TFunction }) {
         <Icon size={12} />
       </span>
       {tagSpan(call)}<span className={styles.toolName}>{call.name}</span>
-      {call.agent ? <span className={styles.toolAgent}>{call.agent}</span> : null}
+      {call.agent ? (
+        <span className={`${styles.toolAgent} ${isTeamCall(call) ? styles.toolAgent_team : styles.toolAgent_leader}`}>
+          {call.agent}
+        </span>
+      ) : null}
       <span className={styles.toolTime}>{formatTime(call.startTime)}</span>
       {call.detail ? (
         <span className={styles.toolChevron}>
@@ -136,6 +149,22 @@ export default function AgentActivityPanel({ conversationId }: AgentActivityPane
   const { t } = useTranslation();
   const { tasks, counters, loading } = useAgentActivity(conversationId);
   const [autoLoop, setAutoLoop] = useState(false);
+  const autoLoopRef = useLatestRef(autoLoop);
+
+  // Auto-loop: when turn completes with ai_waiting_input and Auto-loop ON,
+  // dispatch continue directive so the active sendbox resumes the live turn
+  // (same engine transcript, no restart). Mirrors the Continue banner flow.
+  useEffect(() => {
+    const unsub = ipcBridge.conversation.turnCompleted.on((evt) => {
+      if (!autoLoopRef.current) return;
+      if (evt.sessionId !== conversationId) return;
+      if (evt.state !== 'ai_waiting_input') return;
+      window.dispatchEvent(new CustomEvent<ChatContinueDetail>(CHAT_CONTINUE_EVENT, {
+        detail: { conversationId },
+      }));
+    });
+    return unsub;
+  }, [conversationId]);
 
   const running = tasks.some((x) => x.running);
   const loopState: 'auto' | 'stopping' | 'standby' = autoLoop ? 'auto' : running ? 'stopping' : 'standby';

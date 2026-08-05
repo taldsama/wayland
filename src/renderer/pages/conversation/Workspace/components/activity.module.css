@@ -227,6 +227,16 @@
   padding: 1px 6px;
   border-radius: 999px;
 }
+.toolAgent_leader {
+  color: #7dd3fc;
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  background: rgba(125, 211, 252, 0.1);
+}
+.toolAgent_team {
+  color: #c4b5fd;
+  border: 1px solid rgba(196, 181, 253, 0.35);
+  background: rgba(196, 181, 253, 0.1);
+}
 .toolTag {
   flex-shrink: 0;
   font-size: 10px;
