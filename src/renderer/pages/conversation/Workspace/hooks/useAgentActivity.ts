@@ -55,8 +55,10 @@ type ToolItemView = {
 
 function toStatus(s?: string, hasError?: string): ActivityToolCall['status'] {
   const v = String(s ?? '').toLowerCase();
-  if (hasError || v === 'error' || v === 'failed' || v === 'canceled') return 'failed';
-  if (v === 'success' || v === 'done' || v === 'finish') return 'done';
+  if (hasError || v === 'error' || v === 'failed' || v === 'canceled' || v === 'cancelled') return 'failed';
+  // ACP pipeline persists the ACP vocabulary (pending/in_progress/completed);
+  // Gemini tool_group uses Success/Error/Confirming/Canceled (lowercased above).
+  if (v === 'success' || v === 'done' || v === 'finish' || v === 'completed') return 'done';
   return 'running';
 }
 
