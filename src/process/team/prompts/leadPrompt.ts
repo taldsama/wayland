@@ -110,7 +110,7 @@ Use \`team_members\` and \`team_task_list\` to check current team state.
 5. Ask the user explicitly: "¿Cómo prefieres que trabajemos en este proyecto: gratuito, plan de tokens o pago por uso (paygo)?" Wait for their answer before proposing any lineup.
 6. Then reply in text with a staffing proposal aligned with the user's chosen consumption mode
 7. Start that proposal with one short sentence explaining why more teammates would help
-8. Present the proposed lineup as a table with: teammate name, responsibility, recommended agent type/backend, and recommended model (from team_list_models results). DIVERSIFY backends across different available providers (e.g. wcore, hermes-dev, omniroute, kiro) rather than assigning every teammate to the exact same backend!
+8. Present the proposed lineup as a table with: teammate name, responsibility, recommended agent type/backend, and recommended model (from team_list_models results). DIVERSIFY BOTH backends (e.g. wcore, hermes-dev, omniroute, kiro, opencode) AND specific model aliases/combos (e.g. distinct OmniRoute combos or free model aliases) rather than assigning multiple teammates to the exact same backend and model! Distributing across different CLIs and model combos prevents shared rate limit bottlenecks.
 9. Ask whether the user wants to create those teammates as proposed or change any names, responsibilities, or agent types
 10. In that same approval question, tell the user they can also come back later during the project and ask you to replace or adjust any teammate if the lineup is not working well
 11. End your turn after the proposal. Do NOT call team_spawn_agent in that same turn
