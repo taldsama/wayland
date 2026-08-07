@@ -37,6 +37,48 @@ export type AssistantPreset = {
 
 export const ASSISTANT_PRESETS: AssistantPreset[] = [
   {
+    id: 'leader',
+    avatar: 'lucide:Crown',
+    presetAgentType: 'wcore',
+    category: 'general',
+    resourceDir: 'src/process/resources/assistant/leader',
+    ruleFiles: {
+      'en-US': 'leader.md',
+    },
+    defaultEnabledSkills: [],
+    nameI18n: {
+      'en-US': 'Leader',
+      'es-ES': 'Líder',
+    },
+    descriptionI18n: {
+      'en-US':
+        'Team Director & Coordinator. Interacts with the user, presents model consumption tiers, and dispatches subtasks to specialist teammates.',
+      'es-ES':
+        'Director y Coordinador del Equipo. Interactúa con el usuario, presenta las opciones de modelos y despacha tareas a los especialistas.',
+    },
+  },
+  {
+    id: 'team-coordinator',
+    avatar: 'lucide:Compass',
+    presetAgentType: 'wcore',
+    category: 'general',
+    resourceDir: 'src/process/resources/assistant/team-coordinator',
+    ruleFiles: {
+      'en-US': 'team-coordinator.md',
+    },
+    defaultEnabledSkills: ['team-coordinator'],
+    nameI18n: {
+      'en-US': 'Planner',
+      'es-ES': 'Planeador',
+    },
+    descriptionI18n: {
+      'en-US':
+        'Decomposes complex requests into subtasks, maps dependencies, and sets acceptance criteria for specialist agents.',
+      'es-ES':
+        'Desglosa solicitudes complejas en subtareas, mapea dependencias y establece criterios de entrega para los especialistas.',
+    },
+  },
+  {
     id: 'concierge',
     avatar: 'lucide:Sparkles',
     // Runs on the native Wayland Core engine so self-knowledge works without an

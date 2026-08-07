@@ -115,7 +115,24 @@ const TeamLauncherPage: React.FC = () => {
   // Hydrate initial state from URL params + bundle.
   const initialState = useMemo<LauncherState>(() => {
     if (isBuildMyOwn) {
-      return { name: '', leader: null, teammates: [], goalText: '' };
+      const leaderCandidates = ['builtin-leader', 'leader', 'builtin-secretaria', 'secretaria'];
+      const leaderSpec = leaderCandidates.map((c) => specialistsById.get(c)).find(Boolean) ?? specialists[0];
+      const leaderId = leaderSpec?.id ?? (specialists[0]?.id ?? 'builtin-leader');
+      const leaderBackend = recommend(leaderSpec?.presetAgentType);
+      const leaderEntry: RosterEntry = { specialistId: leaderId, backend: leaderBackend, slotName: 'Leader' };
+
+      const plannerCandidates = ['builtin-team-coordinator', 'team-coordinator', 'builtin-planning-with-files', 'planning-with-files'];
+      const plannerSpec = plannerCandidates.map((c) => specialistsById.get(c)).find(Boolean);
+      const plannerEntry: RosterEntry | null = plannerSpec
+        ? { specialistId: plannerSpec.id, backend: recommend(plannerSpec.presetAgentType), slotName: 'Planner' }
+        : null;
+
+      return {
+        name: '',
+        leader: leaderEntry,
+        teammates: plannerEntry ? [plannerEntry] : [],
+        goalText: '',
+      };
     }
     if (!launcher) {
       return { name: '', leader: null, teammates: [], goalText: '' };
@@ -556,7 +573,7 @@ const TeamLauncherPage: React.FC = () => {
             <div className={styles.goalCard} data-testid='launcher-goal-card'>
               <label className={styles.goalLabel} htmlFor='launcher-goal-input'>
                 {t('teams.launcher.goalLabel', {
-                  defaultValue: "Describe what you're doing - I'll suggest a roster",
+                  defaultValue: 'Project Description & Goal',
                 })}
               </label>
               <Input.TextArea
@@ -566,22 +583,10 @@ const TeamLauncherPage: React.FC = () => {
                 onChange={handleGoalChange}
                 placeholder={t('teams.launcher.goalPlaceholder', {
                   defaultValue:
-                    "e.g. We're launching a paid book funnel and need a small team to ship it in two weeks.",
+                    "e.g. Describe the project goal or deliverables for the team...",
                 })}
                 data-testid='launcher-goal-input'
               />
-              <div className={styles.goalActions}>
-                <Button
-                  type='outline'
-                  size='small'
-                  loading={suggesting}
-                  disabled={state.goalText.trim().length === 0 || suggesting}
-                  onClick={handleSuggest}
-                  data-testid='launcher-suggest-btn'
-                >
-                  {t('teams.launcher.suggestCta', { defaultValue: 'Suggest' })}
-                </Button>
-              </div>
             </div>
           )}
 
