@@ -101,6 +101,7 @@ export class CatalogAssembler {
     const settled = await Promise.allSettled(sources.map((source) => source.listModels()));
 
     const models: CatalogModel[] = [];
+    const seenIds = new Set<string>();
     let sourceErrors = 0;
     for (const result of settled) {
       // A rejected source contributes nothing - degrade per-source, never
@@ -111,6 +112,8 @@ export class CatalogAssembler {
         continue;
       }
       for (const raw of result.value) {
+        if (!raw.id || seenIds.has(raw.id)) continue;
+        seenIds.add(raw.id);
         models.push(this.toCatalogModel(raw, registry));
       }
     }

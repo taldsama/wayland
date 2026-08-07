@@ -206,6 +206,14 @@ export const PROVIDER_META: Record<NativeProviderId, ProviderMeta> = {
     darkText: false,
     group: 'open',
   },
+  omniroute: {
+    id: 'omniroute',
+    displayName: 'OmniRoute',
+    mono: 'OR',
+    bg: '#0f83ff',
+    darkText: false,
+    group: 'open',
+  },
 };
 
 /** Look up provider metadata, falling back to a generic tile for unknown ids. */

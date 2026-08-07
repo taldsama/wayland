@@ -20,6 +20,9 @@ import { agentRegistry } from '@process/agent/AgentRegistry';
 import { ASSISTANT_PRESETS } from '@/common/config/presets/assistantPresets';
 import { resolveLocaleKey } from '@/common/utils';
 import { handleListModels } from '../modelListHandler.ts';
+import { compileTeamModelPolicy, getTeamAvailableModelsFromCompiled } from '@/common/utils/teamModelUtils';
+import { getMergedModelProviders } from '@process/bridge/modelBridge';
+import { hasGeminiOauthCreds } from '../../googleAuthCheck';
 import { notifyMcpReady } from '../../mcpReadiness.ts';
 import { writeTcpMessage, createTcpMessageReader, resolveMcpScriptDir } from '../tcpHelpers.ts';
 import { assertCapGranted } from '../../sandbox/capabilityCheck.ts';
@@ -471,18 +474,42 @@ export class TeamMcpServer {
       }
     }
 
-    if (model && agentType) {
-      const cachedModels = await ProcessConfig.get('acp.cachedModels');
-      const available = cachedModels?.[agentType]?.availableModels;
-      if (available && available.length > 0 && !available.some((m: { id: string }) => m.id === model)) {
+if (model && agentType) {
+  const [cachedModels, policy, providers, isGoogleAuth] = await Promise.all([
+    ProcessConfig.get('acp.cachedModels'),
+    ProcessConfig.get('teams.modelPolicy'),
+    getMergedModelProviders(),
+    hasGeminiOauthCreds(),
+  ]);
+  const compiled = compileTeamModelPolicy(policy, cachedModels, providers);
+  const allowed = getTeamAvailableModelsFromCompiled(agentType, compiled, cachedModels, providers, isGoogleAuth);
+  const cliProfile = compiled.cliProfiles[agentType];
+  const ownsModels = cliProfile?.modelControl === 'own';
+  if (policy) {
+    if (ownsModels) {
+      // modelControl:own — the CLI manages its own model list (Hermes profiles,
+      // kiro). The pool is informational; never block, just warn.
+      if (allowed.length > 0 && !allowed.some((m) => m.id === model)) {
         console.warn(
-          `[TeamMcpServer] handleSpawnAgent: model "${model}" not in available models for backend "${agentType}". ` +
-            `Backend will use default model as fallback.`
+          `[TeamMcpServer] handleSpawnAgent: model "${model}" not in the pool catalog for "${agentType}" (modelControl:own, informational only). The backend may use its own default model.`
         );
       }
+    } else if (!allowed.some((m) => m.id === model)) {
+      // Strict mode: "imposed" (and default) CLIs only accept registered models.
+      throw new Error(
+        `Model "${model}" is not registered for agent type "${agentType}" in teams.modelPolicy. ` +
+          `Registered models for this agent type: ${allowed.map((m) => m.id).join(', ') || '(none)'}. ` +
+          `Update teams.modelPolicy.catalog or a pool in Settings/config to allow it.`
+      );
     }
+  } else if (allowed.length > 0 && !allowed.some((m) => m.id === model)) {
+    console.warn(
+      `[TeamMcpServer] handleSpawnAgent: model "${model}" not in available models for backend "${agentType}". Backend will use default model fallback.`
+    );
+  }
+}
 
-    if (!spawnAgent) {
+      if (!spawnAgent) {
       throw new Error('Agent spawning is not available for this team.');
     }
 

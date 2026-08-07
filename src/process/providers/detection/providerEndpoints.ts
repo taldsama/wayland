@@ -46,4 +46,5 @@ export const PROVIDER_ENDPOINTS: Partial<Record<ProviderId, string>> = {
   // (Local) is intentionally omitted: its endpoint is derived from the user's
   // configured base URL so custom ports/hosts still work.
   'ollama-cloud': 'https://ollama.com/v1/models',
+  omniroute: 'http://localhost:20128/v1/models',
 };

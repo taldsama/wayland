@@ -56,9 +56,9 @@ describe('handleListModels', () => {
 
   it('returns models for a specific agent_type', async () => {
     const result = await handleListModels({ agent_type: 'claude' });
-    expect(result).toContain('## Models for claude');
-    expect(result).toContain('- claude-sonnet-4-20250514');
-    expect(result).toContain('- claude-opus-4-20250514');
+    expect(result).toContain('### claude (`claude`)');
+    expect(result).toContain('claude-sonnet-4-20250514');
+    expect(result).toContain('claude-opus-4-20250514');
   });
 
   it('returns "no models" for an unknown agent_type', async () => {

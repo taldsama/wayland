@@ -175,6 +175,12 @@ export interface IConfigStorageRefer {
   'acp.cachedConfigOptions'?: Record<string, import('@/common/types/acpTypes').AcpSessionConfigOption[]>;
   // Cached modes per ACP backend for Guid page / AgentModeSelector
   'acp.cachedModes'?: Record<string, import('@/common/types/acpTypes').AcpSessionModes>;
+  /**
+   * Team model policy: explicit allowlist (modelId -> tier) + tier defaults per
+   * provider platform. Drives what `team_list_models` returns and what
+   * `team_spawn_agent` accepts, so leaders never propose unregistered models.
+   */
+  'teams.modelPolicy'?: import('@/common/types/teamModelPolicy').TeamModelPolicy;
   'model.config': IProvider[];
   'mcp.config': IMcpServer[];
   'mcp.agentInstallStatus': Record<string, string[]>;

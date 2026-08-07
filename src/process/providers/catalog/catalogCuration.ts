@@ -61,6 +61,7 @@ const NATIVE_ID_MAP: Record<NativeProviderId, true> = {
   'flux-router': true,
   'openai-compatible': true,
   'ollama-local': true,
+  omniroute: true,
 };
 
 /**

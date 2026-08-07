@@ -39,7 +39,8 @@ export type NativeProviderId =
   | 'azure'
   | 'flux-router'
   | 'openai-compatible'
-  | 'ollama-local';
+  | 'ollama-local'
+  | 'omniroute';
 
 /**
  * A provider identifier. Either a {@link NativeProviderId} (ships with native

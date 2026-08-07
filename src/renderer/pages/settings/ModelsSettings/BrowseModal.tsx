@@ -172,7 +172,7 @@ const BrowseModal: React.FC<Props> = ({ visible, onClose, initialProvider, conne
       setView({ kind: 'cloud', provider: provider.id });
     } else {
       setKeyValue('');
-      setBaseUrlValue('');
+      setBaseUrlValue(provider.id === 'omniroute' ? 'http://localhost:20128/v1' : '');
       setErrorKey(null);
       setView({ kind: 'key', provider });
     }
@@ -231,7 +231,14 @@ const BrowseModal: React.FC<Props> = ({ visible, onClose, initialProvider, conne
     // non-empty value is submitted as `creds.baseUrl`; an empty value falls
     // back to the canonical default at chat-start time (no harm in sending
     // `''` either, but omitting keeps the wire shape tidy).
-    const baseUrl = view.provider.id === 'openai-compatible' ? baseUrlValue.trim() : '';
+    const isCustomBaseProvider = view.provider.id === 'openai-compatible' || view.provider.id === 'omniroute';
+    const baseUrl = isCustomBaseProvider
+      ? baseUrlValue.trim() || (view.provider.id === 'omniroute' ? 'http://localhost:20128/v1' : '')
+      : '';
+    if (isCustomBaseProvider && !baseUrl) {
+      setErrorKey('baseUrlRequired');
+      return;
+    }
     setConnecting(true);
     setErrorKey(null);
     try {
@@ -567,7 +574,7 @@ const BrowseModal: React.FC<Props> = ({ visible, onClose, initialProvider, conne
               endpoint (the backend already routes `creds.baseUrl` through to
               both refresh + chat-start). Empty value falls back to the
               provider's canonical default. */}
-          {view.provider.id === 'openai-compatible' && (
+          {(view.provider.id === 'openai-compatible' || view.provider.id === 'omniroute') && (
             <>
               <div className={styles.keyLabel} style={{ marginTop: 12 }}>
                 {t('settings.modelsPage.browse.baseUrlLabel')}

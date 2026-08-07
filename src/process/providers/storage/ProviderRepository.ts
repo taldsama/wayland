@@ -208,13 +208,16 @@ export class ProviderRepository {
   /** Replace a provider's persisted catalog with `models` (full overwrite). */
   replaceRegistryCatalog(providerId: ProviderId, models: CatalogModel[]): void {
     const now = Date.now();
+    const seenIds = new Set<string>();
     const tx = this.db.transaction(() => {
       this.db.prepare(`DELETE FROM model_registry_catalog WHERE provider_id = ?`).run(providerId);
       const stmt = this.db.prepare(
-        `INSERT INTO model_registry_catalog (provider_id, model_id, model_json, updated_at)
+        `INSERT OR REPLACE INTO model_registry_catalog (provider_id, model_id, model_json, updated_at)
          VALUES (?, ?, ?, ?)`
       );
       for (const model of models) {
+        if (!model.id || seenIds.has(model.id)) continue;
+        seenIds.add(model.id);
         stmt.run(providerId, model.id, JSON.stringify(model), now);
       }
     });

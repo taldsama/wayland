@@ -1438,6 +1438,10 @@ export class TeamSessionService {
       // Default to the leader's agent type instead of hardcoding 'claude'
       const leadAgent = team.agents.find((a) => a.role === 'leader');
       const resolvedType = agentType || leadAgent?.agentType || 'claude';
+    // Hermes-native rule: hermes-* agents ALWAYS use the model in their own
+    // config.yaml. The leader only INVOKES them; it never overrides the model.
+    // The model param passed by the leader is dropped for hermes-* backends.
+    const modelOverride = resolvedType.startsWith('hermes') ? undefined : model;
       const newAgent = await this.addAgent(teamId, {
         conversationId: '',
         role: 'teammate',
@@ -1445,7 +1449,7 @@ export class TeamSessionService {
         agentName,
         status: 'pending',
         conversationType: this.resolveConversationType(resolvedType) as 'acp',
-        model,
+        model: modelOverride,
         customAgentId,
       });
       // Inject team MCP stdio config into the new agent's conversation (with agent identity)

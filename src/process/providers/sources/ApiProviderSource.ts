@@ -115,7 +115,16 @@ export class ApiProviderSource implements CatalogSource {
         );
       }
       cursor = parsed.nextCursor;
-      if (!cursor) return models;
+      if (!cursor) {
+        // Filter OmniRoute models strictly to clean user-created combo aliases and whitelist entries
+        if (this.providerId === 'omniroute' || (this.customBaseUrl && this.customBaseUrl.includes(':20128'))) {
+          const WHITELIST = new Set(['int-free', 'gemini-free', 'var-free', 'commandcode-plan', 'Inteligente', 'gemini-combo', 'command-coder', 'kimi-k3-free']);
+          return models.filter(
+            (m) => WHITELIST.has(m.id) || (!m.id.includes('/') && !m.id.startsWith('test'))
+          );
+        }
+        return models;
+      }
     }
 
     // The loop exited via the MAX_PAGES cap while a cursor was still pending -

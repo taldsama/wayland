@@ -466,6 +466,7 @@ export function createModelRegistryHandlers(deps: ModelRegistryDeps): ModelRegis
             ? (stored.creds.baseUrl as string)
             : undefined;
         sources = [deps.makeApiSource(providerId, creds.key, customBaseUrl)];
+    console.error('[BCAT] customBaseUrl=' + JSON.stringify(customBaseUrl));
         usedLiveApiSource = true;
       } else {
         sources = [];
@@ -493,7 +494,8 @@ export function createModelRegistryHandlers(deps: ModelRegistryDeps): ModelRegis
       const finalModels = providerId === FLUX_PROVIDER_ID ? injectFluxVirtualModels(models) : models;
       repo.replaceRegistryCatalog(providerId, finalModels);
       return { ok: true, models: finalModels.length, sourceErrors };
-    } catch {
+    } catch (err) {
+      console.error('[BCAT] catalog-build error=' + (err instanceof Error ? err.message + ' || ' + err.stack : String(err)));
       return { ok: false, models: 0, sourceErrors: 0 };
     }
   }

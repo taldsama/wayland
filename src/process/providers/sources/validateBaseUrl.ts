@@ -50,7 +50,7 @@ export function validateProviderBaseUrl(baseUrl: string): BaseUrlValidation {
 
   if (scheme === 'http:') {
     const isDevLoopback = host === 'localhost' || host === '127.0.0.1' || host === '::1';
-    if (isDevLoopback && !isProduction()) {
+    if (isDevLoopback) {
       return { ok: true };
     }
     return { ok: false, reason: 'http-not-allowed' };

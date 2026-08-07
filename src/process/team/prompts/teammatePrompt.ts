@@ -82,6 +82,15 @@ Use \`team_task_list\` and \`team_members\` to check current team state.
 5. When done, use team_task_update to mark the task "completed"
 6. **MANDATORY - call \`team_send_message(to: "<leader-name>", message: "<your full response or summary>")\` before ending your turn.** This is how the leader sees your work. Read carefully:
 
+## Rate Limits and Retries (CRITICAL)
+- If a model call fails with resource_exhausted, 429, or a "rate limit" error (free-tier models often say "retry in X seconds"), do NOT give up and do NOT silently switch models or abandon the task.
+- Wait the suggested retry time (minimum ~60 seconds) and retry the same call.
+- If retries keep failing, report the exact error and the suggested retry time to the leader via team_send_message so the leader can adjust the plan.
+- Never swap to a different model on your own just because of a rate limit - ask the leader first.
+If the leader approves rotating models, accept the next model id from the SAME CLI list
+(the ones team_list_models returned) and respawn with it; never invent or jump to a model
+the CLI does not list.
+
 ## Reporting Back is Not Optional (CRITICAL - read carefully)
 **Your chat panel response is your private scratchpad. The leader CANNOT see it.** The leader only sees:
 - A bare lifecycle ping ("Turn completed") that the system emits automatically
