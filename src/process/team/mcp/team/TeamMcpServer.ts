@@ -20,7 +20,11 @@ import { agentRegistry } from '@process/agent/AgentRegistry';
 import { ASSISTANT_PRESETS } from '@/common/config/presets/assistantPresets';
 import { resolveLocaleKey } from '@/common/utils';
 import { handleListModels } from '../modelListHandler.ts';
-import { compileTeamModelPolicy, getTeamAvailableModelsFromCompiled } from '@/common/utils/teamModelUtils';
+import {
+  compileTeamModelPolicy,
+  getTeamAvailableModelsFromCompiled,
+  isHermesProfileBackend,
+} from '@/common/utils/teamModelUtils';
 import { getMergedModelProviders } from '@process/bridge/modelBridge';
 import { hasGeminiOauthCreds } from '../../googleAuthCheck';
 import { notifyMcpReady } from '../../mcpReadiness.ts';
@@ -484,14 +488,14 @@ if (model && agentType) {
   const compiled = compileTeamModelPolicy(policy, cachedModels, providers);
   const allowed = getTeamAvailableModelsFromCompiled(agentType, compiled, cachedModels, providers, isGoogleAuth);
   const cliProfile = compiled.cliProfiles[agentType];
-  const ownsModels = cliProfile?.modelControl === 'own';
+  const isHermes = isHermesProfileBackend(agentType, compiled);
   if (policy) {
-    if (ownsModels) {
-      // modelControl:own — the CLI manages its own model list (Hermes profiles,
-      // kiro). The pool is informational; never block, just warn.
+    if (ownsModels || isHermes) {
+      // Hermes profiles and own-model CLIs manage their internal models.
+      // Never block, just warn.
       if (allowed.length > 0 && !allowed.some((m) => m.id === model)) {
         console.warn(
-          `[TeamMcpServer] handleSpawnAgent: model "${model}" not in the pool catalog for "${agentType}" (modelControl:own, informational only). The backend may use its own default model.`
+          `[TeamMcpServer] handleSpawnAgent: model "${model}" supplied for "${agentType}" (Hermes profile / own models). The backend will use its internal model configuration.`
         );
       }
     } else if (!allowed.some((m) => m.id === model)) {

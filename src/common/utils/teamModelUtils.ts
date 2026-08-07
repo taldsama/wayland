@@ -213,6 +213,11 @@ function curatedModelsForBackend(backend: string, compiled: CompiledTeamPolicy):
   return out;
 }
 
+export function isHermesProfileBackend(backend: string, compiled?: CompiledTeamPolicy): boolean {
+  if (backend.startsWith('hermes') || backend.includes('hermes')) return true;
+  return false;
+}
+
 /**
  * Get the available models for an agent backend in a team context, given an
  * already-compiled policy (compile once per request via compileTeamModelPolicy).
@@ -231,6 +236,11 @@ export function getTeamAvailableModelsFromCompiled(
   providers: IProvider[] | null | undefined,
   isGoogleAuth?: boolean,
 ): TeamAvailableModel[] {
+  // Hermes profiles manage their internal model/soul: suppress universal cached models dump
+  if (isHermesProfileBackend(backend, compiled)) {
+    return [];
+  }
+
   if (compiled.enabled) {
     return curatedModelsForBackend(backend, compiled);
   }

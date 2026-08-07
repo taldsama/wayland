@@ -124,29 +124,20 @@ Use \`team_members\` and \`team_task_list\` to check current team state.
 
 ## Model Selection Guidelines
 - Before spawning teammates, use \`team_list_models\` to check available models for that agent type
-- You MUST use the exact model ID strings returned by team_list_models - never shorten or invent model names
-- Only propose models that team_list_models returned. Models not listed are NOT registered for that agent type and will be rejected at spawn time.
-- Align model choices with the user's chosen consumption mode: if they picked free, prefer [tier:free] models; if token, prefer [tier:token]; paygo only if they accepted the cost warning.
-- For complex reasoning tasks: prefer the strongest model available for that backend
-- For routine tasks: prefer faster/cheaper models from the list
-- If team_list_models returns empty for a backend, omit the model parameter to use its default
-- Pass the model parameter to team_spawn_agent when a specific model is recommended
-
+- For Hermes profiles (tagged \`[Hermes profile — manages internal model & soul]\`): omit the \`model\` parameter or pass \`""\` when calling \`team_spawn_agent\`. Hermes manages its internal model and soul configuration independently.
+- For external CLIs (like \`kiro\`): select strictly from the CLI's listed native models (e.g. \`kiro:auto\`, \`kiro:claude-sonnet-4.5\`).
+- For API backends (\`wcore\`, \`openai\`, \`omniroute\`): select strictly from the models listed in \`team_list_models\`. You MUST use the exact model ID strings returned - never shorten or invent model names.
+- Align model choices with the user's chosen consumption mode: if they picked free, prefer [tier:free] models; if token, prefer [tier:token]; paygo ONLY if they explicitly accepted the cost warning in chat.
+- For complex reasoning tasks: prefer the strongest model available for that backend.
+- For routine tasks: prefer faster/cheaper models from the list.
 
 ## CLI Profiles & Consumption Reminders
 - team_list_models section headers may include profile tags:
-  - [own models — informational]: the CLI manages its OWN model list (e.g. Hermes profiles, kiro).
-    Do NOT fight it — propose only its listed models or omit the model parameter (default).
-    Wayland cannot impose a model there; never claim otherwise.
-  - [imposed model control]: Wayland picks the model and spawn validation is STRICT.
-  - ⚠ off (no active plan): the CLI is pre-configured but NOT recommended; avoid proposing it
-    unless the user insists.
-- If a free-tier teammate hits resource_exhausted/429 repeatedly (2+ times in a row) and that
-  CLI has a token plan, mention it ONCE, briefly, max 1 per session: activating the CLI's token
-  plan would end the rate-limit fight. Do not nag or repeat.
-- Combo rotation: when a CLI/pool lists several models, retry the failing one once after ~60s;
-  if it still fails, advance to the NEXT model in that same list (respawn with it) instead of
-  abandoning the task. Only rotate within the models the CLI actually lists.
+  - \`[Hermes profile — manages internal model & soul]\`: Hermes manages its internal model; omit \`model\` on \`team_spawn_agent\`.
+  - \`[own models — informational]\`: the CLI manages its OWN model list (e.g. kiro). Propose only its listed models or omit model parameter.
+  - \`[imposed model control]\`: Wayland picks the model and spawn validation is STRICT.
+  - ⚠ off (no active plan): the CLI is pre-configured but NOT recommended; avoid proposing it unless the user insists.
+- If a free-tier teammate hits resource_exhausted/429 repeatedly (2+ times in a row), wait ~60s and retry with exponential backoff without abandoning the task. Mention token plan activation ONCE if available.
 
 
 ## Pay-Go Model Activation (avoid accidental charges)

@@ -10,7 +10,11 @@
  */
 
 import { isTeamCapableBackend } from '@/common/types/teamTypes';
-import { compileTeamModelPolicy, getTeamAvailableModelsFromCompiled } from '@/common/utils/teamModelUtils';
+import {
+  compileTeamModelPolicy,
+  getTeamAvailableModelsFromCompiled,
+  isHermesProfileBackend,
+} from '@/common/utils/teamModelUtils';
 import type { CliProfile } from '@/common/types/teamModelPolicy';
 import { ProcessConfig } from '@process/utils/initStorage';
 import { getMergedModelProviders } from '@process/bridge/modelBridge';
@@ -63,6 +67,11 @@ export async function handleListModels(args: Record<string, unknown>): Promise<s
   const warningsBlock = warnLines.length > 0 ? `\n## Pool warnings (cross-validation)\n${warnLines.join('\n')}\n` : '';
 
   if (agentType) {
+    if (isHermesProfileBackend(agentType, compiled)) {
+      const header = formatCliHeader(agentType, agentType, compiled.cliProfiles[agentType]);
+      return `${header}\n\n[Hermes profile — manages internal model & soul; omit model parameter when calling team_spawn_agent]${warningsBlock}`;
+    }
+
     const models = getTeamAvailableModelsFromCompiled(agentType, compiled, cachedModels, providers, isGoogleAuth);
     const profile = compiled.cliProfiles[agentType];
     const header = formatCliHeader(agentType, agentType, profile);
@@ -86,8 +95,12 @@ export async function handleListModels(args: Record<string, unknown>): Promise<s
   }
 
   const sections = detectedAgents.map((a) => {
-    const models = getTeamAvailableModelsFromCompiled(a.backend, compiled, cachedModels, providers, isGoogleAuth);
     const profile = compiled.cliProfiles[a.backend];
+    if (isHermesProfileBackend(a.backend, compiled)) {
+      return `${formatCliHeader(a.name, a.backend, profile)}\n[Hermes profile — manages internal model & soul; omit model parameter when calling team_spawn_agent]`;
+    }
+
+    const models = getTeamAvailableModelsFromCompiled(a.backend, compiled, cachedModels, providers, isGoogleAuth);
     const modelLines =
       models.length > 0
         ? models.map((m) => formatModelLine(m.id, m.tier)).join('\n')
